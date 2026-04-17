@@ -27,8 +27,18 @@ func main() {
 		Config: cfg,
 		Log:    telemetry.NewLogger(cfg.Logging, cfg.Env),
 	}
-	if err := cli.Serve(context.Background(), g); err != nil {
+	opts := cli.ServeOptions{
+		HyperliquidNetwork: defaultStr(os.Getenv("PERMAFROST_HYPERLIQUID_NETWORK"), "testnet"),
+	}
+	if err := cli.Serve(context.Background(), g, opts); err != nil {
 		fmt.Fprintln(os.Stderr, "serve:", err)
 		os.Exit(1)
 	}
+}
+
+func defaultStr(v, fallback string) string {
+	if v == "" {
+		return fallback
+	}
+	return v
 }

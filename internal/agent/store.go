@@ -10,6 +10,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
+
+	"github.com/teslashibe/permafrost/internal/types"
 )
 
 // Store wraps DB access for agent lifecycle and the decision/order/swap
@@ -245,6 +247,103 @@ ON CONFLICT (provider, time, model) DO NOTHING;`
 		return fmt.Errorf("agent: persist inference call: %w", err)
 	}
 	return nil
+}
+
+// ─── strategy_positions persistence ─────────────────────────────────────────
+
+// UpsertOpenBasis records or refreshes an OPEN basis position. Returns an
+// error if a different open position already exists for this underlying
+// (the unique partial index enforces at-most-one-open-per-underlying).
+func (s *Store) UpsertOpenBasis(ctx context.Context, p types.BasisPosition) error {
+	legs, err := json.Marshal(p.Legs)
+	if err != nil {
+		return fmt.Errorf("agent: marshal legs: %w", err)
+	}
+	const q = `
+INSERT INTO strategy_positions
+    (id, agent_id, underlying, state, legs, opened_at, realized_funding, realized_basis_pnl, realized_fees, realized_gas)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+ON CONFLICT (id) DO UPDATE
+SET state              = EXCLUDED.state,
+    legs               = EXCLUDED.legs,
+    realized_funding   = EXCLUDED.realized_funding,
+    realized_basis_pnl = EXCLUDED.realized_basis_pnl,
+    realized_fees      = EXCLUDED.realized_fees,
+    realized_gas       = EXCLUDED.realized_gas,
+    updated_at         = now();
+`
+	state := string(p.State)
+	if state == "" {
+		state = string(types.BasisStateOpen)
+	}
+	openedAt := p.OpenedAt
+	if openedAt.IsZero() {
+		openedAt = time.Now().UTC()
+	}
+	if _, err := s.pool.Exec(ctx, q,
+		p.ID, p.AgentID, p.Underlying, state, legs, openedAt,
+		p.RealizedFunding, p.RealizedBasisPnL, p.RealizedFees, p.RealizedGas,
+	); err != nil {
+		return fmt.Errorf("agent: upsert basis: %w", err)
+	}
+	return nil
+}
+
+// CloseBasis marks the OPEN basis for (agentID, underlying) as 'closed'
+// and stamps closed_at. Returns ErrNoOpenBasis if no matching row exists.
+func (s *Store) CloseBasis(ctx context.Context, agentID, underlying string) error {
+	res, err := s.pool.Exec(ctx, `
+UPDATE strategy_positions
+SET state = 'closed', closed_at = now(), updated_at = now()
+WHERE agent_id = $1 AND underlying = $2 AND state IN ('open', 'opening', 'closing')`,
+		agentID, underlying)
+	if err != nil {
+		return fmt.Errorf("agent: close basis: %w", err)
+	}
+	if res.RowsAffected() == 0 {
+		return ErrNoOpenBasis
+	}
+	return nil
+}
+
+// ErrNoOpenBasis is returned by CloseBasis when no open row exists for the
+// supplied agent + underlying. Callers may treat this as a no-op.
+var ErrNoOpenBasis = errors.New("agent: no open basis to close")
+
+// LoadOpenBasis returns all currently-open BasisPositions for the agent.
+// Used by the runtime to hydrate its in-memory view on startup.
+func (s *Store) LoadOpenBasis(ctx context.Context, agentID string) ([]types.BasisPosition, error) {
+	rows, err := s.pool.Query(ctx, `
+SELECT id, agent_id, underlying, state, legs, opened_at, closed_at,
+       realized_funding, realized_basis_pnl, realized_fees, realized_gas
+FROM strategy_positions
+WHERE agent_id = $1 AND state IN ('open', 'opening', 'closing')
+ORDER BY opened_at`, agentID)
+	if err != nil {
+		return nil, fmt.Errorf("agent: load open basis: %w", err)
+	}
+	defer rows.Close()
+	out := make([]types.BasisPosition, 0)
+	for rows.Next() {
+		var (
+			p        types.BasisPosition
+			legsJSON []byte
+			closedAt *time.Time
+		)
+		if err := rows.Scan(
+			&p.ID, &p.AgentID, &p.Underlying, (*string)(&p.State), &legsJSON,
+			&p.OpenedAt, &closedAt,
+			&p.RealizedFunding, &p.RealizedBasisPnL, &p.RealizedFees, &p.RealizedGas,
+		); err != nil {
+			return nil, err
+		}
+		if len(legsJSON) > 0 {
+			_ = json.Unmarshal(legsJSON, &p.Legs)
+		}
+		p.ClosedAt = closedAt
+		out = append(out, p)
+	}
+	return out, rows.Err()
 }
 
 // RecentDecisions returns the most recent decisions for an agent, oldest first.

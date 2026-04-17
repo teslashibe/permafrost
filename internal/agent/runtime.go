@@ -54,16 +54,33 @@ type Runtime struct {
 }
 
 // NewRuntime constructs a Runtime.
+//
+// If Deps.Store is set, NewRuntime hydrates openBasis from any persisted
+// strategy_positions rows so an agent that's restarted picks up where it
+// left off. Hydration errors are logged but don't fail construction.
 func NewRuntime(a Agent, d Deps) *Runtime {
 	if d.Logger == nil {
 		d.Logger = slog.Default()
 	}
-	return &Runtime{
+	r := &Runtime{
 		agent:     a,
 		deps:      d,
 		now:       func() time.Time { return time.Now().UTC() },
 		openBasis: make(map[string]types.BasisPosition),
 	}
+	if d.Store != nil {
+		if existing, err := d.Store.LoadOpenBasis(context.Background(), a.ID); err != nil {
+			d.Logger.Warn("hydrate open basis failed", "agent_id", a.ID, "err", err)
+		} else {
+			for _, p := range existing {
+				r.openBasis[strings.ToUpper(p.Underlying)] = p
+			}
+			if len(existing) > 0 {
+				d.Logger.Info("hydrated open basis", "agent_id", a.ID, "count", len(existing))
+			}
+		}
+	}
+	return r
 }
 
 // SetClock overrides the runtime's clock function. For tests only.
@@ -78,6 +95,11 @@ func (r *Runtime) IsRunning() bool {
 
 // Start launches the tick loop and returns immediately. The supplied parent
 // context controls overall lifetime. Use Stop() for graceful shutdown.
+//
+// Start does NOT mutate the persisted status — that is an operator action
+// performed via the CLI / API. This keeps Stop+restart semantics clean: a
+// graceful daemon shutdown leaves status='running' so the next boot resumes
+// the agent automatically.
 func (r *Runtime) Start(parent context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -87,18 +109,14 @@ func (r *Runtime) Start(parent context.Context) error {
 	ctx, cancel := context.WithCancel(parent)
 	r.cancel = cancel
 	r.running = true
-
-	if r.deps.Store != nil {
-		_ = r.deps.Store.SetStatus(parent, r.agent.ID, StatusRunning)
-	}
-
 	go r.loop(ctx)
 	return nil
 }
 
-// Stop gracefully halts the tick loop and waits for the current tick to
-// complete (best-effort within ctx).
-func (r *Runtime) Stop(ctx context.Context, reason string) error {
+// Stop gracefully halts the tick loop. It does NOT change the persisted
+// agent status — see the Start docstring for the rationale. Operators that
+// want a permanent stop should use the CLI/API to set status='halted'.
+func (r *Runtime) Stop(_ context.Context, reason string) error {
 	r.mu.Lock()
 	if !r.running {
 		r.mu.Unlock()
@@ -107,10 +125,6 @@ func (r *Runtime) Stop(ctx context.Context, reason string) error {
 	r.running = false
 	r.cancel()
 	r.mu.Unlock()
-
-	if r.deps.Store != nil {
-		_ = r.deps.Store.SetStatus(ctx, r.agent.ID, StatusStopped)
-	}
 	r.deps.Logger.Info("agent stopped", "agent_id", r.agent.ID, "reason", reason)
 	return nil
 }
@@ -155,6 +169,17 @@ func (r *Runtime) tickOnce(ctx context.Context) (strategy.Decision, error) {
 	r.persistDecision(ctx, now, decisionID, in, dec)
 
 	r.executeSwapsThenOrders(ctx, now, decisionID, in, dec)
+
+	// One concise per-tick log so operators can see the daemon working
+	// without enabling debug. This is the only INFO line emitted per tick.
+	r.deps.Logger.Info("tick",
+		"agent_id", r.agent.ID,
+		"decision_id", decisionID,
+		"swaps", len(dec.Swaps),
+		"orders", len(dec.Orders),
+		"cancels", len(dec.Cancels),
+		"open_basis", len(in.BasisPositions),
+	)
 	return dec, nil
 }
 
@@ -236,14 +261,15 @@ func (r *Runtime) executeSwapsThenOrders(ctx context.Context, now time.Time, dec
 	for _, c := range dec.Cancels {
 		r.executeCancel(ctx, c)
 	}
-	r.reconcileOpenBasis(now, decisionID, dec)
+	r.reconcileOpenBasis(ctx, now, decisionID, dec)
 }
 
 // reconcileOpenBasis maintains the runtime's in-memory view of open basis
 // positions based on the intents this decision emitted. Pairs are matched by
-// the underlying symbol (perp.Symbol == swap.OutToken.Symbol for opens, or
-// the reduce-only perp's symbol == swap.InToken.Symbol for closes).
-func (r *Runtime) reconcileOpenBasis(now time.Time, decisionID string, dec strategy.Decision) {
+// the underlying symbol. When a Store is configured, every open is upserted
+// and every close is recorded — so a daemon restart hydrates the same
+// position set on the next NewRuntime.
+func (r *Runtime) reconcileOpenBasis(ctx context.Context, now time.Time, decisionID string, dec strategy.Decision) {
 	r.posMu.Lock()
 	defer r.posMu.Unlock()
 
@@ -254,7 +280,17 @@ func (r *Runtime) reconcileOpenBasis(now time.Time, decisionID string, dec strat
 		if !o.ReduceOnly {
 			continue
 		}
-		delete(r.openBasis, strings.ToUpper(o.Symbol))
+		key := strings.ToUpper(o.Symbol)
+		if _, ok := r.openBasis[key]; !ok {
+			continue
+		}
+		delete(r.openBasis, key)
+		if r.deps.Store != nil {
+			if err := r.deps.Store.CloseBasis(ctx, r.agent.ID, o.Symbol); err != nil && !errors.Is(err, ErrNoOpenBasis) {
+				r.deps.Logger.Warn("persist close basis failed",
+					"agent_id", r.agent.ID, "underlying", o.Symbol, "err", err)
+			}
+		}
 	}
 
 	// Opens — pair non-reduce-only sell orders with USDC→token swaps in the
@@ -277,8 +313,8 @@ func (r *Runtime) reconcileOpenBasis(now time.Time, decisionID string, dec strat
 		if _, alreadyOpen := r.openBasis[key]; alreadyOpen {
 			continue
 		}
-		r.openBasis[key] = types.BasisPosition{
-			ID:         "rt:" + decisionID + ":" + key,
+		bp := types.BasisPosition{
+			ID:         "bp:" + r.agent.ID + ":" + key + ":" + decisionID[:8],
 			AgentID:    r.agent.ID,
 			Underlying: o.Symbol,
 			State:      types.BasisStateOpen,
@@ -287,6 +323,13 @@ func (r *Runtime) reconcileOpenBasis(now time.Time, decisionID string, dec strat
 				{Kind: types.BasisLegSpot, Asset: s.OutToken, Qty: s.InAmount},
 				{Kind: types.BasisLegPerp, Symbol: o.Symbol, Qty: o.Size, AvgPrice: o.Price},
 			},
+		}
+		r.openBasis[key] = bp
+		if r.deps.Store != nil {
+			if err := r.deps.Store.UpsertOpenBasis(ctx, bp); err != nil {
+				r.deps.Logger.Warn("persist open basis failed",
+					"agent_id", r.agent.ID, "underlying", o.Symbol, "err", err)
+			}
 		}
 	}
 }
