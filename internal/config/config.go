@@ -22,10 +22,11 @@ const (
 )
 
 type Config struct {
-	Env      Env            `mapstructure:"env"`
-	Server   ServerConfig   `mapstructure:"server"`
-	Logging  LoggingConfig  `mapstructure:"logging"`
-	Database DatabaseConfig `mapstructure:"database"`
+	Env       Env             `mapstructure:"env"`
+	Server    ServerConfig    `mapstructure:"server"`
+	Logging   LoggingConfig   `mapstructure:"logging"`
+	Database  DatabaseConfig  `mapstructure:"database"`
+	Inference InferenceConfig `mapstructure:"inference"`
 }
 
 type ServerConfig struct {
@@ -42,6 +43,23 @@ type DatabaseConfig struct {
 	URL      string `mapstructure:"url"`
 	MaxConns int32  `mapstructure:"max_conns"`
 	MinConns int32  `mapstructure:"min_conns"`
+}
+
+// InferenceConfig holds the named OpenAI-compatible providers and the default
+// provider used when one is not specified.
+type InferenceConfig struct {
+	Default   string                            `mapstructure:"default"`
+	Providers map[string]InferenceProviderConfig `mapstructure:"providers"`
+}
+
+// InferenceProviderConfig is one named provider entry. APIKeyEnv is the name
+// of an environment variable holding the API key (empty for no-auth providers
+// like Ollama). RequestTimeoutSecs is optional (default 60).
+type InferenceProviderConfig struct {
+	BaseURL            string `mapstructure:"base_url"`
+	APIKeyEnv          string `mapstructure:"api_key_env"`
+	APIKey             string `mapstructure:"api_key"` // direct value (use sparingly)
+	RequestTimeoutSecs int    `mapstructure:"request_timeout_secs"`
 }
 
 // Load reads configuration from the given path (optional) and environment.
