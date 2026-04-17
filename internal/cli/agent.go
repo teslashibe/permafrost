@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -11,7 +12,14 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/teslashibe/permafrost/internal/agent"
+	"github.com/teslashibe/permafrost/internal/assets"
+	"github.com/teslashibe/permafrost/internal/exchange"
+	exchangenoop "github.com/teslashibe/permafrost/internal/exchange/noop"
+	"github.com/teslashibe/permafrost/internal/inference"
 	"github.com/teslashibe/permafrost/internal/store"
+	"github.com/teslashibe/permafrost/internal/strategy"
+	fab "github.com/teslashibe/permafrost/internal/strategy/funding_arb_basic"
+	"github.com/teslashibe/permafrost/internal/types"
 )
 
 func init() { addCommandFactory(newAgentCmd) }
@@ -28,6 +36,7 @@ func newAgentCmd() *cobra.Command {
 		newAgentDecisionsCmd(),
 		newAgentSetModeCmd(),
 		newAgentStopCmd(),
+		newAgentTickCmd(),
 	)
 	return cmd
 }
@@ -262,6 +271,142 @@ func newAgentSetModeCmd() *cobra.Command {
 		},
 	}
 }
+
+// newAgentTickCmd runs a single Decide tick for an agent and persists the
+// decision. Designed for paper-mode integration testing without waiting for
+// the background scheduler. Defaults to a no-op perp venue with synthetic
+// funding for whatever symbols the operator passes via --funding.
+func newAgentTickCmd() *cobra.Command {
+	var fundingArgs []string
+	cmd := &cobra.Command{
+		Use:   "tick <id>",
+		Short: "Run one Strategy.Decide tick (paper-mode integration test)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			st, db, err := openAgentStore(c)
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+			a, err := st.Get(c.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			if a.Mode != agent.ModePaper {
+				return fmt.Errorf("agent %q is mode=%q; tick is only safe for paper", a.ID, a.Mode)
+			}
+
+			reg, err := assets.LoadEmbedded()
+			if err != nil {
+				return err
+			}
+			strat, err := buildStrategyForAgent(a, reg)
+			if err != nil {
+				return err
+			}
+
+			perp := &tickFundingVenue{
+				Venue: exchangenoop.New(),
+				rates: parseFundingArgs(fundingArgs),
+			}
+			deps := agent.Deps{
+				Strategy: strat,
+				Perp:     perp,
+				Store:    st,
+			}
+			rt := agent.NewRuntime(a, deps)
+			dec, err := rt.TickOnce(c.Context())
+			if err != nil {
+				return err
+			}
+			fmt.Printf("decision: confidence=%.2f swaps=%d orders=%d cancels=%d\n",
+				dec.Confidence, len(dec.Swaps), len(dec.Orders), len(dec.Cancels))
+			if dec.Notes != "" {
+				fmt.Println("notes:")
+				for _, line := range strings.Split(dec.Notes, "\n") {
+					fmt.Println("  " + line)
+				}
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringSliceVar(&fundingArgs, "funding", nil,
+		"synthetic funding rates as SYMBOL=ANNUAL_PCT (e.g. WIF=80,BONK=15). Repeatable or comma-separated.")
+	return cmd
+}
+
+// buildStrategyForAgent constructs a strategy.Strategy from an Agent record.
+// Currently only funding_arb_basic is supported via this CLI helper.
+func buildStrategyForAgent(a agent.Agent, reg assets.Registry) (strategy.Strategy, error) {
+	switch a.Strategy {
+	case fab.Name:
+		return fab.New(fab.Config{
+			Universe: a.Universe,
+		}, reg, inference.Provider(nil))
+	default:
+		ctor, err := strategy.Get(a.Strategy)
+		if err != nil {
+			return nil, err
+		}
+		return ctor(a.Config)
+	}
+}
+
+// tickFundingVenue is a synthetic Venue for `agent tick`. It returns no
+// positions / balances but does emit synthetic funding rates so the
+// strategy has signal to act on.
+type tickFundingVenue struct {
+	*exchangenoop.Venue
+	rates []agentFundingArg
+}
+
+// agentFundingArg is one parsed --funding entry.
+type agentFundingArg struct {
+	Symbol     string
+	Annualised decimal.Decimal
+}
+
+func parseFundingArgs(args []string) []agentFundingArg {
+	out := make([]agentFundingArg, 0, len(args))
+	for _, a := range args {
+		parts := strings.SplitN(a, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		val, err := decimal.NewFromString(strings.TrimSpace(parts[1]))
+		if err != nil {
+			continue
+		}
+		// Convert percent → fraction (80 → 0.80).
+		ann := val.Div(decimal.NewFromInt(100))
+		out = append(out, agentFundingArg{
+			Symbol:     strings.TrimSpace(parts[0]),
+			Annualised: ann,
+		})
+	}
+	return out
+}
+
+// FundingRates implements the Venue method we override; it returns synthetic
+// per-hour rates derived from the requested annualised values.
+func (v *tickFundingVenue) FundingRates(_ context.Context, _ []string) ([]types.FundingRate, error) {
+	now := time.Now().UTC()
+	hoursPerYear := decimal.NewFromInt(24 * 365)
+	out := make([]types.FundingRate, 0, len(v.rates))
+	for _, r := range v.rates {
+		out = append(out, types.FundingRate{
+			Time:     now,
+			Venue:    "synthetic",
+			Symbol:   r.Symbol,
+			Rate:     r.Annualised.Div(hoursPerYear),
+			Interval: time.Hour,
+		})
+	}
+	return out, nil
+}
+
+// Compile-time check.
+var _ exchange.Venue = (*tickFundingVenue)(nil)
 
 func splitCSV(s string) []string {
 	if s == "" {
