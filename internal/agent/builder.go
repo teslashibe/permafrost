@@ -23,13 +23,14 @@ import (
 // supervisor inside `serve` use this so behaviour stays identical.
 //
 // Inputs:
-//   - a: the Agent record (from the DB).
+//   - a: the Agent record (from the DB). a.Network drives the HL network
+//     unless opts.HyperliquidNetwork overrides it.
 //   - reg: the asset registry (typically assets.LoadEmbedded()).
 //   - store: the agent Store (drives persistence and openBasis hydration).
 //   - keystore: optional; if set and a Hyperliquid signer is present, its
 //     address is wired into the HL Venue so per-account reads work.
 //   - log: scoped slog logger.
-//   - opts: BuildOptions (network, etc.).
+//   - opts: BuildOptions overrides (rarely needed by the daemon).
 //
 // Returns Deps with Strategy + Perp Venue + Store + Logger populated. SwapVenue
 // and Inference Provider are intentionally left nil for v1: paper-mode swaps
@@ -47,7 +48,16 @@ func BuildDeps(
 	if err != nil {
 		return Deps{}, fmt.Errorf("strategy: %w", err)
 	}
-	venue, err := BuildHyperliquidVenue(keystore, opts)
+	// Resolve network: explicit override wins, else fall back to what the
+	// agent itself records, else default to mainnet (paper-safe by design).
+	network := opts.HyperliquidNetwork
+	if network == "" {
+		network = string(a.Network.OrDefault(NetworkMainnet))
+	}
+	venue, err := BuildHyperliquidVenue(keystore, BuildOptions{
+		HyperliquidNetwork: network,
+		HyperliquidAddress: opts.HyperliquidAddress,
+	})
 	if err != nil {
 		return Deps{}, fmt.Errorf("hyperliquid venue: %w", err)
 	}
@@ -58,15 +68,21 @@ func BuildDeps(
 		Strategy: strat,
 		Perp:     venue,
 		Store:    store,
-		Logger:   log.With("agent_id", a.ID),
+		Logger:   log.With("agent_id", a.ID, "network", network, "mode", a.Mode),
 	}, nil
 }
 
-// BuildOptions captures runtime-wiring parameters that aren't stored on the
-// Agent record itself.
+// BuildOptions are caller-supplied OVERRIDES of fields the Agent already
+// carries on its DB record. An empty value means "use the agent's own
+// stored value". Both fields default to non-overriding empty strings.
+//
+// HyperliquidNetwork override is mostly useful as an emergency switch
+// ("force everything to testnet for safety") or for the foreground
+// `agent run` command's --network flag. The daemon supervisor leaves it
+// empty so each agent runs on its own configured network.
 type BuildOptions struct {
-	HyperliquidNetwork string // "mainnet" | "testnet" (default: testnet)
-	HyperliquidAddress string // optional override; else derived from keystore
+	HyperliquidNetwork string // empty → use Agent.Network
+	HyperliquidAddress string // empty → derive from keystore (or no address)
 }
 
 // BuildStrategy is the strategy-construction switch shared between the
@@ -91,6 +107,10 @@ func BuildStrategy(a Agent, reg assets.Registry) (strategy.Strategy, error) {
 // BuildHyperliquidVenue assembles a Hyperliquid Venue. Address resolution:
 // 1) opts.HyperliquidAddress if set, else 2) keystore's HL signer if any,
 // else 3) leave empty (funding-only mode).
+//
+// Network defaults to mainnet here as a low-level safety: callers (BuildDeps)
+// are expected to plumb the agent's stored network, but if invoked directly
+// without a network the safer choice is real-data paper.
 func BuildHyperliquidVenue(keystore wallet.Keystore, opts BuildOptions) (exchange.Venue, error) {
 	addr := opts.HyperliquidAddress
 	if addr == "" && keystore != nil {
@@ -100,7 +120,7 @@ func BuildHyperliquidVenue(keystore wallet.Keystore, opts BuildOptions) (exchang
 	}
 	network := opts.HyperliquidNetwork
 	if network == "" {
-		network = "testnet"
+		network = string(NetworkMainnet)
 	}
 	return hyperliquid.New(hyperliquid.Config{
 		Network: hyperliquid.Network(network),
@@ -171,6 +191,12 @@ func intFromAny(v any) (int, error) {
 
 // Loader is a small helper used by the supervisor inside `serve` to start
 // every running agent on daemon boot. It is safe to call multiple times.
+//
+// BuildOpts is an emergency-override hatch — leave it zero in normal
+// operation so each agent uses the network stored on its own record.
+// Setting BuildOpts.HyperliquidNetwork forces every supervised agent to
+// that network regardless of their stored value (useful for "panic
+// switch all agents to testnet" scenarios).
 type Loader struct {
 	Store      *Store
 	Registry   assets.Registry
