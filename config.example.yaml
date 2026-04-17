@@ -16,3 +16,21 @@ database:
   url: postgres://permafrost:permafrost@localhost:5432/permafrost?sslmode=disable
   max_conns: 16
   min_conns: 2
+
+inference:
+  # Single OpenAI-compatible client. Each entry below points at a different
+  # base_url so providers can be swapped via config. Add your own here.
+  default: openrouter
+  providers:
+    openai:
+      base_url: https://api.openai.com/v1
+      api_key_env: OPENAI_API_KEY
+    openrouter:
+      base_url: https://openrouter.ai/api/v1
+      api_key_env: OPENROUTER_API_KEY
+    groq:
+      base_url: https://api.groq.com/openai/v1
+      api_key_env: GROQ_API_KEY
+    ollama:
+      base_url: http://localhost:11434/v1
+      api_key_env: ""        # not required for local Ollama

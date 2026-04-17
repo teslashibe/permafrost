@@ -54,7 +54,20 @@ func NewRootCmd(ctx context.Context) *cobra.Command {
 		newDBCmd(),
 		newVersionCmd(),
 	)
+	for _, f := range commandFactories {
+		cmd.AddCommand(f())
+	}
 	return cmd
+}
+
+// commandFactories is a registration table populated via init() functions
+// in sibling files. This lets each milestone PR add its own CLI subcommand
+// without editing root.go (which would create constant merge conflicts).
+var commandFactories []func() *cobra.Command
+
+// addCommandFactory registers a command constructor. Call from init().
+func addCommandFactory(f func() *cobra.Command) {
+	commandFactories = append(commandFactories, f)
 }
 
 type globalsKey struct{}
