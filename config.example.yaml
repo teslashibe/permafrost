@@ -34,3 +34,7 @@ inference:
     ollama:
       base_url: http://localhost:11434/v1
       api_key_env: ""        # not required for local Ollama
+
+wallet:
+  keystore_path: ""                              # default: ~/.permafrost/keystore.json
+  passphrase_env: PERMAFROST_KEYSTORE_PASSPHRASE # env var holding the unlock passphrase

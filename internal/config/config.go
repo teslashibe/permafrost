@@ -27,6 +27,7 @@ type Config struct {
 	Logging   LoggingConfig   `mapstructure:"logging"`
 	Database  DatabaseConfig  `mapstructure:"database"`
 	Inference InferenceConfig `mapstructure:"inference"`
+	Wallet    WalletConfig    `mapstructure:"wallet"`
 }
 
 type ServerConfig struct {
@@ -62,6 +63,12 @@ type InferenceProviderConfig struct {
 	RequestTimeoutSecs int    `mapstructure:"request_timeout_secs"`
 }
 
+// WalletConfig configures the local encrypted keystore.
+type WalletConfig struct {
+	KeystorePath  string `mapstructure:"keystore_path"`   // defaults to ~/.permafrost/keystore.json
+	PassphraseEnv string `mapstructure:"passphrase_env"`  // env var holding the passphrase
+}
+
 // Load reads configuration from the given path (optional) and environment.
 // If path is empty, it looks for config.yaml in the current directory.
 func Load(path string) (*Config, error) {
@@ -74,6 +81,7 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("database.url", "postgres://permafrost:permafrost@localhost:5432/permafrost?sslmode=disable")
 	v.SetDefault("database.max_conns", int32(16))
 	v.SetDefault("database.min_conns", int32(2))
+	v.SetDefault("wallet.passphrase_env", "PERMAFROST_KEYSTORE_PASSPHRASE")
 
 	if path != "" {
 		v.SetConfigFile(path)
