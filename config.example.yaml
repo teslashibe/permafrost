@@ -1,0 +1,18 @@
+# Permafrost configuration (example).
+# Copy to config.yaml and fill in real values. Never commit config.yaml.
+
+env: dev                 # dev | prod (controls log format, defaults)
+
+server:
+  bind: 127.0.0.1:8080   # default loopback for v1 (single operator)
+  auth_token: ""         # required if bind is non-loopback; bearer token
+
+logging:
+  level: info            # debug | info | warn | error
+  format: ""             # "" = auto (text in dev, json in prod), or "text" / "json"
+
+database:
+  # postgres + timescale; matches deploy/compose/docker-compose.yml
+  url: postgres://permafrost:permafrost@localhost:5432/permafrost?sslmode=disable
+  max_conns: 16
+  min_conns: 2

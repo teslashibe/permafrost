@@ -1,0 +1,16 @@
+.git
+.github
+bin/
+dist/
+tmp/
+.idea/
+.vscode/
+.DS_Store
+*.test
+*.log
+config.yaml
+config.local.yaml
+.env
+.env.*
+!.env.example
+keystore.json
