@@ -27,7 +27,57 @@ func newAgentCmd() *cobra.Command {
 		newAgentStatusCmd(),
 		newAgentDecisionsCmd(),
 		newAgentSetModeCmd(),
+		newAgentStopCmd(),
 	)
+	return cmd
+}
+
+func newAgentStopCmd() *cobra.Command {
+	var all bool
+	cmd := &cobra.Command{
+		Use:   "stop [id]",
+		Short: "Halt an agent (or all agents). Marks status=halted.",
+		Long: `Halt an agent: marks status=halted in the database. The full kill switch
+(cancel orders + close positions) requires a running daemon with a live
+supervisor. This subcommand performs the persistent state change so a
+subsequent 'permafrost serve' will not auto-restart the agent.`,
+		Args: func(c *cobra.Command, args []string) error {
+			if all && len(args) != 0 {
+				return errors.New("either --all or an id, not both")
+			}
+			if !all && len(args) != 1 {
+				return errors.New("provide --all or an agent id")
+			}
+			return nil
+		},
+		RunE: func(c *cobra.Command, args []string) error {
+			_, db, err := openAgentStore(c)
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+			if all {
+				res, err := db.Pool.Exec(c.Context(),
+					`UPDATE agents SET status = 'halted', updated_at = now() WHERE status <> 'halted'`)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("halted %d agents\n", res.RowsAffected())
+				return nil
+			}
+			res, err := db.Pool.Exec(c.Context(),
+				`UPDATE agents SET status = 'halted', updated_at = now() WHERE id = $1`, args[0])
+			if err != nil {
+				return err
+			}
+			if res.RowsAffected() == 0 {
+				return fmt.Errorf("agent %q not found", args[0])
+			}
+			fmt.Printf("agent %s halted\n", args[0])
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&all, "all", false, "halt every agent (kill switch)")
 	return cmd
 }
 
