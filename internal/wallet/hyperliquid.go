@@ -56,6 +56,17 @@ func (s *HyperliquidSigner) PrivateKeyHex() string {
 	return "0x" + hex.EncodeToString(s.priv.Serialize())
 }
 
+// PrivateKeyBytes returns the raw 32-byte secp256k1 secret. Callers MUST
+// treat this as sensitive material — never log it, never persist it
+// outside the encrypted keystore. The byte slice is a fresh copy so the
+// caller can zeroise it.
+func (s *HyperliquidSigner) PrivateKeyBytes() []byte {
+	raw := s.priv.Serialize()
+	out := make([]byte, len(raw))
+	copy(out, raw)
+	return out
+}
+
 func (s *HyperliquidSigner) Address() string      { return s.addr }
 func (s *HyperliquidSigner) Chain() types.ChainID { return types.ChainHyperliquid }
 

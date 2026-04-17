@@ -108,24 +108,35 @@ func BuildStrategy(a Agent, reg assets.Registry) (strategy.Strategy, error) {
 // 1) opts.HyperliquidAddress if set, else 2) keystore's HL signer if any,
 // else 3) leave empty (funding-only mode).
 //
+// If the keystore yields a *wallet.HyperliquidSigner the venue is wired
+// for signed writes (Place / Cancel) too — otherwise it is read-only.
+//
 // Network defaults to mainnet here as a low-level safety: callers (BuildDeps)
 // are expected to plumb the agent's stored network, but if invoked directly
 // without a network the safer choice is real-data paper.
 func BuildHyperliquidVenue(keystore wallet.Keystore, opts BuildOptions) (exchange.Venue, error) {
 	addr := opts.HyperliquidAddress
-	if addr == "" && keystore != nil {
+	var hlSigner wallet.Signer
+	if keystore != nil {
 		if s, err := keystore.Signer(types.ChainHyperliquid); err == nil {
-			addr = s.Address()
+			hlSigner = s
+			if addr == "" {
+				addr = s.Address()
+			}
 		}
 	}
 	network := opts.HyperliquidNetwork
 	if network == "" {
 		network = string(NetworkMainnet)
 	}
+	venueOpts := []hyperliquid.Option{}
+	if hlSigner != nil {
+		venueOpts = append(venueOpts, hyperliquid.WithSigner(hlSigner))
+	}
 	return hyperliquid.New(hyperliquid.Config{
 		Network: hyperliquid.Network(network),
 		Address: addr,
-	})
+	}, venueOpts...)
 }
 
 // applyFundingArbConfig copies known keys from agents.config (jsonb) into

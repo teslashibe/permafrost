@@ -17,12 +17,21 @@ import (
 // Venue is the Hyperliquid implementation of exchange.Venue.
 //
 // Read-only methods (Subscribe, Positions, Balances, FundingRates) work
-// without a Signer. Place and Cancel require WithSigner; the EIP-712
-// action-signing flow itself lands in M4.
+// without a Signer. Place and Cancel require WithSigner — under the hood
+// they delegate to sonirico/go-hyperliquid for the EIP-712 action signing
+// (msgpack → keccak256 → EIP-712 → secp256k1). We do not roll our own.
 type Venue struct {
 	cfg    Config
 	client *Client
 	signer wallet.Signer
+	sdk    *sdkClient // lazily initialised when signer is set
+
+	// orderSymbols remembers the coin (Symbol) of orders we've placed so
+	// Cancel(id) can supply it without callers having to plumb it back.
+	// This is in-memory only; restart loses it. Callers that need
+	// restart-resilience should track (oid → coin) themselves.
+	orderSymMu sync.Mutex
+	orderSym   map[types.OrderID]string
 
 	// metaCache caches the universe ↔ index mapping; refreshed lazily.
 	metaMu       sync.Mutex
@@ -50,11 +59,15 @@ func New(cfg Config, opts ...Option) (*Venue, error) {
 		return nil, err
 	}
 	v := &Venue{
-		cfg:    cfg,
-		client: NewClient(ep),
+		cfg:      cfg,
+		client:   NewClient(ep),
+		orderSym: make(map[types.OrderID]string),
 	}
 	for _, opt := range opts {
 		opt(v)
+	}
+	if hlSigner, ok := v.signer.(*wallet.HyperliquidSigner); ok {
+		v.sdk = newSDKClient(hlSigner, cfg.Network)
 	}
 	return v, nil
 }
@@ -174,22 +187,68 @@ func (v *Venue) Subscribe(ctx context.Context, symbols []string) (<-chan types.M
 	return subscribe(ctx, ep.WS, symbols)
 }
 
-// Place is gated on Signer + signing implementation (M4).
+// Place submits an order via the EIP-712-signed action endpoint.
+//
+// Requires a *wallet.HyperliquidSigner installed via WithSigner(). If a
+// generic wallet.Signer is supplied (i.e. not a HyperliquidSigner), the
+// adapter cannot extract the secp256k1 key required for action signing
+// and ErrSignerRequired is returned.
 func (v *Venue) Place(ctx context.Context, intent types.OrderIntent) (types.OrderAck, error) {
-	if v.signer == nil {
+	if v.sdk == nil {
 		return types.OrderAck{}, ErrSignerRequired
 	}
-	_, err := signAction(ctx, v.signer, intent)
-	return types.OrderAck{}, err
+	ack, err := v.sdk.Place(ctx, intent)
+	if err == nil && ack.ID != "" {
+		v.rememberOrder(ack.ID, intent.Symbol)
+	}
+	return ack, err
 }
 
-// Cancel is gated on Signer + signing implementation (M4).
+// Cancel removes a resting order. The Hyperliquid /exchange API requires
+// both the venue oid and the coin (symbol). We remember each (oid, symbol)
+// pair we placed so callers don't have to plumb it back; if the order
+// wasn't placed by this Venue instance the caller must supply symbol via
+// CancelWithSymbol.
 func (v *Venue) Cancel(ctx context.Context, id types.OrderID) error {
-	if v.signer == nil {
+	if v.sdk == nil {
 		return ErrSignerRequired
 	}
-	_, err := signAction(ctx, v.signer, id)
-	return err
+	v.orderSymMu.Lock()
+	sym, ok := v.orderSym[id]
+	v.orderSymMu.Unlock()
+	if !ok {
+		return fmt.Errorf("hyperliquid: cancel: unknown order %q in this Venue's session — use CancelWithSymbol", id)
+	}
+	if err := v.sdk.Cancel(ctx, id, sym); err != nil {
+		return err
+	}
+	v.forgetOrder(id)
+	return nil
+}
+
+// CancelWithSymbol cancels an order placed by another process / restart
+// where this Venue doesn't know the symbol mapping.
+func (v *Venue) CancelWithSymbol(ctx context.Context, id types.OrderID, symbol string) error {
+	if v.sdk == nil {
+		return ErrSignerRequired
+	}
+	if err := v.sdk.Cancel(ctx, id, symbol); err != nil {
+		return err
+	}
+	v.forgetOrder(id)
+	return nil
+}
+
+func (v *Venue) rememberOrder(id types.OrderID, symbol string) {
+	v.orderSymMu.Lock()
+	defer v.orderSymMu.Unlock()
+	v.orderSym[id] = symbol
+}
+
+func (v *Venue) forgetOrder(id types.OrderID) {
+	v.orderSymMu.Lock()
+	defer v.orderSymMu.Unlock()
+	delete(v.orderSym, id)
 }
 
 // refreshMeta reloads metaAndAssetCtxs if the cached snapshot is older than

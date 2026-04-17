@@ -333,18 +333,18 @@ func newAgentSetModeCmd() *cobra.Command {
 }
 
 // newAgentRunCmd runs the full Runtime tick loop for ONE agent in the
-// foreground. Designed for paper-mode end-to-end testing against the real
-// Hyperliquid funding API: no signer required (Hyperliquid funding is
-// public). Stops on SIGINT/SIGTERM or after --ticks N (whichever first).
+// foreground. Paper-mode requires no signer (Hyperliquid funding is
+// public); live-mode requires a Hyperliquid signer in the keystore AND
+// the explicit --confirm-live flag (real money).
 //
-// For live mode this command will refuse to start unless a signer is
-// configured. The supervisor-driven multi-agent runner is a v1.1 concern.
+// Stops on SIGINT/SIGTERM or after --ticks N (whichever first).
 func newAgentRunCmd() *cobra.Command {
 	var (
 		networkOverride string
 		hlAddress       string
 		maxTicks        int
 		dryRun          bool
+		confirmLive     bool
 	)
 	cmd := &cobra.Command{
 		Use:   "run <id>",
@@ -373,8 +373,20 @@ Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 			if err != nil {
 				return err
 			}
-			if a.Mode != agent.ModePaper {
-				return fmt.Errorf("agent %q is mode=%q; `agent run` is paper-mode only in v1", a.ID, a.Mode)
+			// Live mode requires a Hyperliquid signer in the keystore so
+			// the runtime can sign real orders. Paper mode runs without
+			// any signer (funding-only reads).
+			if a.Mode == agent.ModeLive {
+				if !confirmLive {
+					return fmt.Errorf("agent %q is mode=live; pass --confirm-live to acknowledge real-money risk", a.ID)
+				}
+				ks, err := openKeystore(c)
+				if err != nil {
+					return fmt.Errorf("live mode requires keystore: %w", err)
+				}
+				if _, err := ks.Signer(types.ChainHyperliquid); err != nil {
+					return fmt.Errorf("live mode requires a hyperliquid signer in the keystore: %w", err)
+				}
 			}
 
 			reg, err := assets.LoadEmbedded()
@@ -449,6 +461,8 @@ Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 	cmd.Flags().StringVar(&hlAddress, "address", "", "hyperliquid address override (default: derived from keystore)")
 	cmd.Flags().IntVar(&maxTicks, "ticks", 0, "stop after N ticks (0 = run until SIGINT)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "do not persist decisions/orders/swaps")
+	cmd.Flags().BoolVar(&confirmLive, "confirm-live", false,
+		"required for mode=live: acknowledge that real funds will be at risk")
 	return cmd
 }
 
