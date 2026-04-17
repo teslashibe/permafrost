@@ -26,12 +26,23 @@ func slogMiddleware(log *slog.Logger) fiber.Handler {
 	}
 }
 
+// publicRoutes are exempt from auth even when the API is bound to a
+// non-loopback address. /v1/health is the only one for v1 — Docker /
+// load-balancer healthchecks must not require credentials.
+var publicRoutes = map[string]struct{}{
+	"/v1/health": {},
+}
+
 // authMiddleware enforces a static bearer token. Only mounted when the API
 // is bound to a non-loopback address; loopback runs are trusted in v1
-// (single-operator local-first model).
+// (single-operator local-first model). Routes in publicRoutes are always
+// allowed.
 func authMiddleware(token string) fiber.Handler {
 	expected := []byte("Bearer " + token)
 	return func(c *fiber.Ctx) error {
+		if _, ok := publicRoutes[c.Path()]; ok {
+			return c.Next()
+		}
 		if token == "" {
 			return fiber.NewError(fiber.StatusUnauthorized, "auth token not configured")
 		}
