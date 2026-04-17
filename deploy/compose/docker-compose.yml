@@ -1,0 +1,65 @@
+name: permafrost
+
+services:
+  timescale:
+    image: timescale/timescaledb:2.17.2-pg16
+    container_name: permafrost-timescale
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: permafrost
+      POSTGRES_PASSWORD: permafrost
+      POSTGRES_DB: permafrost
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U permafrost"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    image: permafrost:latest
+    container_name: permafrost-migrate
+    depends_on:
+      timescale:
+        condition: service_healthy
+    entrypoint: ["permafrost", "db", "migrate", "up"]
+    environment:
+      PERMAFROST_DATABASE__URL: postgres://permafrost:permafrost@timescale:5432/permafrost?sslmode=disable
+      PERMAFROST_LOGGING__LEVEL: info
+    restart: "no"
+
+  permafrostd:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    image: permafrost:latest
+    container_name: permafrost-daemon
+    depends_on:
+      timescale:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      PERMAFROST_ENV: dev
+      PERMAFROST_SERVER__BIND: 0.0.0.0:8080
+      PERMAFROST_DATABASE__URL: postgres://permafrost:permafrost@timescale:5432/permafrost?sslmode=disable
+      PERMAFROST_LOGGING__LEVEL: info
+      PERMAFROST_LOGGING__FORMAT: json
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/v1/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  timescale_data:
+    name: permafrost_timescale_data
