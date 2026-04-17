@@ -49,14 +49,26 @@ func newTestVenue(t *testing.T, srv *httptest.Server) *Venue {
 }
 
 func TestConfigValidation(t *testing.T) {
-	if _, err := New(Config{}); err == nil {
-		t.Error("missing address should error")
+	if _, err := New(Config{}); err != nil {
+		t.Errorf("empty Address should be allowed (funding-only mode): %v", err)
 	}
 	if _, err := New(Config{Address: "0xZZZ"}); err == nil {
 		t.Error("malformed address should error")
 	}
 	if _, err := New(Config{Address: testAddr, Network: "rinkeby"}); err == nil {
 		t.Error("unknown network should error")
+	}
+
+	// Without an address, per-account reads must fail with ErrAddressRequired.
+	v, err := New(Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.Positions(context.Background()); !errors.Is(err, ErrAddressRequired) {
+		t.Errorf("Positions: expected ErrAddressRequired, got %v", err)
+	}
+	if _, err := v.Balances(context.Background()); !errors.Is(err, ErrAddressRequired) {
+		t.Errorf("Balances: expected ErrAddressRequired, got %v", err)
 	}
 }
 

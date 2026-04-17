@@ -64,8 +64,12 @@ var _ exchange.Venue = (*Venue)(nil)
 
 func (v *Venue) Name() string { return VenueName }
 
-// Positions returns currently-open positions across all coins.
+// Positions returns currently-open positions across all coins. Requires
+// Address to be configured.
 func (v *Venue) Positions(ctx context.Context) ([]types.Position, error) {
+	if v.cfg.Address == "" {
+		return nil, ErrAddressRequired
+	}
 	var out clearinghouseStateResp
 	if err := v.client.info(ctx, infoRequest{Type: "clearinghouseState", User: v.cfg.Address}, &out); err != nil {
 		return nil, err
@@ -98,7 +102,11 @@ func (v *Venue) Positions(ctx context.Context) ([]types.Position, error) {
 
 // Balances returns the venue-side USDC balance. Hyperliquid is a USDC-margined
 // venue, so we synthesise a single Balance from the clearinghouse summary.
+// Requires Address to be configured.
 func (v *Venue) Balances(ctx context.Context) ([]types.Balance, error) {
+	if v.cfg.Address == "" {
+		return nil, ErrAddressRequired
+	}
 	var out clearinghouseStateResp
 	if err := v.client.info(ctx, infoRequest{Type: "clearinghouseState", User: v.cfg.Address}, &out); err != nil {
 		return nil, err

@@ -52,9 +52,16 @@ func EndpointsFor(n Network) (Endpoints, error) {
 	}
 }
 
-// Config configures a Hyperliquid Venue. Address is the user account address
-// (0x-prefixed hex). Network selects mainnet vs testnet. RESTOverride and
-// WSOverride allow tests and private gateways to redirect traffic.
+// Config configures a Hyperliquid Venue.
+//
+// Address is the user account address (0x-prefixed 42-char hex). It is
+// REQUIRED for any per-account read (Positions, Balances) or write
+// (Place, Cancel) operation, but is OPTIONAL for funding-only / public
+// market data — Subscribe and FundingRates work without one. This lets
+// paper-mode agents pull venue data without any keys configured.
+//
+// Network selects mainnet vs testnet. RESTOverride and WSOverride allow
+// tests and private gateways to redirect traffic.
 type Config struct {
 	Network      Network
 	Address      string
@@ -76,13 +83,18 @@ func (c Config) endpoints() (Endpoints, error) {
 	return ep, nil
 }
 
-// validate checks the config has the minimum required fields.
+// validate checks the config. Address is optional; if supplied it must be
+// well-formed.
 func (c Config) validate() error {
 	if c.Address == "" {
-		return errors.New("hyperliquid: Address is required")
+		return nil
 	}
 	if !strings.HasPrefix(c.Address, "0x") || len(c.Address) != 42 {
 		return fmt.Errorf("hyperliquid: Address %q must be 0x-prefixed 42-char hex", c.Address)
 	}
 	return nil
 }
+
+// ErrAddressRequired is returned when a per-account read/write is attempted
+// without an Address configured.
+var ErrAddressRequired = errors.New("hyperliquid: Address is required for this operation")

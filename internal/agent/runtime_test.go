@@ -103,6 +103,94 @@ func TestTickOnce_LiveMode_CallsVenues(t *testing.T) {
 	}
 }
 
+// TestTickOnce_ReconcilesOpenBasis exercises the runtime's in-memory
+// position bookkeeping: after a Decision opens a basis, the next tick's
+// DecisionInput.BasisPositions reflects it (so the strategy doesn't
+// re-emit the same open).
+func TestTickOnce_ReconcilesOpenBasis(t *testing.T) {
+	openIntent := strategy.Decision{
+		Notes: "open WIF",
+		Swaps: []types.SwapIntent{{
+			Chain:    types.ChainSolana,
+			InToken:  types.Asset{Symbol: "USDC", Chain: types.ChainSolana},
+			OutToken: types.Asset{Symbol: "WIF", Chain: types.ChainSolana, Mint: "wifmint"},
+			InAmount: decimal.NewFromInt(100),
+		}},
+		Orders: []types.OrderIntent{{
+			Venue: "hyperliquid", Symbol: "WIF", Side: types.SideSell,
+			Type: types.OrderTypeMarket, Size: decimal.NewFromInt(100),
+		}},
+	}
+
+	captured := []strategy.DecisionInput{}
+	strat := &captureStrategy{
+		decisions: []strategy.Decision{openIntent, openIntent}, // same intent twice
+		captured:  &captured,
+	}
+
+	a := Agent{ID: "a1", Strategy: "test", Mode: ModePaper}
+	r := NewRuntime(a, Deps{Strategy: strat})
+
+	if _, err := r.TickOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(r.snapshotOpenBasis()); got != 1 {
+		t.Fatalf("after first tick, expected 1 open basis, got %d", got)
+	}
+
+	if _, err := r.TickOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(captured); got != 2 {
+		t.Fatalf("strategy should have been called twice, got %d", got)
+	}
+	// Second tick must have seen the open basis.
+	if got := len(captured[1].BasisPositions); got != 1 {
+		t.Errorf("second tick BasisPositions: got %d want 1", got)
+	}
+	if captured[1].BasisPositions[0].Underlying != "WIF" {
+		t.Errorf("expected WIF, got %s", captured[1].BasisPositions[0].Underlying)
+	}
+}
+
+// captureStrategy records the DecisionInput it was called with and replays
+// scripted Decisions in order.
+type captureStrategy struct {
+	decisions []strategy.Decision
+	captured  *[]strategy.DecisionInput
+	calls     int
+}
+
+func (s *captureStrategy) Name() string                                          { return "capture" }
+func (s *captureStrategy) Warmup(_ context.Context, _ strategy.WarmupInput) error { return nil }
+func (s *captureStrategy) Decide(_ context.Context, in strategy.DecisionInput) (strategy.Decision, error) {
+	*s.captured = append(*s.captured, in)
+	d := s.decisions[s.calls%len(s.decisions)]
+	s.calls++
+	return d, nil
+}
+
+func TestReconcileOpenBasis_ClosesOnReduceOnly(t *testing.T) {
+	a := Agent{ID: "a", Strategy: "x", Mode: ModePaper}
+	r := NewRuntime(a, Deps{Strategy: nil})
+	r.openBasis["WIF"] = types.BasisPosition{
+		Underlying: "WIF",
+		State:      types.BasisStateOpen,
+		Legs: []types.BasisLeg{
+			{Kind: types.BasisLegPerp, Symbol: "WIF", Qty: decimal.NewFromInt(100)},
+		},
+	}
+	r.reconcileOpenBasis(time.Now(), "dec1", strategy.Decision{
+		Orders: []types.OrderIntent{{
+			Venue: "hyperliquid", Symbol: "WIF", Side: types.SideBuy,
+			ReduceOnly: true, Type: types.OrderTypeMarket, Size: decimal.NewFromInt(100),
+		}},
+	})
+	if len(r.snapshotOpenBasis()) != 0 {
+		t.Errorf("reduce-only buy should have closed the basis")
+	}
+}
+
 func TestRuntime_StartStop(t *testing.T) {
 	strat := &scriptedStrategy{name: "noop"}
 	a := Agent{ID: "a1", Strategy: "noop", Mode: ModePaper, TickSecs: 1}
