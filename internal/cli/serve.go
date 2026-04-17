@@ -83,11 +83,14 @@ func Serve(ctx context.Context, g *Globals, opts ServeOptions) error {
 			g.Log.Warn("supervisor: load registry failed; agents will not start", "err", err)
 		} else {
 			loader := &agent.Loader{
-				Store:      agent.NewStore(db.Pool),
-				Registry:   reg,
-				Keystore:   ks,
-				Logger:     g.Log,
-				BuildOpts:  agent.BuildOptions{HyperliquidNetwork: opts.HyperliquidNetworkOverride},
+				Store:    agent.NewStore(db.Pool),
+				Registry: reg,
+				Keystore: ks,
+				Logger:   g.Log,
+				BuildOpts: agent.BuildOptions{
+					HyperliquidNetwork: opts.HyperliquidNetworkOverride,
+					Solana:             solanaSpotFromConfig(g.Config.Solana),
+				},
 				Supervisor: sup,
 			}
 			n, err := loader.LoadAndStartRunning(ctx)

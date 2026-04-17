@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/teslashibe/permafrost/internal/assets"
@@ -139,6 +140,106 @@ func TestBuildDeps_PerAgentNetworkPlumbed(t *testing.T) {
 				t.Fatal("Perp venue should be set")
 			}
 		})
+	}
+}
+
+func TestBuildSolanaSwapVenue_RequiresConfigAndSigner(t *testing.T) {
+	// No config → error.
+	if _, err := BuildSolanaSwapVenue(SolanaSpot{}, nil); err == nil {
+		t.Fatal("expected error without config")
+	}
+	// Config but no keystore → ErrNoSolanaSigner.
+	cfg := SolanaSpot{RPCURL: "http://localhost:8899"}
+	if _, err := BuildSolanaSwapVenue(cfg, nil); !errors.Is(err, ErrNoSolanaSigner) {
+		t.Fatalf("expected ErrNoSolanaSigner, got %v", err)
+	}
+	// Config + keystore without solana key → ErrNoSolanaSigner.
+	emptyKS := walletnoop.NewKeystore() // no chains registered
+	if _, err := BuildSolanaSwapVenue(cfg, emptyKS); !errors.Is(err, ErrNoSolanaSigner) {
+		t.Fatalf("expected ErrNoSolanaSigner from empty keystore, got %v", err)
+	}
+}
+
+func TestBuildSolanaSwapVenue_BuildsWithSolanaSigner(t *testing.T) {
+	ks := walletnoop.NewKeystore("solana") // type missing — let me check
+	cfg := SolanaSpot{
+		RPCURL:        "http://localhost:8899",
+		SubmitMode:    "rpc",
+		JitoBundleURL: "",
+	}
+	v, err := BuildSolanaSwapVenue(cfg, ks)
+	if err != nil {
+		t.Fatalf("BuildSolanaSwapVenue: %v", err)
+	}
+	if v == nil {
+		t.Fatal("expected swap venue")
+	}
+	if v.Name() != "jupiter" {
+		t.Errorf("Name: %q want jupiter", v.Name())
+	}
+}
+
+func TestBuildDeps_PopulatesSwapWhenSolanaConfigured(t *testing.T) {
+	reg, err := assets.LoadEmbedded()
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := Agent{
+		ID:       "ag",
+		Strategy: "funding_arb_basic",
+		Universe: []string{"WIF"},
+	}
+	ks := walletnoop.NewKeystore("solana")
+	deps, err := BuildDeps(a, reg, nil, ks, nil, BuildOptions{
+		HyperliquidNetwork: "testnet",
+		Solana: SolanaSpot{
+			RPCURL:     "http://localhost:8899",
+			SubmitMode: "rpc",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deps.Swap == nil {
+		t.Fatal("expected Deps.Swap to be populated")
+	}
+	if deps.Perp == nil {
+		t.Fatal("expected Deps.Perp to be populated")
+	}
+}
+
+func TestBuildDeps_LeavesSwapNilWhenSolanaUnconfigured(t *testing.T) {
+	reg, _ := assets.LoadEmbedded()
+	a := Agent{ID: "ag", Strategy: "funding_arb_basic", Universe: []string{"WIF"}}
+	deps, err := BuildDeps(a, reg, nil, nil, nil, BuildOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deps.Swap != nil {
+		t.Error("Swap should be nil when Solana is unconfigured (paper-spot fallback)")
+	}
+}
+
+func TestBuildDeps_DegradesWhenSolanaConfiguredButNoSigner(t *testing.T) {
+	reg, _ := assets.LoadEmbedded()
+	a := Agent{ID: "ag", Strategy: "funding_arb_basic", Universe: []string{"WIF"}}
+	deps, err := BuildDeps(a, reg, nil, nil, nil, BuildOptions{
+		Solana: SolanaSpot{RPCURL: "http://localhost:8899"},
+	})
+	if err != nil {
+		t.Fatalf("BuildDeps should not error when degrading to paper-spot: %v", err)
+	}
+	if deps.Swap != nil {
+		t.Error("Swap should be nil when no Solana signer available")
+	}
+}
+
+func TestSolanaSpot_IsEnabled(t *testing.T) {
+	if (SolanaSpot{}).IsEnabled() {
+		t.Error("zero SolanaSpot must be disabled")
+	}
+	if !(SolanaSpot{RPCURL: "x"}).IsEnabled() {
+		t.Error("RPCURL alone must enable")
 	}
 }
 

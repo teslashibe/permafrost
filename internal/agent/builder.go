@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/shopspring/decimal"
 
@@ -14,6 +15,8 @@ import (
 	"github.com/teslashibe/permafrost/internal/inference"
 	"github.com/teslashibe/permafrost/internal/strategy"
 	fab "github.com/teslashibe/permafrost/internal/strategy/funding_arb_basic"
+	"github.com/teslashibe/permafrost/internal/swap"
+	"github.com/teslashibe/permafrost/internal/swap/jupiter"
 	"github.com/teslashibe/permafrost/internal/types"
 	"github.com/teslashibe/permafrost/internal/wallet"
 )
@@ -64,26 +67,103 @@ func BuildDeps(
 	if log == nil {
 		log = slog.Default()
 	}
+
+	// Build the spot SwapVenue if Solana config is provided. We only
+	// surface the venue when both RPC and a Solana signer are available;
+	// without a signer there's nothing to sign Jupiter swap transactions
+	// with, so leaving it nil is the only safe choice (runtime falls
+	// back to paper-spot recording).
+	var swapVenue swap.SwapVenue
+	if opts.Solana.IsEnabled() {
+		v, err := BuildSolanaSwapVenue(opts.Solana, keystore)
+		switch {
+		case err == nil:
+			swapVenue = v
+		case errors.Is(err, ErrNoSolanaSigner):
+			log.Warn("solana swap disabled: no Solana signer in keystore",
+				"agent_id", a.ID)
+		default:
+			return Deps{}, fmt.Errorf("solana swap venue: %w", err)
+		}
+	}
+
 	return Deps{
 		Strategy: strat,
 		Perp:     venue,
+		Swap:     swapVenue,
 		Store:    store,
 		Logger:   log.With("agent_id", a.ID, "network", network, "mode", a.Mode),
 	}, nil
 }
 
+// ErrNoSolanaSigner is returned by BuildSolanaSwapVenue when the
+// supplied keystore doesn't contain a Solana key. The caller decides
+// whether to degrade (paper-spot) or fail (live-mode required).
+var ErrNoSolanaSigner = errors.New("agent: no Solana signer in keystore")
+
+// BuildSolanaSwapVenue constructs a Jupiter-backed SwapVenue from
+// SolanaSpot config + a keystore that holds a Solana signer.
+func BuildSolanaSwapVenue(cfg SolanaSpot, keystore wallet.Keystore) (swap.SwapVenue, error) {
+	if !cfg.IsEnabled() {
+		return nil, errors.New("agent: SolanaSpot is not configured")
+	}
+	if keystore == nil {
+		return nil, ErrNoSolanaSigner
+	}
+	signer, err := keystore.Signer(types.ChainSolana)
+	if err != nil {
+		return nil, ErrNoSolanaSigner
+	}
+	mode := jupiter.SubmitMode(cfg.SubmitMode)
+	if mode == "" {
+		mode = jupiter.SubmitJito
+	}
+	return jupiter.New(jupiter.Config{
+		RPCURL:                   cfg.RPCURL,
+		JupiterAPIKey:            cfg.JupiterAPIKey,
+		JupiterBaseURL:           cfg.JupiterBaseURL,
+		Mode:                     mode,
+		JitoBundleURL:            cfg.JitoBundleURL,
+		PriorityFeeMicroLamports: cfg.PriorityFeeMicroLamports,
+		PollTimeout:              time.Duration(cfg.ConfirmationTimeoutSecs) * time.Second,
+	}, signer)
+}
+
 // BuildOptions are caller-supplied OVERRIDES of fields the Agent already
 // carries on its DB record. An empty value means "use the agent's own
-// stored value". Both fields default to non-overriding empty strings.
+// stored value". Both Hyperliquid fields default to non-overriding
+// empty strings.
 //
 // HyperliquidNetwork override is mostly useful as an emergency switch
 // ("force everything to testnet for safety") or for the foreground
 // `agent run` command's --network flag. The daemon supervisor leaves it
 // empty so each agent runs on its own configured network.
+//
+// Solana enables the live spot leg. When zero, the Runtime falls back
+// to paper-spot (records intent, never quotes Jupiter, never broadcasts).
+// Required for any agent that emits SwapIntents in mode=live.
 type BuildOptions struct {
 	HyperliquidNetwork string // empty → use Agent.Network
 	HyperliquidAddress string // empty → derive from keystore (or no address)
+	Solana             SolanaSpot
 }
+
+// SolanaSpot captures everything the Jupiter SwapVenue needs to settle
+// real spot legs on Solana. Mirrors config.SolanaConfig but lives in the
+// agent package so the builder doesn't import the cli/config layer.
+type SolanaSpot struct {
+	RPCURL                   string
+	JupiterBaseURL           string
+	JupiterAPIKey            string
+	SubmitMode               string // "jito" | "rpc"; "" => jito
+	JitoBundleURL            string
+	PriorityFeeMicroLamports uint64
+	ConfirmationTimeoutSecs  int
+}
+
+// IsEnabled reports whether the operator has provided enough config for
+// the SwapVenue to be constructed. RPCURL is the bare minimum.
+func (s SolanaSpot) IsEnabled() bool { return s.RPCURL != "" }
 
 // BuildStrategy is the strategy-construction switch shared between the
 // foreground CLI and the supervisor. Currently funding_arb_basic is the

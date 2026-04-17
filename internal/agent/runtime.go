@@ -247,29 +247,44 @@ func (r *Runtime) persistDecision(ctx context.Context, now time.Time, decisionID
 // executeSwapsThenOrders runs swaps first (spot leg), then orders (perp leg)
 // — this is the spot-first invariant called for in SCOPE.md §11.
 //
-// After execution, the runtime's in-memory openBasis is reconciled so the
-// next tick's DecisionInput.BasisPositions reflects what just opened/closed.
-// This stops basis strategies from re-emitting opens for symbols they
-// already opened on a previous tick within the same Run.
+// Each leg's success is tracked per-symbol so reconcileOpenBasis only
+// marks a basis "open" when BOTH legs succeeded. A failed swap or order
+// is recorded in the audit ledger (orders / swaps tables) with a failed
+// status but does not produce a basis-position row — leaving the strategy
+// free to retry on the next tick instead of believing it already has the
+// position.
 func (r *Runtime) executeSwapsThenOrders(ctx context.Context, now time.Time, decisionID string, _ strategy.DecisionInput, dec strategy.Decision) {
+	swapOK := map[string]bool{}  // keyed by uppercased OUT-token symbol
+	orderOK := map[string]bool{} // keyed by uppercased perp symbol
+
 	for i, s := range dec.Swaps {
-		r.executeSwap(ctx, now, decisionID, i, s)
+		if r.executeSwap(ctx, now, decisionID, i, s) {
+			swapOK[strings.ToUpper(s.OutToken.Symbol)] = true
+		}
 	}
 	for i, o := range dec.Orders {
-		r.executeOrder(ctx, now, decisionID, i, o)
+		if r.executeOrder(ctx, now, decisionID, i, o) {
+			orderOK[strings.ToUpper(o.Symbol)] = true
+		}
 	}
 	for _, c := range dec.Cancels {
 		r.executeCancel(ctx, c)
 	}
-	r.reconcileOpenBasis(ctx, now, decisionID, dec)
+	r.reconcileOpenBasis(ctx, now, decisionID, dec, swapOK, orderOK)
 }
 
 // reconcileOpenBasis maintains the runtime's in-memory view of open basis
-// positions based on the intents this decision emitted. Pairs are matched by
-// the underlying symbol. When a Store is configured, every open is upserted
-// and every close is recorded — so a daemon restart hydrates the same
+// positions based on the intents this decision emitted AND per-leg success
+// flags from the executor. Pairs are matched by the underlying symbol;
+// only pairs where BOTH the spot swap and the perp order succeeded are
+// marked open. When a Store is configured, every open is upserted and
+// every close is recorded — so a daemon restart hydrates the same
 // position set on the next NewRuntime.
-func (r *Runtime) reconcileOpenBasis(ctx context.Context, now time.Time, decisionID string, dec strategy.Decision) {
+//
+// swapOK / orderOK are keyed by uppercased symbol (out-token for swaps,
+// perp symbol for orders). nil maps mean "treat all as success" — used
+// by tests that don't go through the executor.
+func (r *Runtime) reconcileOpenBasis(ctx context.Context, now time.Time, decisionID string, dec strategy.Decision, swapOK, orderOK map[string]bool) {
 	r.posMu.Lock()
 	defer r.posMu.Unlock()
 
@@ -282,6 +297,14 @@ func (r *Runtime) reconcileOpenBasis(ctx context.Context, now time.Time, decisio
 		}
 		key := strings.ToUpper(o.Symbol)
 		if _, ok := r.openBasis[key]; !ok {
+			continue
+		}
+		// Only close on a successful reduce-only order; a failed close
+		// means the position is still open at the venue, so we must not
+		// drop our local view.
+		if orderOK != nil && !orderOK[key] {
+			r.deps.Logger.Warn("close intent failed; basis remains open in our view",
+				"agent_id", r.agent.ID, "underlying", o.Symbol)
 			continue
 		}
 		delete(r.openBasis, key)
@@ -313,8 +336,20 @@ func (r *Runtime) reconcileOpenBasis(ctx context.Context, now time.Time, decisio
 		if _, alreadyOpen := r.openBasis[key]; alreadyOpen {
 			continue
 		}
+		// Both legs must have succeeded. A half-open basis (e.g. spot
+		// filled but perp rejected) is dangerous to record as "open" —
+		// the strategy would think it's hedged when it isn't. Log a
+		// warning so an operator can intervene.
+		spotSucceeded := swapOK == nil || swapOK[key]
+		perpSucceeded := orderOK == nil || orderOK[key]
+		if !spotSucceeded || !perpSucceeded {
+			r.deps.Logger.Warn("partial open; skipping basis reconcile",
+				"agent_id", r.agent.ID, "underlying", o.Symbol,
+				"spot_ok", spotSucceeded, "perp_ok", perpSucceeded)
+			continue
+		}
 		bp := types.BasisPosition{
-			ID:         "bp:" + r.agent.ID + ":" + key + ":" + decisionID[:8],
+			ID:         "bp:" + r.agent.ID + ":" + key + ":" + safeShortID(decisionID),
 			AgentID:    r.agent.ID,
 			Underlying: o.Symbol,
 			State:      types.BasisStateOpen,
@@ -334,7 +369,11 @@ func (r *Runtime) reconcileOpenBasis(ctx context.Context, now time.Time, decisio
 	}
 }
 
-func (r *Runtime) executeSwap(ctx context.Context, now time.Time, decisionID string, slot int, s types.SwapIntent) {
+// executeSwap returns true iff the swap was successfully recorded (paper)
+// or confirmed on chain (live). A return of false means the basis pair
+// MUST NOT be reconciled into the open-basis set — the position would be
+// half-open at best, which is worse than retrying on the next tick.
+func (r *Runtime) executeSwap(ctx context.Context, now time.Time, decisionID string, slot int, s types.SwapIntent) bool {
 	if s.ClientID == "" {
 		s.ClientID = clientIDFromSwap(r.agent.ID, decisionID, slot, s)
 	}
@@ -342,12 +381,12 @@ func (r *Runtime) executeSwap(ctx context.Context, now time.Time, decisionID str
 		v := r.deps.Risk.PreTrade(ctx, r.agent.ID, s, types.PortfolioSnapshot{})
 		if v.IsBlock() {
 			r.deps.Logger.Warn("swap blocked by risk", "agent_id", r.agent.ID, "reason", v.Reason)
-			return
+			return false
 		}
 	}
 	if r.agent.Mode == ModePaper || r.deps.Swap == nil {
 		r.recordSwap(ctx, now, decisionID, s, "", types.SwapStatusConfirmed, true, s.InAmount, decimal.Zero)
-		return
+		return true
 	}
 
 	q, err := r.deps.Swap.Quote(ctx, types.QuoteRequest{
@@ -356,24 +395,28 @@ func (r *Runtime) executeSwap(ctx context.Context, now time.Time, decisionID str
 	if err != nil {
 		r.deps.Logger.Error("swap quote failed", "err", err)
 		r.recordSwap(ctx, now, decisionID, s, "", types.SwapStatusFailed, false, decimal.Zero, decimal.Zero)
-		return
+		return false
 	}
 	tx, err := r.deps.Swap.Swap(ctx, q, s.SlippageBps)
 	if err != nil {
 		r.deps.Logger.Error("swap submit failed", "err", err)
 		r.recordSwap(ctx, now, decisionID, s, "", types.SwapStatusFailed, false, decimal.Zero, decimal.Zero)
-		return
+		return false
 	}
 	res, err := r.deps.Swap.WaitConfirm(ctx, tx)
 	if err != nil {
 		r.deps.Logger.Error("swap confirm failed", "err", err)
 		r.recordSwap(ctx, now, decisionID, s, string(tx), types.SwapStatusFailed, false, decimal.Zero, decimal.Zero)
-		return
+		return false
 	}
 	r.recordSwap(ctx, now, decisionID, s, string(res.TxHash), res.Status, false, res.OutAmount, res.GasNative)
+	return res.Status == types.SwapStatusConfirmed
 }
 
-func (r *Runtime) executeOrder(ctx context.Context, now time.Time, decisionID string, slot int, o types.OrderIntent) {
+// executeOrder returns true iff the order was accepted (paper "open" or
+// live ack with non-rejected status). False means the basis pair must
+// not be reconciled.
+func (r *Runtime) executeOrder(ctx context.Context, now time.Time, decisionID string, slot int, o types.OrderIntent) bool {
 	if o.ClientID == "" {
 		o.ClientID = types.DeriveClientID(r.agent.ID, decisionID, slot, o.Venue, o.Symbol, o.Side, o.Size)
 	}
@@ -383,20 +426,21 @@ func (r *Runtime) executeOrder(ctx context.Context, now time.Time, decisionID st
 		v := r.deps.Risk.PreTrade(ctx, r.agent.ID, o, types.PortfolioSnapshot{})
 		if v.IsBlock() {
 			r.deps.Logger.Warn("order blocked by risk", "agent_id", r.agent.ID, "reason", v.Reason)
-			return
+			return false
 		}
 	}
 	if r.agent.Mode == ModePaper || r.deps.Perp == nil {
 		r.recordOrder(ctx, now, decisionID, o, "", string(types.OrderStatusOpen), true)
-		return
+		return true
 	}
 	ack, err := r.deps.Perp.Place(ctx, o)
 	if err != nil {
 		r.deps.Logger.Error("order place failed", "err", err)
 		r.recordOrder(ctx, now, decisionID, o, "", string(types.OrderStatusRejected), false)
-		return
+		return false
 	}
 	r.recordOrder(ctx, now, decisionID, o, string(ack.ID), string(ack.Status), false)
+	return ack.Status != types.OrderStatusRejected
 }
 
 func (r *Runtime) executeCancel(ctx context.Context, id types.OrderID) {
@@ -467,6 +511,15 @@ func decisionInputHash(in strategy.DecisionInput) string {
 	h := sha256.New()
 	fmt.Fprintf(h, "%s|%d|%d|%d|%d", in.AgentID, in.Now.UnixNano(), len(in.PerpPositions), len(in.SpotBalances), len(in.BasisPositions))
 	return hex.EncodeToString(h.Sum(nil))[:16]
+}
+
+// safeShortID returns the first 8 chars of id, or all of id if shorter.
+// Avoids panicking on short ids during tests / unusual decisionIDs.
+func safeShortID(id string) string {
+	if len(id) >= 8 {
+		return id[:8]
+	}
+	return id
 }
 
 // clientIDFromSwap creates a deterministic client_id for a SwapIntent.

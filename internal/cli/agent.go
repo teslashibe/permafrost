@@ -16,9 +16,11 @@ import (
 
 	"github.com/teslashibe/permafrost/internal/agent"
 	"github.com/teslashibe/permafrost/internal/assets"
+	"github.com/teslashibe/permafrost/internal/config"
 	"github.com/teslashibe/permafrost/internal/exchange"
 	exchangenoop "github.com/teslashibe/permafrost/internal/exchange/noop"
 	"github.com/teslashibe/permafrost/internal/store"
+	fab "github.com/teslashibe/permafrost/internal/strategy/funding_arb_basic"
 	"github.com/teslashibe/permafrost/internal/types"
 )
 
@@ -374,8 +376,10 @@ Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 				return err
 			}
 			// Live mode requires a Hyperliquid signer in the keystore so
-			// the runtime can sign real orders. Paper mode runs without
-			// any signer (funding-only reads).
+			// the runtime can sign real orders. Basis strategies (which
+			// hedge a perp short with a Solana spot long) ALSO require a
+			// Solana signer + Solana RPC so the spot leg can settle live.
+			// Paper mode runs without any signer (funding-only reads).
 			if a.Mode == agent.ModeLive {
 				if !confirmLive {
 					return fmt.Errorf("agent %q is mode=live; pass --confirm-live to acknowledge real-money risk", a.ID)
@@ -386,6 +390,16 @@ Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 				}
 				if _, err := ks.Signer(types.ChainHyperliquid); err != nil {
 					return fmt.Errorf("live mode requires a hyperliquid signer in the keystore: %w", err)
+				}
+				if isBasisStrategy(a.Strategy) {
+					if _, err := ks.Signer(types.ChainSolana); err != nil {
+						return fmt.Errorf("live mode for basis strategy %q requires a Solana signer: %w",
+							a.Strategy, err)
+					}
+					if g.Config.Solana.RPCURL == "" {
+						return fmt.Errorf("live mode for basis strategy %q requires solana.rpc_url in config",
+							a.Strategy)
+					}
 				}
 			}
 
@@ -400,6 +414,7 @@ Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 			deps, err := agent.BuildDeps(a, reg, st, ks, g.Log, agent.BuildOptions{
 				HyperliquidNetwork: networkOverride,
 				HyperliquidAddress: hlAddress,
+				Solana:             solanaSpotFromConfig(g.Config.Solana),
 			})
 			if err != nil {
 				return err
@@ -588,6 +603,33 @@ func (v *tickFundingVenue) FundingRates(_ context.Context, _ []string) ([]types.
 
 // Compile-time check.
 var _ exchange.Venue = (*tickFundingVenue)(nil)
+
+// isBasisStrategy reports whether a strategy emits SwapIntents (and
+// therefore needs a working spot leg in live mode). Right now
+// funding_arb_basic is the only one, but new basis strategies should
+// register here.
+func isBasisStrategy(name string) bool {
+	switch name {
+	case fab.Name:
+		return true
+	}
+	return false
+}
+
+// solanaSpotFromConfig translates the cli config view into the agent
+// builder's view (the agent package can't import config without an
+// import cycle).
+func solanaSpotFromConfig(cfg config.SolanaConfig) agent.SolanaSpot {
+	return agent.SolanaSpot{
+		RPCURL:                   cfg.RPCURL,
+		JupiterBaseURL:           cfg.JupiterBaseURL,
+		JupiterAPIKey:            cfg.JupiterAPIKey,
+		SubmitMode:               cfg.SubmitMode,
+		JitoBundleURL:            cfg.JitoBundleURL,
+		PriorityFeeMicroLamports: cfg.PriorityFeeMicroLamports,
+		ConfirmationTimeoutSecs:  cfg.ConfirmationTimeoutSecs,
+	}
+}
 
 func splitCSV(s string) []string {
 	if s == "" {
