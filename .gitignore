@@ -1,0 +1,51 @@
+## Binaries
+bin/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+## Test & coverage
+*.test
+*.out
+coverage.*
+profile.*
+
+## Go
+vendor/
+go.work
+go.work.sum
+
+## Editor / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+## Local config & secrets
+config.yaml
+config.local.yaml
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+keystore.json
+~/.permafrost/
+
+## Build artifacts
+tmp/
+.cache/
+
+## Docker
+.docker/
+
+## sqlc generated marker (we DO commit sqlc output by default)
+# (intentionally not ignored)
+
+## Logs
+*.log
+logs/

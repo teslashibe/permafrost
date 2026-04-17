@@ -1,0 +1,55 @@
+.PHONY: help build test lint fmt vet tidy clean up down logs migrate sqlc tools
+
+GO ?= go
+BIN_DIR := bin
+BINS := permafrost permafrostd
+LDFLAGS := -s -w
+
+help: ## Show this help
+	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+build: ## Build all binaries into ./bin
+	@mkdir -p $(BIN_DIR)
+	@for b in $(BINS); do \
+		echo "==> building $$b"; \
+		$(GO) build -ldflags="$(LDFLAGS)" -o $(BIN_DIR)/$$b ./cmd/$$b; \
+	done
+
+test: ## Run unit tests
+	$(GO) test ./... -race -count=1
+
+lint: ## Run go vet + golangci-lint (if installed)
+	$(GO) vet ./...
+	@which golangci-lint > /dev/null && golangci-lint run ./... || echo "golangci-lint not installed; skipping"
+
+fmt: ## Format code
+	$(GO) fmt ./...
+
+vet: ## Run go vet
+	$(GO) vet ./...
+
+tidy: ## Tidy go.mod
+	$(GO) mod tidy
+
+clean: ## Remove build artifacts
+	rm -rf $(BIN_DIR)
+
+up: ## Bring up local stack (Timescale + permafrostd)
+	docker compose -f deploy/compose/docker-compose.yml up -d
+
+down: ## Tear down local stack
+	docker compose -f deploy/compose/docker-compose.yml down
+
+logs: ## Tail logs for the local stack
+	docker compose -f deploy/compose/docker-compose.yml logs -f
+
+migrate: ## Apply database migrations
+	$(GO) run ./cmd/permafrost db migrate up
+
+sqlc: ## Regenerate sqlc bindings
+	@which sqlc > /dev/null || (echo "install sqlc: https://docs.sqlc.dev/en/latest/overview/install.html" && exit 1)
+	sqlc generate
+
+tools: ## Install dev tools
+	$(GO) install github.com/pressly/goose/v3/cmd/goose@latest
+	$(GO) install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
