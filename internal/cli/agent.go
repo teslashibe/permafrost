@@ -2,9 +2,12 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,6 +17,7 @@ import (
 	"github.com/teslashibe/permafrost/internal/agent"
 	"github.com/teslashibe/permafrost/internal/assets"
 	"github.com/teslashibe/permafrost/internal/exchange"
+	"github.com/teslashibe/permafrost/internal/exchange/hyperliquid"
 	exchangenoop "github.com/teslashibe/permafrost/internal/exchange/noop"
 	"github.com/teslashibe/permafrost/internal/inference"
 	"github.com/teslashibe/permafrost/internal/store"
@@ -37,6 +41,7 @@ func newAgentCmd() *cobra.Command {
 		newAgentSetModeCmd(),
 		newAgentStopCmd(),
 		newAgentTickCmd(),
+		newAgentRunCmd(),
 	)
 	return cmd
 }
@@ -108,6 +113,7 @@ func newAgentCreateCmd() *cobra.Command {
 		universeCSV                                            string
 		alloc                                                  string
 		tickSecs                                               int
+		configJSON                                             string
 	)
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -129,6 +135,12 @@ func newAgentCreateCmd() *cobra.Command {
 				}
 			}
 			universe := splitCSV(universeCSV)
+			cfgMap := map[string]any{}
+			if configJSON != "" {
+				if err := json.Unmarshal([]byte(configJSON), &cfgMap); err != nil {
+					return fmt.Errorf("--config-json: %w", err)
+				}
+			}
 			a := agent.Agent{
 				ID:             id,
 				Name:           name,
@@ -140,6 +152,7 @@ func newAgentCreateCmd() *cobra.Command {
 				Universe:       universe,
 				AllocationUSDC: amt,
 				TickSecs:       tickSecs,
+				Config:         cfgMap,
 			}
 			out, err := s.Create(c.Context(), a)
 			if err != nil {
@@ -160,6 +173,8 @@ func newAgentCreateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&universeCSV, "universe", "", "comma-separated symbols (e.g. WIF,BONK,POPCAT)")
 	cmd.Flags().StringVar(&alloc, "alloc", "", "allocation in USDC")
 	cmd.Flags().IntVar(&tickSecs, "tick-secs", 60, "tick interval seconds")
+	cmd.Flags().StringVar(&configJSON, "config-json", "",
+		`strategy-specific config as JSON (e.g. '{"entry_annualised_funding":0.05,"position_cap_usdc":100}')`)
 	return cmd
 }
 
@@ -272,6 +287,156 @@ func newAgentSetModeCmd() *cobra.Command {
 	}
 }
 
+// newAgentRunCmd runs the full Runtime tick loop for ONE agent in the
+// foreground. Designed for paper-mode end-to-end testing against the real
+// Hyperliquid funding API: no signer required (Hyperliquid funding is
+// public). Stops on SIGINT/SIGTERM or after --ticks N (whichever first).
+//
+// For live mode this command will refuse to start unless a signer is
+// configured. The supervisor-driven multi-agent runner is a v1.1 concern.
+func newAgentRunCmd() *cobra.Command {
+	var (
+		network    string
+		hlAddress  string
+		maxTicks   int
+		dryRun     bool
+	)
+	cmd := &cobra.Command{
+		Use:   "run <id>",
+		Short: "Run an agent's tick loop in the foreground (paper-mode only in v1)",
+		Long: `Runs ONE agent's Strategy.Decide loop in the foreground, against the real
+Hyperliquid public funding-rate API. Decisions and (paper) orders/swaps are
+persisted to the database.
+
+This is the proper end-to-end paper-mode flow — equivalent to what a
+multi-agent daemon will do once supervisor-driven agent loading lands.
+
+Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			g := FromContext(c.Context())
+			if g == nil {
+				return errors.New("globals not initialised")
+			}
+			st, db, err := openAgentStore(c)
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+			a, err := st.Get(c.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			if a.Mode != agent.ModePaper {
+				return fmt.Errorf("agent %q is mode=%q; `agent run` is paper-mode only in v1", a.ID, a.Mode)
+			}
+
+			// Build venue. If Hyperliquid signer is in the keystore, use its
+			// address (allows positions/balances calls to also work). Otherwise
+			// allow funding-only mode by leaving Address empty.
+			perp, err := buildHLVenue(c, network, hlAddress)
+			if err != nil {
+				return err
+			}
+
+			reg, err := assets.LoadEmbedded()
+			if err != nil {
+				return err
+			}
+			strat, err := buildStrategyForAgent(a, reg)
+			if err != nil {
+				return err
+			}
+
+			deps := agent.Deps{
+				Strategy: strat,
+				Perp:     perp,
+				Store:    st,
+				Logger:   g.Log,
+			}
+			if dryRun {
+				deps.Store = nil
+				g.Log.Info("dry-run: no DB writes")
+			}
+			rt := agent.NewRuntime(a, deps)
+
+			ctx, stop := signal.NotifyContext(c.Context(), syscall.SIGINT, syscall.SIGTERM)
+			defer stop()
+
+			g.Log.Info("agent run starting",
+				"agent_id", a.ID, "strategy", a.Strategy, "mode", a.Mode,
+				"tick_secs", a.TickSecs, "universe", a.Universe,
+				"hyperliquid_network", network)
+
+			ticks := 0
+			tickInterval := a.Interval()
+			ticker := time.NewTicker(tickInterval)
+			defer ticker.Stop()
+
+			doTick := func() error {
+				dec, err := rt.TickOnce(ctx)
+				if err != nil {
+					g.Log.Error("tick failed", "err", err)
+					return nil // don't bail the loop on transient errors
+				}
+				g.Log.Info("tick",
+					"swaps", len(dec.Swaps),
+					"orders", len(dec.Orders),
+					"cancels", len(dec.Cancels),
+					"confidence", dec.Confidence,
+					"notes", dec.Notes,
+				)
+				ticks++
+				return nil
+			}
+
+			if err := doTick(); err != nil {
+				return err
+			}
+			for {
+				if maxTicks > 0 && ticks >= maxTicks {
+					g.Log.Info("max ticks reached, exiting", "ticks", ticks)
+					return nil
+				}
+				select {
+				case <-ctx.Done():
+					g.Log.Info("agent run stopping", "ticks", ticks)
+					return nil
+				case <-ticker.C:
+					if err := doTick(); err != nil {
+						return err
+					}
+				}
+			}
+		},
+	}
+	cmd.Flags().StringVar(&network, "network", "testnet", "hyperliquid network: mainnet | testnet")
+	cmd.Flags().StringVar(&hlAddress, "address", "", "hyperliquid address override (default: derived from keystore)")
+	cmd.Flags().IntVar(&maxTicks, "ticks", 0, "stop after N ticks (0 = run until SIGINT)")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "do not persist decisions/orders/swaps")
+	return cmd
+}
+
+// buildHLVenue assembles a real Hyperliquid Venue. If --address is given it
+// wins; else we try the keystore's Hyperliquid signer; else we run in
+// funding-only mode (no per-account reads).
+func buildHLVenue(c *cobra.Command, network, addrOverride string) (exchange.Venue, error) {
+	addr := addrOverride
+	if addr == "" {
+		// Try the keystore (if unlocked).
+		if ks, err := openKeystore(c); err == nil {
+			if s, err := ks.Signer(types.ChainHyperliquid); err == nil {
+				addr = s.Address()
+			}
+		}
+	}
+	cfg := hyperliquid.Config{
+		Network: hyperliquid.Network(network),
+		Address: addr,
+	}
+	return hyperliquid.New(cfg)
+}
+
 // newAgentTickCmd runs a single Decide tick for an agent and persists the
 // decision. Designed for paper-mode integration testing without waiting for
 // the background scheduler. Defaults to a no-op perp venue with synthetic
@@ -337,12 +502,50 @@ func newAgentTickCmd() *cobra.Command {
 
 // buildStrategyForAgent constructs a strategy.Strategy from an Agent record.
 // Currently only funding_arb_basic is supported via this CLI helper.
+//
+// For funding_arb_basic, the agent's Config map may contain optional
+// overrides:
+//   - entry_annualised_funding: float (e.g. 0.50 for 50% APR)
+//   - exit_annualised_funding:  float
+//   - position_cap_usdc:        number
+//   - slippage_bps:             int
+//   - use_llm_veto:             bool
+//   - veto_model:               string
 func buildStrategyForAgent(a agent.Agent, reg assets.Registry) (strategy.Strategy, error) {
 	switch a.Strategy {
 	case fab.Name:
-		return fab.New(fab.Config{
-			Universe: a.Universe,
-		}, reg, inference.Provider(nil))
+		cfg := fab.Config{Universe: a.Universe}
+		if v, ok := a.Config["entry_annualised_funding"]; ok {
+			if d, err := decimalFromAny(v); err == nil {
+				cfg.EntryAnnualisedFunding = d
+			}
+		}
+		if v, ok := a.Config["exit_annualised_funding"]; ok {
+			if d, err := decimalFromAny(v); err == nil {
+				cfg.ExitAnnualisedFunding = d
+			}
+		}
+		if v, ok := a.Config["position_cap_usdc"]; ok {
+			if d, err := decimalFromAny(v); err == nil {
+				cfg.PositionCapUSDC = d
+			}
+		}
+		if v, ok := a.Config["slippage_bps"]; ok {
+			if i, err := intFromAny(v); err == nil {
+				cfg.SlippageBps = i
+			}
+		}
+		if v, ok := a.Config["use_llm_veto"]; ok {
+			if b, ok := v.(bool); ok {
+				cfg.UseLLMVeto = b
+			}
+		}
+		if v, ok := a.Config["veto_model"]; ok {
+			if s, ok := v.(string); ok {
+				cfg.VetoModel = s
+			}
+		}
+		return fab.New(cfg, reg, inference.Provider(nil))
 	default:
 		ctor, err := strategy.Get(a.Strategy)
 		if err != nil {
@@ -350,6 +553,35 @@ func buildStrategyForAgent(a agent.Agent, reg assets.Registry) (strategy.Strateg
 		}
 		return ctor(a.Config)
 	}
+}
+
+// decimalFromAny coerces JSON-decoded values (float64, int, string) into a
+// shopspring.Decimal.
+func decimalFromAny(v any) (decimal.Decimal, error) {
+	switch x := v.(type) {
+	case float64:
+		return decimal.NewFromFloat(x), nil
+	case int:
+		return decimal.NewFromInt(int64(x)), nil
+	case int64:
+		return decimal.NewFromInt(x), nil
+	case string:
+		return decimal.NewFromString(x)
+	}
+	return decimal.Zero, fmt.Errorf("unrecognised numeric type %T", v)
+}
+
+// intFromAny coerces JSON-decoded numerics to int.
+func intFromAny(v any) (int, error) {
+	switch x := v.(type) {
+	case float64:
+		return int(x), nil
+	case int:
+		return x, nil
+	case int64:
+		return int(x), nil
+	}
+	return 0, fmt.Errorf("unrecognised int type %T", v)
 }
 
 // tickFundingVenue is a synthetic Venue for `agent tick`. It returns no

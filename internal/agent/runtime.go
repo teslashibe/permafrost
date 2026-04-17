@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -43,6 +44,13 @@ type Runtime struct {
 	mu      sync.Mutex
 	running bool
 	cancel  context.CancelFunc
+
+	// openBasis tracks paper-mode (and to-be-fully-persisted live-mode)
+	// basis positions across ticks within a Run. Keyed by underlying symbol.
+	// This is in-memory state only; v1.1 should drive this off a
+	// strategy_positions row in the database so it survives restarts.
+	posMu     sync.Mutex
+	openBasis map[string]types.BasisPosition
 }
 
 // NewRuntime constructs a Runtime.
@@ -51,9 +59,10 @@ func NewRuntime(a Agent, d Deps) *Runtime {
 		d.Logger = slog.Default()
 	}
 	return &Runtime{
-		agent: a,
-		deps:  d,
-		now:   func() time.Time { return time.Now().UTC() },
+		agent:     a,
+		deps:      d,
+		now:       func() time.Time { return time.Now().UTC() },
+		openBasis: make(map[string]types.BasisPosition),
 	}
 }
 
@@ -150,13 +159,16 @@ func (r *Runtime) tickOnce(ctx context.Context) (strategy.Decision, error) {
 }
 
 // buildDecisionInput pulls current state from venues + the configured
-// universe and bundles it for Strategy.Decide.
+// universe and bundles it for Strategy.Decide. PerpPositions and Balances
+// are only fetched if the venue supports them (per-account reads can fail
+// gracefully when no Address is configured — see hyperliquid.ErrAddressRequired).
 func (r *Runtime) buildDecisionInput(ctx context.Context, now time.Time) (strategy.DecisionInput, error) {
 	in := strategy.DecisionInput{
-		AgentID: r.agent.ID,
-		Now:     now,
-		Cash:    map[string]types.Balance{},
-		Limits:  types.RiskLimits{},
+		AgentID:        r.agent.ID,
+		Now:            now,
+		Cash:           map[string]types.Balance{},
+		Limits:         types.RiskLimits{},
+		BasisPositions: r.snapshotOpenBasis(),
 	}
 	if r.deps.Perp != nil {
 		if pos, err := r.deps.Perp.Positions(ctx); err == nil {
@@ -178,6 +190,18 @@ func (r *Runtime) buildDecisionInput(ctx context.Context, now time.Time) (strate
 	return in, nil
 }
 
+// snapshotOpenBasis returns a defensive copy of the runtime's currently-open
+// basis positions, in deterministic order.
+func (r *Runtime) snapshotOpenBasis() []types.BasisPosition {
+	r.posMu.Lock()
+	defer r.posMu.Unlock()
+	out := make([]types.BasisPosition, 0, len(r.openBasis))
+	for _, p := range r.openBasis {
+		out = append(out, p)
+	}
+	return out
+}
+
 func (r *Runtime) persistDecision(ctx context.Context, now time.Time, decisionID string, in strategy.DecisionInput, dec strategy.Decision) {
 	if r.deps.Store == nil {
 		return
@@ -197,6 +221,11 @@ func (r *Runtime) persistDecision(ctx context.Context, now time.Time, decisionID
 
 // executeSwapsThenOrders runs swaps first (spot leg), then orders (perp leg)
 // — this is the spot-first invariant called for in SCOPE.md §11.
+//
+// After execution, the runtime's in-memory openBasis is reconciled so the
+// next tick's DecisionInput.BasisPositions reflects what just opened/closed.
+// This stops basis strategies from re-emitting opens for symbols they
+// already opened on a previous tick within the same Run.
 func (r *Runtime) executeSwapsThenOrders(ctx context.Context, now time.Time, decisionID string, _ strategy.DecisionInput, dec strategy.Decision) {
 	for i, s := range dec.Swaps {
 		r.executeSwap(ctx, now, decisionID, i, s)
@@ -206,6 +235,59 @@ func (r *Runtime) executeSwapsThenOrders(ctx context.Context, now time.Time, dec
 	}
 	for _, c := range dec.Cancels {
 		r.executeCancel(ctx, c)
+	}
+	r.reconcileOpenBasis(now, decisionID, dec)
+}
+
+// reconcileOpenBasis maintains the runtime's in-memory view of open basis
+// positions based on the intents this decision emitted. Pairs are matched by
+// the underlying symbol (perp.Symbol == swap.OutToken.Symbol for opens, or
+// the reduce-only perp's symbol == swap.InToken.Symbol for closes).
+func (r *Runtime) reconcileOpenBasis(now time.Time, decisionID string, dec strategy.Decision) {
+	r.posMu.Lock()
+	defer r.posMu.Unlock()
+
+	// Closes first — for any reduce-only order where we already track an
+	// open basis on that symbol, drop it. This matches funding_arb_basic's
+	// closeIntents shape (reduce-only buy + spot→USDC swap).
+	for _, o := range dec.Orders {
+		if !o.ReduceOnly {
+			continue
+		}
+		delete(r.openBasis, strings.ToUpper(o.Symbol))
+	}
+
+	// Opens — pair non-reduce-only sell orders with USDC→token swaps in the
+	// same Decision.
+	swapsByOut := map[string]types.SwapIntent{}
+	for _, s := range dec.Swaps {
+		if s.InToken.Symbol == "USDC" && s.OutToken.Symbol != "USDC" {
+			swapsByOut[strings.ToUpper(s.OutToken.Symbol)] = s
+		}
+	}
+	for _, o := range dec.Orders {
+		if o.ReduceOnly || o.Side != types.SideSell {
+			continue
+		}
+		key := strings.ToUpper(o.Symbol)
+		s, ok := swapsByOut[key]
+		if !ok {
+			continue
+		}
+		if _, alreadyOpen := r.openBasis[key]; alreadyOpen {
+			continue
+		}
+		r.openBasis[key] = types.BasisPosition{
+			ID:         "rt:" + decisionID + ":" + key,
+			AgentID:    r.agent.ID,
+			Underlying: o.Symbol,
+			State:      types.BasisStateOpen,
+			OpenedAt:   now,
+			Legs: []types.BasisLeg{
+				{Kind: types.BasisLegSpot, Asset: s.OutToken, Qty: s.InAmount},
+				{Kind: types.BasisLegPerp, Symbol: o.Symbol, Qty: o.Size, AvgPrice: o.Price},
+			},
+		}
 	}
 }
 
