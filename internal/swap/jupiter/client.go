@@ -30,9 +30,16 @@ type Client struct {
 // ClientOption configures a Client.
 type ClientOption func(*Client)
 
-// WithBaseURL overrides the default https://api.jup.ag base URL.
+// WithBaseURL overrides the default https://api.jup.ag base URL. An empty
+// string is a no-op so callers that pass an unset config field don't
+// accidentally clear the default.
 func WithBaseURL(u string) ClientOption {
-	return func(c *Client) { c.base = strings.TrimRight(u, "/") }
+	return func(c *Client) {
+		if u == "" {
+			return
+		}
+		c.base = strings.TrimRight(u, "/")
+	}
 }
 
 // WithAPIKey installs an x-api-key header for authenticated tiers.

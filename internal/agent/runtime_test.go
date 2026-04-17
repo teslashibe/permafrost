@@ -185,9 +185,61 @@ func TestReconcileOpenBasis_ClosesOnReduceOnly(t *testing.T) {
 			Venue: "hyperliquid", Symbol: "WIF", Side: types.SideBuy,
 			ReduceOnly: true, Type: types.OrderTypeMarket, Size: decimal.NewFromInt(100),
 		}},
-	})
+	}, nil, nil) // nil success maps = treat all as success
 	if len(r.snapshotOpenBasis()) != 0 {
 		t.Errorf("reduce-only buy should have closed the basis")
+	}
+}
+
+// TestReconcileOpenBasis_SkipsHalfOpenAfterFailedSwap covers the new
+// per-leg success tracking: if the spot swap failed, the basis must NOT
+// be reconciled as open (we'd believe we're hedged when we're actually
+// directional via the perp leg only).
+func TestReconcileOpenBasis_SkipsHalfOpenAfterFailedSwap(t *testing.T) {
+	a := Agent{ID: "a", Strategy: "x", Mode: ModeLive}
+	r := NewRuntime(a, Deps{Strategy: nil})
+
+	dec := strategy.Decision{
+		Swaps: []types.SwapIntent{{
+			Chain:    types.ChainSolana,
+			InToken:  types.Asset{Symbol: "USDC"},
+			OutToken: types.Asset{Symbol: "WIF", Mint: "wif"},
+			InAmount: decimal.NewFromInt(100),
+		}},
+		Orders: []types.OrderIntent{{
+			Venue: "hyperliquid", Symbol: "WIF", Side: types.SideSell,
+			Type: types.OrderTypeMarket, Size: decimal.NewFromInt(100),
+		}},
+	}
+	// swap failed (WIF not in swapOK), order succeeded
+	r.reconcileOpenBasis(context.Background(), time.Now(), "decX", dec,
+		map[string]bool{},                  // swapOK: empty → swap failed
+		map[string]bool{"WIF": true})       // orderOK: WIF placed
+	if got := len(r.snapshotOpenBasis()); got != 0 {
+		t.Errorf("expected NO basis when swap failed, got %d", got)
+	}
+}
+
+func TestReconcileOpenBasis_OpensOnlyWhenBothLegsSucceed(t *testing.T) {
+	a := Agent{ID: "a", Strategy: "x", Mode: ModeLive}
+	r := NewRuntime(a, Deps{Strategy: nil})
+	dec := strategy.Decision{
+		Swaps: []types.SwapIntent{{
+			Chain:    types.ChainSolana,
+			InToken:  types.Asset{Symbol: "USDC"},
+			OutToken: types.Asset{Symbol: "WIF", Mint: "wif"},
+			InAmount: decimal.NewFromInt(100),
+		}},
+		Orders: []types.OrderIntent{{
+			Venue: "hyperliquid", Symbol: "WIF", Side: types.SideSell,
+			Type: types.OrderTypeMarket, Size: decimal.NewFromInt(100),
+		}},
+	}
+	r.reconcileOpenBasis(context.Background(), time.Now(), "decY", dec,
+		map[string]bool{"WIF": true},
+		map[string]bool{"WIF": true})
+	if got := len(r.snapshotOpenBasis()); got != 1 {
+		t.Errorf("expected 1 basis when both legs succeed, got %d", got)
 	}
 }
 
