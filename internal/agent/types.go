@@ -3,6 +3,7 @@
 package agent
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -15,6 +16,35 @@ const (
 	ModePaper Mode = "paper" // record decisions; no venue calls
 	ModeLive  Mode = "live"  // submit to venues
 )
+
+// Network selects which Hyperliquid environment the agent reads/writes
+// against. Per-agent so a single deployment can run e.g. a paper-mainnet
+// research agent next to a live-testnet agent under development. v1 only
+// supports mainnet | testnet.
+type Network string
+
+const (
+	NetworkMainnet Network = "mainnet"
+	NetworkTestnet Network = "testnet"
+)
+
+// Validate returns an error if n is not one of the recognised networks.
+func (n Network) Validate() error {
+	switch n {
+	case NetworkMainnet, NetworkTestnet, "":
+		return nil
+	}
+	return fmt.Errorf("agent: invalid network %q (want mainnet or testnet)", n)
+}
+
+// OrDefault returns n if non-empty, else the supplied fallback. Used by
+// the Loader and CLI when an agent record predates the network column.
+func (n Network) OrDefault(fallback Network) Network {
+	if n == "" {
+		return fallback
+	}
+	return n
+}
 
 // Status is the persisted lifecycle state.
 type Status string
@@ -31,6 +61,7 @@ type Agent struct {
 	Name           string
 	Strategy       string
 	Mode           Mode
+	Network        Network // hyperliquid environment (mainnet|testnet)
 	PerpVenue      string
 	SpotVenue      string
 	Inference      string // "provider:model"

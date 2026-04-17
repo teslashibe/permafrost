@@ -37,13 +37,20 @@ func (s *Store) Create(ctx context.Context, a Agent) (Agent, error) {
 	if a.Status == "" {
 		a.Status = StatusStopped
 	}
+	if a.Network == "" {
+		a.Network = NetworkMainnet
+	}
+	if err := a.Network.Validate(); err != nil {
+		return Agent{}, err
+	}
 	cfgBytes, _ := json.Marshal(orZero(a.Config))
 	const q = `
-INSERT INTO agents (id, name, strategy, mode, perp_venue, spot_venue, inference, universe, allocation_usdc, tick_secs, status, config)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+INSERT INTO agents (id, name, strategy, mode, network, perp_venue, spot_venue, inference, universe, allocation_usdc, tick_secs, status, config)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 RETURNING created_at, updated_at;`
 	if err := s.pool.QueryRow(ctx, q,
-		a.ID, a.Name, a.Strategy, string(a.Mode), a.PerpVenue, a.SpotVenue, a.Inference,
+		a.ID, a.Name, a.Strategy, string(a.Mode), string(a.Network),
+		a.PerpVenue, a.SpotVenue, a.Inference,
 		a.Universe, a.AllocationUSDC, a.TickSecs, string(a.Status), cfgBytes,
 	).Scan(&a.CreatedAt, &a.UpdatedAt); err != nil {
 		return Agent{}, fmt.Errorf("agent: create: %w", err)
@@ -53,15 +60,16 @@ RETURNING created_at, updated_at;`
 
 // Get returns an agent by id.
 func (s *Store) Get(ctx context.Context, id string) (Agent, error) {
-	const q = `SELECT id, name, strategy, mode, perp_venue, spot_venue, inference, universe, allocation_usdc, tick_secs, status, config, created_at, updated_at
+	const q = `SELECT id, name, strategy, mode, network, perp_venue, spot_venue, inference, universe, allocation_usdc, tick_secs, status, config, created_at, updated_at
 FROM agents WHERE id = $1`
 	var (
 		a   Agent
 		cfg []byte
 	)
 	if err := s.pool.QueryRow(ctx, q, id).Scan(
-		&a.ID, &a.Name, &a.Strategy, (*string)(&a.Mode), &a.PerpVenue, &a.SpotVenue,
-		&a.Inference, &a.Universe, &a.AllocationUSDC, &a.TickSecs, (*string)(&a.Status),
+		&a.ID, &a.Name, &a.Strategy, (*string)(&a.Mode), (*string)(&a.Network),
+		&a.PerpVenue, &a.SpotVenue, &a.Inference, &a.Universe,
+		&a.AllocationUSDC, &a.TickSecs, (*string)(&a.Status),
 		&cfg, &a.CreatedAt, &a.UpdatedAt,
 	); err != nil {
 		return Agent{}, fmt.Errorf("agent: get: %w", err)
@@ -74,7 +82,7 @@ FROM agents WHERE id = $1`
 
 // List returns all agents (newest first).
 func (s *Store) List(ctx context.Context) ([]Agent, error) {
-	rows, err := s.pool.Query(ctx, `SELECT id, name, strategy, mode, status, allocation_usdc, created_at FROM agents ORDER BY created_at DESC`)
+	rows, err := s.pool.Query(ctx, `SELECT id, name, strategy, mode, network, status, allocation_usdc, created_at FROM agents ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -82,12 +90,32 @@ func (s *Store) List(ctx context.Context) ([]Agent, error) {
 	out := make([]Agent, 0)
 	for rows.Next() {
 		var a Agent
-		if err := rows.Scan(&a.ID, &a.Name, &a.Strategy, (*string)(&a.Mode), (*string)(&a.Status), &a.AllocationUSDC, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.Strategy, (*string)(&a.Mode), (*string)(&a.Network), (*string)(&a.Status), &a.AllocationUSDC, &a.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
 	}
 	return out, rows.Err()
+}
+
+// SetNetwork updates an agent's persisted network.
+func (s *Store) SetNetwork(ctx context.Context, id string, network Network) error {
+	if err := network.Validate(); err != nil {
+		return err
+	}
+	if network == "" {
+		return errors.New("agent: network required")
+	}
+	res, err := s.pool.Exec(ctx,
+		`UPDATE agents SET network = $1, updated_at = now() WHERE id = $2`,
+		string(network), id)
+	if err != nil {
+		return fmt.Errorf("agent: set network: %w", err)
+	}
+	if res.RowsAffected() == 0 {
+		return fmt.Errorf("agent %q not found", id)
+	}
+	return nil
 }
 
 // SetStatus updates an agent's persisted lifecycle status.

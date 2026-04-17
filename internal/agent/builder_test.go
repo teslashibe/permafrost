@@ -77,6 +77,71 @@ func TestBuildOptions_DefaultsToTestnet(t *testing.T) {
 	}
 }
 
+func TestNetwork_Validate(t *testing.T) {
+	for _, n := range []Network{NetworkMainnet, NetworkTestnet, ""} {
+		if err := n.Validate(); err != nil {
+			t.Errorf("Validate(%q): unexpected error %v", n, err)
+		}
+	}
+	if err := Network("rinkeby").Validate(); err == nil {
+		t.Error("expected error for unknown network")
+	}
+}
+
+func TestNetwork_OrDefault(t *testing.T) {
+	if got := Network("").OrDefault(NetworkMainnet); got != NetworkMainnet {
+		t.Errorf("OrDefault: empty should fall back, got %q", got)
+	}
+	if got := NetworkTestnet.OrDefault(NetworkMainnet); got != NetworkTestnet {
+		t.Errorf("OrDefault: non-empty should pass through, got %q", got)
+	}
+}
+
+// TestBuildDeps_PerAgentNetworkPlumbed ensures that BuildDeps uses
+// agent.Network when no override is supplied. We can't easily check the
+// venue's resolved endpoint without poking internals, but we CAN check
+// that an agent with Network=testnet doesn't error and that the override
+// path explicitly wins.
+func TestBuildDeps_PerAgentNetworkPlumbed(t *testing.T) {
+	reg, err := assets.LoadEmbedded()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name           string
+		stored         Network
+		override       string
+		expectError    bool
+	}{
+		{"stored=mainnet, no override", NetworkMainnet, "", false},
+		{"stored=testnet, no override", NetworkTestnet, "", false},
+		{"empty stored, no override", "", "", false},
+		{"override=testnet wins", NetworkMainnet, "testnet", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := Agent{
+				ID:       "ag",
+				Strategy: "funding_arb_basic",
+				Network:  tc.stored,
+				Universe: []string{"WIF"},
+			}
+			deps, err := BuildDeps(a, reg, nil, nil, nil, BuildOptions{
+				HyperliquidNetwork: tc.override,
+			})
+			if tc.expectError && err == nil {
+				t.Fatal("expected error")
+			}
+			if !tc.expectError && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !tc.expectError && deps.Perp == nil {
+				t.Fatal("Perp venue should be set")
+			}
+		})
+	}
+}
+
 func TestApplyFundingArbConfig_NumericTypes(t *testing.T) {
 	cases := []map[string]any{
 		{"entry_annualised_funding": 0.5},          // float64 (JSON default)

@@ -28,17 +28,13 @@ func main() {
 		Log:    telemetry.NewLogger(cfg.Logging, cfg.Env),
 	}
 	opts := cli.ServeOptions{
-		HyperliquidNetwork: defaultStr(os.Getenv("PERMAFROST_HYPERLIQUID_NETWORK"), "testnet"),
+		// PERMAFROST_HYPERLIQUID_NETWORK acts as the global override; empty
+		// means "use each agent's stored network". Default left empty so
+		// the daemon respects per-agent network choices out of the box.
+		HyperliquidNetworkOverride: os.Getenv("PERMAFROST_HYPERLIQUID_NETWORK"),
 	}
 	if err := cli.Serve(context.Background(), g, opts); err != nil {
 		fmt.Fprintln(os.Stderr, "serve:", err)
 		os.Exit(1)
 	}
-}
-
-func defaultStr(v, fallback string) string {
-	if v == "" {
-		return fallback
-	}
-	return v
 }

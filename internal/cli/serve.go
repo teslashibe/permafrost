@@ -29,17 +29,22 @@ func newServeCmd() *cobra.Command {
 			if g == nil {
 				return errors.New("globals not initialised")
 			}
-			return Serve(c.Context(), g, ServeOptions{HyperliquidNetwork: hlNetwork})
+			return Serve(c.Context(), g, ServeOptions{HyperliquidNetworkOverride: hlNetwork})
 		},
 	}
-	cmd.Flags().StringVar(&hlNetwork, "hyperliquid-network", "testnet",
-		"hyperliquid network for supervised agents (mainnet | testnet)")
+	cmd.Flags().StringVar(&hlNetwork, "hyperliquid-network", "",
+		"force ALL supervised agents onto this network (emergency override; empty = use each agent's stored network)")
 	return cmd
 }
 
 // ServeOptions configures the daemon at runtime.
 type ServeOptions struct {
-	HyperliquidNetwork string
+	// HyperliquidNetworkOverride, if non-empty, forces every supervised
+	// agent onto this network regardless of the network stored on its
+	// own DB record. Useful as an emergency switch ("force everything to
+	// testnet"). Leave empty in normal operation so each agent runs on
+	// its own configured network.
+	HyperliquidNetworkOverride string
 }
 
 // Serve runs the permafrostd HTTP server, loads any agents that are
@@ -51,9 +56,11 @@ func Serve(ctx context.Context, g *Globals, opts ServeOptions) error {
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	g.Log.Info("permafrostd starting",
-		"env", g.Config.Env, "bind", g.Config.Server.Bind,
-		"hyperliquid_network", opts.HyperliquidNetwork)
+	startFields := []any{"env", g.Config.Env, "bind", g.Config.Server.Bind}
+	if opts.HyperliquidNetworkOverride != "" {
+		startFields = append(startFields, "hyperliquid_network_override", opts.HyperliquidNetworkOverride)
+	}
+	g.Log.Info("permafrostd starting", startFields...)
 
 	var db *store.DB
 	if g.Config.Database.URL != "" {
@@ -80,7 +87,7 @@ func Serve(ctx context.Context, g *Globals, opts ServeOptions) error {
 				Registry:   reg,
 				Keystore:   ks,
 				Logger:     g.Log,
-				BuildOpts:  agent.BuildOptions{HyperliquidNetwork: opts.HyperliquidNetwork},
+				BuildOpts:  agent.BuildOptions{HyperliquidNetwork: opts.HyperliquidNetworkOverride},
 				Supervisor: sup,
 			}
 			n, err := loader.LoadAndStartRunning(ctx)

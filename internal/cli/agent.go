@@ -35,11 +35,51 @@ func newAgentCmd() *cobra.Command {
 		newAgentStatusCmd(),
 		newAgentDecisionsCmd(),
 		newAgentSetModeCmd(),
+		newAgentSetNetworkCmd(),
 		newAgentStopCmd(),
 		newAgentTickCmd(),
 		newAgentRunCmd(),
 	)
 	return cmd
+}
+
+func newAgentSetNetworkCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-network <id> <mainnet|testnet>",
+		Short: "Switch an agent between mainnet and testnet (Hyperliquid).",
+		Long: `Switches an agent's data source. Paper-mode agents are safe to
+run against mainnet — no orders are submitted. Live-mode agents (when
+signing lands) MUST be re-confirmed before flipping to mainnet because
+real money is at stake.
+
+The daemon picks up the change on next tick — no restart needed for
+read-only effects, but if the agent is currently running you may want
+to stop+start it so the venue client reconnects with the new endpoint.`,
+		Args: cobra.ExactArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			st, db, err := openAgentStore(c)
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+			network := agent.Network(args[1])
+			if network != agent.NetworkMainnet && network != agent.NetworkTestnet {
+				return fmt.Errorf("network must be mainnet or testnet")
+			}
+			a, err := st.Get(c.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			if a.Mode == agent.ModeLive && network == agent.NetworkMainnet {
+				fmt.Printf("WARNING: agent %q is live-mode. Switching to mainnet means real money on the next tick.\n", a.ID)
+			}
+			if err := st.SetNetwork(c.Context(), a.ID, network); err != nil {
+				return err
+			}
+			fmt.Printf("agent %s network -> %s\n", a.ID, network)
+			return nil
+		},
+	}
 }
 
 func newAgentStopCmd() *cobra.Command {
@@ -105,15 +145,21 @@ func openAgentStore(c *cobra.Command) (*agent.Store, *store.DB, error) {
 
 func newAgentCreateCmd() *cobra.Command {
 	var (
-		id, name, strategy, perp, spot, inferenceRef, modeStr string
-		universeCSV                                            string
-		alloc                                                  string
-		tickSecs                                               int
-		configJSON                                             string
+		id, name, strategy, perp, spot, inferenceRef, modeStr, networkStr string
+		universeCSV                                                       string
+		alloc                                                             string
+		tickSecs                                                          int
+		configJSON                                                        string
 	)
 	cmd := &cobra.Command{
 		Use:   "create",
-		Short: "Create a strategy agent (paper mode by default)",
+		Short: "Create a strategy agent (paper mode + mainnet data by default)",
+		Long: `Create a new agent.
+
+Paper mode is the default and is safe — no orders are submitted. It pairs
+naturally with mainnet data so the strategy makes decisions against real
+funding rates. Use --network testnet if you specifically want sparse
+testnet data (e.g. while developing a live-mode signing flow).`,
 		RunE: func(c *cobra.Command, _ []string) error {
 			s, db, err := openAgentStore(c)
 			if err != nil {
@@ -142,6 +188,7 @@ func newAgentCreateCmd() *cobra.Command {
 				Name:           name,
 				Strategy:       strategy,
 				Mode:           agent.Mode(modeStr),
+				Network:        agent.Network(networkStr),
 				PerpVenue:      perp,
 				SpotVenue:      spot,
 				Inference:      inferenceRef,
@@ -154,8 +201,8 @@ func newAgentCreateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("created agent id=%s name=%s strategy=%s mode=%s alloc=%s\n",
-				out.ID, out.Name, out.Strategy, out.Mode, out.AllocationUSDC)
+			fmt.Printf("created agent id=%s name=%s strategy=%s mode=%s network=%s alloc=%s\n",
+				out.ID, out.Name, out.Strategy, out.Mode, out.Network, out.AllocationUSDC)
 			return nil
 		},
 	}
@@ -166,6 +213,8 @@ func newAgentCreateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&spot, "spot", "jupiter", "spot venue")
 	cmd.Flags().StringVar(&inferenceRef, "inference", "", "inference provider:model (e.g. openrouter:anthropic/claude-sonnet-4.5)")
 	cmd.Flags().StringVar(&modeStr, "mode", string(agent.ModePaper), "paper | live")
+	cmd.Flags().StringVar(&networkStr, "network", string(agent.NetworkMainnet),
+		"hyperliquid network: mainnet (real funding data) | testnet (sparse / synthetic)")
 	cmd.Flags().StringVar(&universeCSV, "universe", "", "comma-separated symbols (e.g. WIF,BONK,POPCAT)")
 	cmd.Flags().StringVar(&alloc, "alloc", "", "allocation in USDC")
 	cmd.Flags().IntVar(&tickSecs, "tick-secs", 60, "tick interval seconds")
@@ -189,8 +238,8 @@ func newAgentListCmd() *cobra.Command {
 				return err
 			}
 			for _, a := range rows {
-				fmt.Printf("%-12s  %-20s  %-20s  %-7s  %-7s  alloc=%s  created=%s\n",
-					a.ID, a.Name, a.Strategy, a.Mode, a.Status, a.AllocationUSDC, a.CreatedAt.Format(time.RFC3339))
+				fmt.Printf("%-12s  %-20s  %-20s  %-7s  %-7s  %-7s  alloc=%s  created=%s\n",
+					a.ID, a.Name, a.Strategy, a.Mode, a.Network, a.Status, a.AllocationUSDC, a.CreatedAt.Format(time.RFC3339))
 			}
 			return nil
 		},
@@ -212,8 +261,8 @@ func newAgentStatusCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("id:         %s\nname:       %s\nstrategy:   %s\nmode:       %s\nstatus:     %s\nperp:       %s\nspot:       %s\ninference:  %s\nuniverse:   %s\nalloc:      %s\ntick_secs:  %d\ncreated:    %s\n",
-				a.ID, a.Name, a.Strategy, a.Mode, a.Status, a.PerpVenue, a.SpotVenue,
+			fmt.Printf("id:         %s\nname:       %s\nstrategy:   %s\nmode:       %s\nnetwork:    %s\nstatus:     %s\nperp:       %s\nspot:       %s\ninference:  %s\nuniverse:   %s\nalloc:      %s\ntick_secs:  %d\ncreated:    %s\n",
+				a.ID, a.Name, a.Strategy, a.Mode, a.Network, a.Status, a.PerpVenue, a.SpotVenue,
 				a.Inference, strings.Join(a.Universe, ","), a.AllocationUSDC, a.TickSecs, a.CreatedAt.Format(time.RFC3339))
 			return nil
 		},
@@ -292,10 +341,10 @@ func newAgentSetModeCmd() *cobra.Command {
 // configured. The supervisor-driven multi-agent runner is a v1.1 concern.
 func newAgentRunCmd() *cobra.Command {
 	var (
-		network    string
-		hlAddress  string
-		maxTicks   int
-		dryRun     bool
+		networkOverride string
+		hlAddress       string
+		maxTicks        int
+		dryRun          bool
 	)
 	cmd := &cobra.Command{
 		Use:   "run <id>",
@@ -304,8 +353,9 @@ func newAgentRunCmd() *cobra.Command {
 Hyperliquid public funding-rate API. Decisions and (paper) orders/swaps are
 persisted to the database.
 
-This is the proper end-to-end paper-mode flow — equivalent to what a
-multi-agent daemon will do once supervisor-driven agent loading lands.
+By default the agent runs on its stored network (--network on agent
+create, or 'mainnet' if unspecified). Pass --network here to override
+just for this run — useful for ad-hoc testnet smoke tests.
 
 Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 		Args: cobra.ExactArgs(1),
@@ -333,8 +383,10 @@ Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 			}
 			// Keystore is best-effort here; funding rates work without one.
 			ks, _ := openKeystore(c)
+			// Empty networkOverride lets the builder fall back to a.Network
+			// (which is the operator's stored choice, default mainnet).
 			deps, err := agent.BuildDeps(a, reg, st, ks, g.Log, agent.BuildOptions{
-				HyperliquidNetwork: network,
+				HyperliquidNetwork: networkOverride,
 				HyperliquidAddress: hlAddress,
 			})
 			if err != nil {
@@ -349,10 +401,14 @@ Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 			ctx, stop := signal.NotifyContext(c.Context(), syscall.SIGINT, syscall.SIGTERM)
 			defer stop()
 
+			effectiveNet := networkOverride
+			if effectiveNet == "" {
+				effectiveNet = string(a.Network.OrDefault(agent.NetworkMainnet))
+			}
 			g.Log.Info("agent run starting",
 				"agent_id", a.ID, "strategy", a.Strategy, "mode", a.Mode,
 				"tick_secs", a.TickSecs, "universe", a.Universe,
-				"hyperliquid_network", network)
+				"hyperliquid_network", effectiveNet)
 
 			ticks := 0
 			tickInterval := a.Interval()
@@ -388,7 +444,8 @@ Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 			}
 		},
 	}
-	cmd.Flags().StringVar(&network, "network", "testnet", "hyperliquid network: mainnet | testnet")
+	cmd.Flags().StringVar(&networkOverride, "network", "",
+		"override the agent's stored network for this run (mainnet | testnet); empty = use agent record")
 	cmd.Flags().StringVar(&hlAddress, "address", "", "hyperliquid address override (default: derived from keystore)")
 	cmd.Flags().IntVar(&maxTicks, "ticks", 0, "stop after N ticks (0 = run until SIGINT)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "do not persist decisions/orders/swaps")
