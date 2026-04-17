@@ -28,6 +28,7 @@ type Config struct {
 	Database  DatabaseConfig  `mapstructure:"database"`
 	Inference InferenceConfig `mapstructure:"inference"`
 	Wallet    WalletConfig    `mapstructure:"wallet"`
+	Solana    SolanaConfig    `mapstructure:"solana"`
 }
 
 type ServerConfig struct {
@@ -67,6 +68,18 @@ type InferenceProviderConfig struct {
 type WalletConfig struct {
 	KeystorePath  string `mapstructure:"keystore_path"`   // defaults to ~/.permafrost/keystore.json
 	PassphraseEnv string `mapstructure:"passphrase_env"`  // env var holding the passphrase
+}
+
+// SolanaConfig configures the Solana RPC + Jupiter + Jito stack used by the
+// jupiter SwapVenue.
+type SolanaConfig struct {
+	RPCURL                       string `mapstructure:"rpc_url"`
+	JupiterAPIKey                string `mapstructure:"jupiter_api_key"`
+	JupiterBaseURL               string `mapstructure:"jupiter_base_url"`
+	SubmitMode                   string `mapstructure:"submit_mode"`              // "jito" (default) | "rpc"
+	JitoBundleURL                string `mapstructure:"jito_bundle_url"`
+	PriorityFeeMicroLamports     uint64 `mapstructure:"priority_fee_micro_lamports"`
+	ConfirmationTimeoutSecs      int    `mapstructure:"confirmation_timeout_secs"`
 }
 
 // Load reads configuration from the given path (optional) and environment.

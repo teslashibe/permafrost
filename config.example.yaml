@@ -38,3 +38,13 @@ inference:
 wallet:
   keystore_path: ""                              # default: ~/.permafrost/keystore.json
   passphrase_env: PERMAFROST_KEYSTORE_PASSPHRASE # env var holding the unlock passphrase
+
+solana:
+  # Plug in a paid RPC for production (Helius / Triton / Quicknode).
+  rpc_url: https://api.mainnet-beta.solana.com
+  jupiter_base_url: https://api.jup.ag                # leave empty to use default
+  jupiter_api_key: ""                                  # required for higher tiers
+  submit_mode: jito                                    # jito | rpc
+  jito_bundle_url: https://mainnet.block-engine.jito.wtf/api/v1/bundles
+  priority_fee_micro_lamports: 0                       # 0 = no priority fee
+  confirmation_timeout_secs: 90
