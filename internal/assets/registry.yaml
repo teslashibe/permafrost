@@ -1,0 +1,104 @@
+# Permafrost asset registry — curated mapping between Hyperliquid perp
+# symbols and Solana spot mints used by funding-arb strategies.
+#
+# Entries here are the SOURCE OF TRUTH for what `funding_arb_basic` may
+# trade. Adding an entry here makes that token tradable; removing it stops
+# new positions (existing positions still unwind normally).
+#
+# Operators MUST verify each spot.mint against on-chain records (Solscan,
+# Jupiter token list) before going live. A wrong mint will result in trading
+# the wrong token. The mints below are the publicly-known production mints
+# at the time of writing; they do not change, but verify before trusting.
+
+version: 1
+defaults:
+  hedge_ratio: 1.0       # 1:1 notional matching by default
+
+assets:
+  # Quote currency. No perp; included so the loader knows about its decimals.
+  - symbol: USDC
+    spot:
+      chain: solana
+      mint: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+      decimals: 6
+    notes: Quote currency. Native USDC on Solana.
+
+  - symbol: WIF
+    perp:
+      venue: hyperliquid
+      symbol: WIF
+    spot:
+      chain: solana
+      mint: EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYLDKSHhX2P
+      decimals: 6
+    notes: dogwifhat. Solana native; deep liquidity on Raydium + Orca.
+
+  - symbol: BONK
+    perp:
+      venue: hyperliquid
+      symbol: BONK
+    spot:
+      chain: solana
+      mint: DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263
+      decimals: 5
+    notes: BONK. High velocity, frequent funding spikes.
+
+  - symbol: POPCAT
+    perp:
+      venue: hyperliquid
+      symbol: POPCAT
+    spot:
+      chain: solana
+      mint: 7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr
+      decimals: 9
+    notes: POPCAT (SOL).
+
+  - symbol: PNUT
+    perp:
+      venue: hyperliquid
+      symbol: PNUT
+    spot:
+      chain: solana
+      mint: 2qEHjDLDLbuBgRYvsxhc5D6uDWAivNFZGan56P1tpump
+      decimals: 6
+    notes: Peanut the Squirrel.
+
+  - symbol: GOAT
+    perp:
+      venue: hyperliquid
+      symbol: GOAT
+    spot:
+      chain: solana
+      mint: CzLSujWBLFsSjncfkh59rUFqvafWcY5tzedWJSuypump
+      decimals: 6
+    notes: Goatseus Maximus.
+
+  - symbol: FARTCOIN
+    perp:
+      venue: hyperliquid
+      symbol: FARTCOIN
+    spot:
+      chain: solana
+      mint: 9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump
+      decimals: 6
+    notes: Fartcoin.
+
+  - symbol: MOODENG
+    perp:
+      venue: hyperliquid
+      symbol: MOODENG
+    spot:
+      chain: solana
+      mint: ED5nyyWEzpPPiWimP8vYm7sD7TD3LAt3Q3gRTWHzPJBY
+      decimals: 6
+    notes: Moo Deng (the hippo).
+
+  - symbol: CHILLGUY
+    perp:
+      venue: hyperliquid
+      symbol: CHILLGUY
+    spot:
+      chain: solana
+      mint: Df6yfrKC8kZE3KNkrHERKzAetSxbrWeniQfyJY4Jpump
+      decimals: 6
+    notes: Just a chill guy.
