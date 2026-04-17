@@ -17,11 +17,17 @@ import (
 )
 
 // FundingTick is one observation in the input series.
+//
+// MarkPrice is optional; if zero, MarketSnapshotAt fills in a sentinel
+// $1.00 mark so strategies that gate on mark price (e.g. funding_arb_basic
+// which sizes perp legs as cap_usdc / mark) keep working in synthetic
+// backtests. Real CSVs from venue history should include the mark.
 type FundingTick struct {
-	Time     time.Time
-	Symbol   string
-	Rate     decimal.Decimal // per-interval, fractional
-	Interval time.Duration   // typically 1h or 8h
+	Time      time.Time
+	Symbol    string
+	Rate      decimal.Decimal // per-interval, fractional
+	Interval  time.Duration   // typically 1h or 8h
+	MarkPrice decimal.Decimal // optional; defaults to 1.00 if zero
 }
 
 // Costs models the per-trade frictions applied during the simulation.
@@ -86,6 +92,7 @@ type NAVPoint struct {
 // time t (the most recent tick per symbol with Time <= t wins). Exposed for
 // test reuse.
 func MarketSnapshotAt(t time.Time, ticks []FundingTick) types.MarketSnapshot {
+	defaultMark := decimal.NewFromInt(1) // sentinel so strategies can size
 	snap := types.MarketSnapshot{Time: t, Symbols: map[string]types.SymbolSnap{}}
 	for _, tk := range ticks {
 		if tk.Time.After(t) {
@@ -95,9 +102,17 @@ func MarketSnapshotAt(t time.Time, ticks []FundingTick) types.MarketSnapshot {
 		if ok && tk.Time.Before(cur.Funding.Time) {
 			continue
 		}
+		mark := tk.MarkPrice
+		if mark.IsZero() {
+			mark = defaultMark
+		}
 		snap.Symbols[tk.Symbol] = types.SymbolSnap{
 			Funding: types.FundingRate{
-				Time: tk.Time, Symbol: tk.Symbol, Rate: tk.Rate, Interval: tk.Interval,
+				Time:      tk.Time,
+				Symbol:    tk.Symbol,
+				Rate:      tk.Rate,
+				Interval:  tk.Interval,
+				MarkPrice: mark,
 			},
 		}
 	}

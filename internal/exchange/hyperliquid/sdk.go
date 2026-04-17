@@ -2,6 +2,8 @@ package hyperliquid
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"sync"
@@ -29,10 +31,14 @@ type sdkClient struct {
 	signer   *wallet.HyperliquidSigner
 	network  Network
 	address  string
+
+	// szLookup is a callback the venue installs so the adapter can resolve
+	// per-coin size precision (szDecimals) without importing the venue back.
+	szLookup func(ctx context.Context, coin string) (int, error)
 }
 
-func newSDKClient(s *wallet.HyperliquidSigner, network Network) *sdkClient {
-	return &sdkClient{signer: s, network: network, address: s.Address()}
+func newSDKClient(s *wallet.HyperliquidSigner, network Network, szLookup func(ctx context.Context, coin string) (int, error)) *sdkClient {
+	return &sdkClient{signer: s, network: network, address: s.Address(), szLookup: szLookup}
 }
 
 // init lazily constructs the sonirico Exchange. Done at first use so
@@ -78,7 +84,21 @@ func (c *sdkClient) Place(ctx context.Context, intent types.OrderIntent) (types.
 	}
 
 	isBuy := intent.Side == types.SideBuy
-	size, _ := intent.Size.Float64()
+
+	// Round size DOWN to the venue's size-precision (szDecimals) so HL
+	// doesn't reject for "Order has invalid size step". szLookup is best
+	// effort: if it fails we pass through unrounded and let the venue
+	// surface the error.
+	sized := intent.Size
+	if c.szLookup != nil {
+		if dec, err := c.szLookup(ctx, intent.Symbol); err == nil && dec >= 0 {
+			sized = sized.Truncate(int32(dec))
+		}
+	}
+	if !sized.IsPositive() {
+		return types.OrderAck{}, fmt.Errorf("hyperliquid: size %s rounds to zero at the venue's szDecimals", intent.Size)
+	}
+	size, _ := sized.Float64()
 	price, _ := intent.Price.Float64()
 
 	var orderType hl.OrderType
@@ -104,9 +124,15 @@ func (c *sdkClient) Place(ctx context.Context, intent types.OrderIntent) (types.
 		ReduceOnly: intent.ReduceOnly,
 		OrderType:  orderType,
 	}
+	// HL's cloid must be exactly 32 hex characters with a 0x prefix
+	// (16 bytes). Our framework's ClientID format is `pf_<24hex>` (a
+	// hash truncated for log-readability across venues), so we normalise
+	// here: deterministically widen to 16 bytes and re-encode. The
+	// translation is stable, so a network retry of the same intent
+	// produces the same HL cloid → idempotent at the venue.
 	if intent.ClientID != "" {
-		s := string(intent.ClientID)
-		req.ClientOrderID = &s
+		cloid := normaliseCloid(string(intent.ClientID))
+		req.ClientOrderID = &cloid
 	}
 
 	status, err := ex.Order(ctx, req, nil)
@@ -184,6 +210,17 @@ func decimalFromString(s string) decimal.Decimal {
 		return decimal.Zero
 	}
 	return d
+}
+
+// normaliseCloid maps any caller-supplied client-order-id into HL's
+// strict format: 0x + 32 lowercase hex characters (16 bytes).
+//
+// We sha256 the supplied id and take the first 16 bytes. This is a
+// stable function — replays of the same input produce the same output —
+// so HL's idempotency-by-cloid still works.
+func normaliseCloid(in string) string {
+	h := sha256.Sum256([]byte(in))
+	return "0x" + hex.EncodeToString(h[:16])
 }
 
 // parseOID parses a Hyperliquid order id (numeric).
