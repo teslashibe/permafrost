@@ -85,10 +85,16 @@ func (s *Strategy) Decide(ctx context.Context, in strategy.DecisionInput) (strat
 				continue
 			}
 		}
-		spotIntent, perpIntent := openIntents(c, s.cfg, in.AgentID)
+		spotIntent, perpIntent, err := openIntents(c, s.cfg, in.AgentID)
+		if err != nil {
+			dec.Notes = appendNote(dec.Notes, fmt.Sprintf("skip %s: %v", c.Symbol, err))
+			continue
+		}
 		dec.Swaps = append(dec.Swaps, spotIntent)
 		dec.Orders = append(dec.Orders, perpIntent)
-		dec.Notes = appendNote(dec.Notes, fmt.Sprintf("opening %s @ funding %s/yr", c.Symbol, c.Annualised))
+		dec.Notes = appendNote(dec.Notes, fmt.Sprintf(
+			"opening %s @ funding %s/yr (mark=%s size=%s)",
+			c.Symbol, c.Annualised, c.Funding.MarkPrice, perpIntent.Size))
 	}
 
 	dec.Confidence = candidateConfidence(candidates)
@@ -164,7 +170,25 @@ func openSymbolSet(positions []types.BasisPosition) map[string]bool {
 }
 
 // openIntents builds the spot-buy + perp-short pair for a candidate.
-func openIntents(c candidate, cfg Config, agentID string) (types.SwapIntent, types.OrderIntent) {
+//
+// The spot leg trades USDC for the spot mint and is naturally USDC-sized
+// (Jupiter takes InAmount in input-token units, so USDC works directly).
+//
+// The perp leg needs base-asset units (e.g. WIF tokens), not USDC notional.
+// We translate using the venue-published mark price:
+//
+//	perp.Size = position_cap_usdc / mark_price
+//
+// If the mark is unknown (zero) we cannot size safely and refuse the open
+// — callers will see "skip <SYMBOL>: no mark price" in Decision.Notes.
+func openIntents(c candidate, cfg Config, agentID string) (types.SwapIntent, types.OrderIntent, error) {
+	mark := c.Funding.MarkPrice
+	if !mark.IsPositive() {
+		return types.SwapIntent{}, types.OrderIntent{},
+			fmt.Errorf("no mark price for %s — venue cache miss?", c.Symbol)
+	}
+	perpSize := cfg.PositionCapUSDC.Div(mark)
+
 	usdc := types.Asset{Symbol: "USDC", Chain: c.Asset.Spot.Chain, Mint: usdcMintFor(c.Asset.Spot.Chain), Decimals: 6}
 	swap := types.SwapIntent{
 		Chain:       c.Asset.Spot.Chain,
@@ -178,13 +202,15 @@ func openIntents(c candidate, cfg Config, agentID string) (types.SwapIntent, typ
 		Venue:      c.Asset.Perp.Venue,
 		Symbol:     c.Asset.Perp.Symbol,
 		Side:       types.SideSell,
-		Type:       types.OrderTypeMarket,
-		Size:       cfg.PositionCapUSDC, // notional; the runtime/venue will translate to base units in M3+
+		Type:       types.OrderTypeLimit, // resting maker far from book; live tests use a price near mark
+		Price:      mark,                 // strategy submits at mark; venue rounds size to szDecimals
+		Size:       perpSize,
+		TIF:        types.TIFGTC,
 		ReduceOnly: false,
 		Tag:        "open:" + c.Symbol,
 	}
 	_ = agentID
-	return swap, perp
+	return swap, perp, nil
 }
 
 // closeIntents builds the unwind pair for an open basis position.

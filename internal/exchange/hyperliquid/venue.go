@@ -67,7 +67,7 @@ func New(cfg Config, opts ...Option) (*Venue, error) {
 		opt(v)
 	}
 	if hlSigner, ok := v.signer.(*wallet.HyperliquidSigner); ok {
-		v.sdk = newSDKClient(hlSigner, cfg.Network)
+		v.sdk = newSDKClient(hlSigner, cfg.Network, v.SzDecimals)
 	}
 	return v, nil
 }
@@ -165,12 +165,14 @@ func (v *Venue) FundingRates(ctx context.Context, symbols []string) ([]types.Fun
 			continue
 		}
 		rate, _ := decimal.NewFromString(snap.Ctxs[i].Funding)
+		mark, _ := decimal.NewFromString(snap.Ctxs[i].MarkPx)
 		out = append(out, types.FundingRate{
-			Time:     now,
-			Venue:    VenueName,
-			Symbol:   coin,
-			Rate:     rate,
-			Interval: time.Hour,
+			Time:      now,
+			Venue:     VenueName,
+			Symbol:    coin,
+			Rate:      rate,
+			Interval:  time.Hour,
+			MarkPrice: mark,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Symbol < out[j].Symbol })
@@ -249,6 +251,23 @@ func (v *Venue) forgetOrder(id types.OrderID) {
 	v.orderSymMu.Lock()
 	defer v.orderSymMu.Unlock()
 	delete(v.orderSym, id)
+}
+
+// SzDecimals returns the size-precision decimal count for a coin from the
+// cached metaAndAssetCtxs (refreshes lazily). Used by the SDK adapter to
+// round order sizes to the venue's accepted precision before submission.
+// Returns -1 if the symbol is unknown.
+func (v *Venue) SzDecimals(ctx context.Context, coin string) (int, error) {
+	if err := v.refreshMeta(ctx, false); err != nil {
+		return -1, err
+	}
+	v.metaMu.Lock()
+	defer v.metaMu.Unlock()
+	idx, ok := v.metaIndex[coin]
+	if !ok {
+		return -1, fmt.Errorf("hyperliquid: unknown coin %q", coin)
+	}
+	return v.metaSnapshot.Meta.Universe[idx].SzDecimals, nil
 }
 
 // refreshMeta reloads metaAndAssetCtxs if the cached snapshot is older than

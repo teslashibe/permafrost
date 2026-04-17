@@ -13,10 +13,12 @@ import (
 
 // LoadCSV reads funding ticks from a CSV file with header columns:
 //
-//	time,symbol,rate,interval_seconds
+//	time,symbol,rate,interval_seconds[,mark_price]
 //
 // Time may be RFC3339 or epoch milliseconds. Rate is fractional
-// (0.0001 = 1bp/interval). Returns the parsed ticks in original order.
+// (0.0001 = 1bp/interval). mark_price is optional but recommended for
+// strategies that size positions in USDC; missing values fall back to the
+// MarketSnapshotAt sentinel ($1.00). Returns ticks in original order.
 func LoadCSV(path string) ([]FundingTick, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -50,6 +52,7 @@ func ReadCSV(r io.Reader) ([]FundingTick, error) {
 	if tIdx < 0 || sIdx < 0 || rIdx < 0 || iIdx < 0 {
 		return nil, fmt.Errorf("backtest: csv missing required columns time,symbol,rate,interval_seconds")
 	}
+	mIdx := idx("mark_price") // optional
 
 	out := make([]FundingTick, 0, len(rows)-1)
 	for ln, row := range rows[1:] {
@@ -68,12 +71,20 @@ func ReadCSV(r io.Reader) ([]FundingTick, error) {
 		if err != nil {
 			return nil, fmt.Errorf("backtest: csv row %d interval: %w", ln+2, err)
 		}
-		out = append(out, FundingTick{
+		tk := FundingTick{
 			Time:     t,
 			Symbol:   row[sIdx],
 			Rate:     rate,
 			Interval: time.Duration(intervalSecs) * time.Second,
-		})
+		}
+		if mIdx >= 0 && mIdx < len(row) && row[mIdx] != "" {
+			mark, err := decimal.NewFromString(row[mIdx])
+			if err != nil {
+				return nil, fmt.Errorf("backtest: csv row %d mark_price: %w", ln+2, err)
+			}
+			tk.MarkPrice = mark
+		}
+		out = append(out, tk)
 	}
 	return out, nil
 }
