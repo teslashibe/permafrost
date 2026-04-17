@@ -180,7 +180,7 @@ func TestReconcileOpenBasis_ClosesOnReduceOnly(t *testing.T) {
 			{Kind: types.BasisLegPerp, Symbol: "WIF", Qty: decimal.NewFromInt(100)},
 		},
 	}
-	r.reconcileOpenBasis(time.Now(), "dec1", strategy.Decision{
+	r.reconcileOpenBasis(context.Background(), time.Now(), "dec1", strategy.Decision{
 		Orders: []types.OrderIntent{{
 			Venue: "hyperliquid", Symbol: "WIF", Side: types.SideBuy,
 			ReduceOnly: true, Type: types.OrderTypeMarket, Size: decimal.NewFromInt(100),

@@ -17,12 +17,8 @@ import (
 	"github.com/teslashibe/permafrost/internal/agent"
 	"github.com/teslashibe/permafrost/internal/assets"
 	"github.com/teslashibe/permafrost/internal/exchange"
-	"github.com/teslashibe/permafrost/internal/exchange/hyperliquid"
 	exchangenoop "github.com/teslashibe/permafrost/internal/exchange/noop"
-	"github.com/teslashibe/permafrost/internal/inference"
 	"github.com/teslashibe/permafrost/internal/store"
-	"github.com/teslashibe/permafrost/internal/strategy"
-	fab "github.com/teslashibe/permafrost/internal/strategy/funding_arb_basic"
 	"github.com/teslashibe/permafrost/internal/types"
 )
 
@@ -331,28 +327,18 @@ Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 				return fmt.Errorf("agent %q is mode=%q; `agent run` is paper-mode only in v1", a.ID, a.Mode)
 			}
 
-			// Build venue. If Hyperliquid signer is in the keystore, use its
-			// address (allows positions/balances calls to also work). Otherwise
-			// allow funding-only mode by leaving Address empty.
-			perp, err := buildHLVenue(c, network, hlAddress)
-			if err != nil {
-				return err
-			}
-
 			reg, err := assets.LoadEmbedded()
 			if err != nil {
 				return err
 			}
-			strat, err := buildStrategyForAgent(a, reg)
+			// Keystore is best-effort here; funding rates work without one.
+			ks, _ := openKeystore(c)
+			deps, err := agent.BuildDeps(a, reg, st, ks, g.Log, agent.BuildOptions{
+				HyperliquidNetwork: network,
+				HyperliquidAddress: hlAddress,
+			})
 			if err != nil {
 				return err
-			}
-
-			deps := agent.Deps{
-				Strategy: strat,
-				Perp:     perp,
-				Store:    st,
-				Logger:   g.Log,
 			}
 			if dryRun {
 				deps.Store = nil
@@ -374,18 +360,10 @@ Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 			defer ticker.Stop()
 
 			doTick := func() error {
-				dec, err := rt.TickOnce(ctx)
-				if err != nil {
+				if _, err := rt.TickOnce(ctx); err != nil {
 					g.Log.Error("tick failed", "err", err)
 					return nil // don't bail the loop on transient errors
 				}
-				g.Log.Info("tick",
-					"swaps", len(dec.Swaps),
-					"orders", len(dec.Orders),
-					"cancels", len(dec.Cancels),
-					"confidence", dec.Confidence,
-					"notes", dec.Notes,
-				)
 				ticks++
 				return nil
 			}
@@ -417,26 +395,6 @@ Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 	return cmd
 }
 
-// buildHLVenue assembles a real Hyperliquid Venue. If --address is given it
-// wins; else we try the keystore's Hyperliquid signer; else we run in
-// funding-only mode (no per-account reads).
-func buildHLVenue(c *cobra.Command, network, addrOverride string) (exchange.Venue, error) {
-	addr := addrOverride
-	if addr == "" {
-		// Try the keystore (if unlocked).
-		if ks, err := openKeystore(c); err == nil {
-			if s, err := ks.Signer(types.ChainHyperliquid); err == nil {
-				addr = s.Address()
-			}
-		}
-	}
-	cfg := hyperliquid.Config{
-		Network: hyperliquid.Network(network),
-		Address: addr,
-	}
-	return hyperliquid.New(cfg)
-}
-
 // newAgentTickCmd runs a single Decide tick for an agent and persists the
 // decision. Designed for paper-mode integration testing without waiting for
 // the background scheduler. Defaults to a no-op perp venue with synthetic
@@ -465,7 +423,7 @@ func newAgentTickCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			strat, err := buildStrategyForAgent(a, reg)
+			strat, err := agent.BuildStrategy(a, reg)
 			if err != nil {
 				return err
 			}
@@ -500,89 +458,9 @@ func newAgentTickCmd() *cobra.Command {
 	return cmd
 }
 
-// buildStrategyForAgent constructs a strategy.Strategy from an Agent record.
-// Currently only funding_arb_basic is supported via this CLI helper.
-//
-// For funding_arb_basic, the agent's Config map may contain optional
-// overrides:
-//   - entry_annualised_funding: float (e.g. 0.50 for 50% APR)
-//   - exit_annualised_funding:  float
-//   - position_cap_usdc:        number
-//   - slippage_bps:             int
-//   - use_llm_veto:             bool
-//   - veto_model:               string
-func buildStrategyForAgent(a agent.Agent, reg assets.Registry) (strategy.Strategy, error) {
-	switch a.Strategy {
-	case fab.Name:
-		cfg := fab.Config{Universe: a.Universe}
-		if v, ok := a.Config["entry_annualised_funding"]; ok {
-			if d, err := decimalFromAny(v); err == nil {
-				cfg.EntryAnnualisedFunding = d
-			}
-		}
-		if v, ok := a.Config["exit_annualised_funding"]; ok {
-			if d, err := decimalFromAny(v); err == nil {
-				cfg.ExitAnnualisedFunding = d
-			}
-		}
-		if v, ok := a.Config["position_cap_usdc"]; ok {
-			if d, err := decimalFromAny(v); err == nil {
-				cfg.PositionCapUSDC = d
-			}
-		}
-		if v, ok := a.Config["slippage_bps"]; ok {
-			if i, err := intFromAny(v); err == nil {
-				cfg.SlippageBps = i
-			}
-		}
-		if v, ok := a.Config["use_llm_veto"]; ok {
-			if b, ok := v.(bool); ok {
-				cfg.UseLLMVeto = b
-			}
-		}
-		if v, ok := a.Config["veto_model"]; ok {
-			if s, ok := v.(string); ok {
-				cfg.VetoModel = s
-			}
-		}
-		return fab.New(cfg, reg, inference.Provider(nil))
-	default:
-		ctor, err := strategy.Get(a.Strategy)
-		if err != nil {
-			return nil, err
-		}
-		return ctor(a.Config)
-	}
-}
-
-// decimalFromAny coerces JSON-decoded values (float64, int, string) into a
-// shopspring.Decimal.
-func decimalFromAny(v any) (decimal.Decimal, error) {
-	switch x := v.(type) {
-	case float64:
-		return decimal.NewFromFloat(x), nil
-	case int:
-		return decimal.NewFromInt(int64(x)), nil
-	case int64:
-		return decimal.NewFromInt(x), nil
-	case string:
-		return decimal.NewFromString(x)
-	}
-	return decimal.Zero, fmt.Errorf("unrecognised numeric type %T", v)
-}
-
-// intFromAny coerces JSON-decoded numerics to int.
-func intFromAny(v any) (int, error) {
-	switch x := v.(type) {
-	case float64:
-		return int(x), nil
-	case int:
-		return x, nil
-	case int64:
-		return int(x), nil
-	}
-	return 0, fmt.Errorf("unrecognised int type %T", v)
-}
+// (BuildStrategy + BuildHyperliquidVenue + helpers live in
+// internal/agent/builder.go so the daemon supervisor and the CLI share one
+// source of truth.)
 
 // tickFundingVenue is a synthetic Venue for `agent tick`. It returns no
 // positions / balances but does emit synthetic funding rates so the

@@ -60,19 +60,23 @@ func TestLive_FundingRates_Mainnet_TopAnnualised(t *testing.T) {
 // TestLive_FundingRates_Universe prints the funding for our registry
 // universe so we know what the strategy would actually see.
 func TestLive_FundingRates_Universe(t *testing.T) {
-	v, err := New(Config{Network: NetworkMainnet})
-	if err != nil {
-		t.Fatal(err)
-	}
-	universe := []string{"WIF", "BONK", "POPCAT", "PNUT", "GOAT", "FARTCOIN", "MOODENG", "CHILLGUY"}
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	rates, err := v.FundingRates(ctx, universe)
-	if err != nil {
-		t.Fatalf("FundingRates: %v", err)
-	}
-	t.Logf("funding for permafrost universe (mainnet, %d hits):", len(rates))
-	for _, r := range rates {
-		t.Logf("  %-10s rate/h=%-15s ann=%s", r.Symbol, r.Rate, r.Annualised())
+	for _, n := range []Network{NetworkMainnet, NetworkTestnet} {
+		t.Run(string(n), func(t *testing.T) {
+			v, err := New(Config{Network: n})
+			if err != nil {
+				t.Fatal(err)
+			}
+			universe := []string{"WIF", "BONK", "POPCAT", "PNUT", "GOAT", "FARTCOIN", "MOODENG", "CHILLGUY"}
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			rates, err := v.FundingRates(ctx, universe)
+			if err != nil {
+				t.Fatalf("FundingRates: %v", err)
+			}
+			t.Logf("funding for permafrost universe (%s, %d hits):", n, len(rates))
+			for _, r := range rates {
+				t.Logf("  %-10s rate/h=%-15s ann=%s", r.Symbol, r.Rate, r.Annualised())
+			}
+		})
 	}
 }
