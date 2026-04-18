@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/teslashibe/permafrost/internal/exchange"
 	"github.com/teslashibe/permafrost/internal/inference"
+	"github.com/teslashibe/permafrost/internal/pnl"
 	"github.com/teslashibe/permafrost/internal/risk"
 	"github.com/teslashibe/permafrost/internal/strategy"
 	"github.com/teslashibe/permafrost/internal/swap"
@@ -190,6 +192,10 @@ func (r *Runtime) tickOnce(ctx context.Context) (strategy.Decision, error) {
 
 	r.executeSwapsThenOrders(ctx, now, decisionID, in, dec)
 
+	// Persist a NAV snapshot on every tick. Failures are logged but do
+	// not bubble up — telemetry shouldn't block trading.
+	r.persistNAVSnapshot(ctx, now)
+
 	// One concise per-tick log so operators can see the daemon working
 	// without enabling debug. This is the only INFO line emitted per tick.
 	// open_basis is the post-tick count (after reconcile), not the
@@ -204,6 +210,45 @@ func (r *Runtime) tickOnce(ctx context.Context) (strategy.Decision, error) {
 		"open_basis", len(r.snapshotOpenBasis()),
 	)
 	return dec, nil
+}
+
+// persistNAVSnapshot computes a NAV snapshot using the pnl.Engine and
+// writes it to agent_nav_snapshots. Best-effort — any failure (RPC,
+// DB) is logged at WARN and does not affect the tick.
+func (r *Runtime) persistNAVSnapshot(ctx context.Context, now time.Time) {
+	if r.deps.Store == nil {
+		return
+	}
+	engine := pnl.New(r.deps.Perp, r.deps.Swaps)
+	hist, err := r.deps.Store.AggregatesForAgent(ctx, r.agent.ID)
+	if err != nil {
+		r.deps.Logger.Warn("nav: aggregates failed", "agent_id", r.agent.ID, "err", err)
+		return
+	}
+	nav, err := engine.ValueAgent(ctx, r.agent.ID, pnl.History{
+		OpenPositions:     r.snapshotOpenBasis(),
+		RealizedPnLUSDC:   hist.RealizedPnLUSDC,
+		CumulativeGasUSDC: hist.CumulativeGasUSDC,
+	})
+	if err != nil {
+		r.deps.Logger.Warn("nav: valuation failed", "agent_id", r.agent.ID, "err", err)
+		return
+	}
+	posJSON, _ := json.Marshal(nav.Positions)
+	if err := r.deps.Store.PersistNAVSnapshot(ctx, PersistNAVSnapshotInput{
+		Time:               now,
+		AgentID:            r.agent.ID,
+		NAVUSDC:            nav.NAVUSDC,
+		SpotValueUSDC:      nav.SpotValueUSDC,
+		PerpUnrealizedUSDC: nav.PerpUnrealizedUSDC,
+		FundingAccruedUSDC: nav.FundingAccruedUSDC,
+		RealizedPnLUSDC:    nav.RealizedPnLUSDC,
+		CumulativeGasUSDC:  nav.CumulativeGasUSDC,
+		OpenPositions:      nav.OpenPositions,
+		PositionsJSON:      posJSON,
+	}); err != nil {
+		r.deps.Logger.Warn("nav: persist failed", "agent_id", r.agent.ID, "err", err)
+	}
 }
 
 // buildDecisionInput pulls current state from venues + the configured
