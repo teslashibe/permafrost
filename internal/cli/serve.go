@@ -90,6 +90,7 @@ func Serve(ctx context.Context, g *Globals, opts ServeOptions) error {
 				BuildOpts: agent.BuildOptions{
 					HyperliquidNetwork: opts.HyperliquidNetworkOverride,
 					Solana:             solanaSpotFromConfig(g.Config.Solana),
+					EVM:                evmSpotsFromConfig(g.Config.EVM, os.Getenv),
 				},
 				Supervisor: sup,
 			}

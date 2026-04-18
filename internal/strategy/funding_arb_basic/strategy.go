@@ -190,12 +190,17 @@ func openIntents(c candidate, cfg Config, agentID string) (types.SwapIntent, typ
 	perpSize := cfg.PositionCapUSDC.Div(mark)
 
 	usdc := types.Asset{Symbol: "USDC", Chain: c.Asset.Spot.Chain, Mint: usdcMintFor(c.Asset.Spot.Chain), Decimals: 6}
+	// BasisKey is the registry asset symbol — uniquely identifies the
+	// (perp_symbol, spot_chain) pair so multi-chain entries (ETH-BASE vs
+	// ETH-MAINNET) reconcile correctly.
+	basisKey := c.Symbol
 	swap := types.SwapIntent{
 		Chain:       c.Asset.Spot.Chain,
 		InToken:     usdc,
 		OutToken:    c.Asset.AsAsset(),
 		InAmount:    cfg.PositionCapUSDC,
 		SlippageBps: cfg.SlippageBps,
+		BasisKey:    basisKey,
 		Tag:         "open:" + c.Symbol,
 	}
 	perp := types.OrderIntent{
@@ -207,6 +212,7 @@ func openIntents(c candidate, cfg Config, agentID string) (types.SwapIntent, typ
 		Size:       perpSize,
 		TIF:        types.TIFGTC,
 		ReduceOnly: false,
+		BasisKey:   basisKey,
 		Tag:        "open:" + c.Symbol,
 	}
 	_ = agentID
@@ -230,6 +236,7 @@ func closeIntents(p types.BasisPosition, agentID string) (types.SwapIntent, type
 		InToken:  spotLeg.Asset,
 		OutToken: usdc,
 		InAmount: spotLeg.Qty,
+		BasisKey: p.Underlying,
 		Tag:      "close:" + p.Underlying,
 	}
 	perp := types.OrderIntent{
@@ -237,6 +244,7 @@ func closeIntents(p types.BasisPosition, agentID string) (types.SwapIntent, type
 		Symbol:     perpLeg.Symbol,
 		Side:       types.SideBuy, // closing a short → buy back
 		Type:       types.OrderTypeMarket,
+		BasisKey:   p.Underlying,
 		Size:       perpLeg.Qty,
 		ReduceOnly: true,
 		Tag:        "close:" + p.Underlying,
@@ -245,12 +253,29 @@ func closeIntents(p types.BasisPosition, agentID string) (types.SwapIntent, type
 	return swap, perp
 }
 
-// usdcMintFor returns the canonical USDC mint for a chain. Hard-coded for
-// MVP; future versions can drive this off the registry.
+// usdcMintFor returns the canonical USDC mint/contract for a chain.
+// Hard-coded for MVP; future versions can drive this off the registry.
+//
+// Sources:
+//   - Solana:    Circle's native USDC mint
+//   - Ethereum:  https://www.circle.com/usdc-multichain/ethereum
+//   - Base:      Circle's native USDC on Base (NOT USDbC, which is bridged)
+//   - Avalanche: Circle's native USDC on Avalanche C-Chain
+//   - BSC:       Binance-Peg USDC (no native USDC; pegged is the de-facto liquid one)
+//
+// All EVM USDC contracts are 6-decimal; Solana USDC is also 6-decimal.
 func usdcMintFor(chain types.ChainID) string {
 	switch chain {
 	case types.ChainSolana:
 		return "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+	case types.ChainEthereum:
+		return "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+	case types.ChainBase:
+		return "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+	case types.ChainAvalanche:
+		return "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E"
+	case types.ChainBSC:
+		return "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
 	default:
 		return ""
 	}

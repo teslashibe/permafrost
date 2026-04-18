@@ -29,6 +29,7 @@ type Config struct {
 	Inference InferenceConfig `mapstructure:"inference"`
 	Wallet    WalletConfig    `mapstructure:"wallet"`
 	Solana    SolanaConfig    `mapstructure:"solana"`
+	EVM       EVMConfig       `mapstructure:"evm"`
 }
 
 type ServerConfig struct {
@@ -82,6 +83,34 @@ type SolanaConfig struct {
 	ConfirmationTimeoutSecs      int    `mapstructure:"confirmation_timeout_secs"`
 }
 
+// EVMConfig configures the EVM swap stack: a shared 1inch API key plus
+// one per-chain block (RPC URL, optional overrides). Operators omit
+// chains they don't intend to use.
+//
+// Example:
+//
+//	evm:
+//	  oneinch_api_key_env: ONEINCH_API_KEY
+//	  default_slippage_bps: 50
+//	  chains:
+//	    ethereum: { rpc_url: https://eth.llamarpc.com }
+//	    base:     { rpc_url: https://mainnet.base.org }
+//	    avalanche: { rpc_url: https://api.avax.network/ext/bc/C/rpc }
+//	    bsc:      { rpc_url: https://bsc-dataseed.binance.org }
+type EVMConfig struct {
+	OneInchAPIKey           string                       `mapstructure:"oneinch_api_key"`
+	OneInchAPIKeyEnv        string                       `mapstructure:"oneinch_api_key_env"`
+	OneInchBaseURL          string                       `mapstructure:"oneinch_base_url"`
+	DefaultSlippageBps      int                          `mapstructure:"default_slippage_bps"`
+	ConfirmationTimeoutSecs int                          `mapstructure:"confirmation_timeout_secs"`
+	Chains                  map[string]EVMChainConfig    `mapstructure:"chains"`
+}
+
+// EVMChainConfig is the per-chain block under evm.chains.{name}.
+type EVMChainConfig struct {
+	RPCURL string `mapstructure:"rpc_url"`
+}
+
 // Load reads configuration from the given path (optional) and environment.
 // If path is empty, it looks for config.yaml in the current directory.
 func Load(path string) (*Config, error) {
@@ -95,6 +124,9 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("database.max_conns", int32(16))
 	v.SetDefault("database.min_conns", int32(2))
 	v.SetDefault("wallet.passphrase_env", "PERMAFROST_KEYSTORE_PASSPHRASE")
+	v.SetDefault("evm.oneinch_api_key_env", "ONEINCH_API_KEY")
+	v.SetDefault("evm.default_slippage_bps", 50)
+	v.SetDefault("evm.confirmation_timeout_secs", 90)
 
 	if path != "" {
 		v.SetConfigFile(path)
@@ -149,6 +181,18 @@ func (c *Config) validate() error {
 		return fmt.Errorf("invalid logging.format %q", c.Logging.Format)
 	}
 	return nil
+}
+
+// ResolvedOneInchAPIKey returns the 1inch API key, preferring the env
+// var named by OneInchAPIKeyEnv (if set) over the inline OneInchAPIKey.
+// Returns an empty string when nothing is configured.
+func (e EVMConfig) ResolvedOneInchAPIKey(getenv func(string) string) string {
+	if e.OneInchAPIKeyEnv != "" {
+		if v := getenv(e.OneInchAPIKeyEnv); v != "" {
+			return v
+		}
+	}
+	return e.OneInchAPIKey
 }
 
 // IsLoopback reports whether the configured bind address is a loopback

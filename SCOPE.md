@@ -28,9 +28,11 @@ The whole MVP is built so a single operator can run it locally with `docker-comp
 | Config | `viper` (yaml + env) |
 | Logging | `log/slog` (stdlib, structured; JSON in prod, text in dev) |
 | Perp venue | Hyperliquid Go SDK |
-| Spot venue (v1) | Solana, via Jupiter aggregator |
+| Spot venues | Solana via Jupiter, EVM chains via 1inch v6 |
+| EVM chains (v1) | Ethereum, Base, Avalanche C-Chain, BNB Smart Chain |
 | Solana RPC | Helius (paid) or Triton |
-| MEV protection | Jito bundles (Solana) |
+| EVM RPC | Per-chain in `evm.chains.{name}.rpc_url`; public defaults work |
+| MEV protection | Jito bundles (Solana); private mempool deferred for EVM |
 | Inference | Single OpenAI-compatible client (works with OpenAI, OpenRouter, Groq, Together, Fireworks, vLLM, Ollama, LM Studio) |
 | Key management | Local encrypted JSON keystore, env-loaded passphrase |
 | Deploy | Docker + docker-compose, runs locally |
@@ -181,6 +183,17 @@ type QuoteRequest struct {
 ```
 
 Solana implementation routes through Jupiter and submits via Jito bundles for MEV protection.
+
+**Multi-chain (M19+):** the runtime carries a `map[ChainID]SwapVenue` rather than one venue, and routes each `SwapIntent` to the venue keyed by its `Chain` field. v1 ships with two adapters:
+
+| Chain | Adapter | Submission | MEV |
+|---|---|---|---|
+| Solana | Jupiter | Jito bundle (default) or RPC | bundle private mempool |
+| Ethereum / Base / Avalanche / BSC | 1inch v6 | EIP-1559 (ETH/Base) / legacy (AVAX/BSC) raw tx | none in v1; private mempools deferred |
+
+The 1inch adapter is one Go package (`internal/swap/oneinch`) that constructs one `Venue` per EVM chain. All four EVM venues share the same secp256k1 keypair (the one already used to sign Hyperliquid actions) — operators manage one secret across all five chains. ERC-20 approvals follow a plain `approve(MAX)` pattern, cached per `(chain, token)` pair so subsequent swaps skip the on-chain check.
+
+Native gas-token swaps (ETH/AVAX/BNB ↔ ERC-20) are deferred — v1 routes only ERC-20 ↔ ERC-20.
 
 ### 4.4 Inference provider
 

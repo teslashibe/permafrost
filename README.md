@@ -86,8 +86,8 @@ See [`SCOPE.md`](SCOPE.md) for the full architectural specification.
 | Config | [`viper`](https://github.com/spf13/viper) (yaml + env) |
 | Logging | [`log/slog`](https://pkg.go.dev/log/slog) (stdlib) |
 | Perp venue | [Hyperliquid](https://hyperliquid.xyz/) |
-| Spot venue | [Solana](https://solana.com/) via [Jupiter](https://jup.ag/) aggregator |
-| MEV protection | [Jito](https://www.jito.wtf/) bundles |
+| Spot venues | [Solana](https://solana.com/) via [Jupiter](https://jup.ag/); EVM (Ethereum, Base, Avalanche, BSC) via [1inch](https://1inch.io/) v6 |
+| MEV protection | [Jito](https://www.jito.wtf/) bundles (Solana) |
 | Inference | OpenAI-compatible (works with OpenAI, OpenRouter, Groq, Together, vLLM, Ollama, etc.) |
 | Deploy | Docker + docker-compose |
 

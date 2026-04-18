@@ -48,3 +48,23 @@ solana:
   jito_bundle_url: https://mainnet.block-engine.jito.wtf/api/v1/bundles
   priority_fee_micro_lamports: 0                       # 0 = no priority fee
   confirmation_timeout_secs: 90
+
+evm:
+  # Multi-chain spot legs via 1inch v6. One free API key works across
+  # every chain — get one at https://portal.1inch.dev .
+  oneinch_api_key_env: ONEINCH_API_KEY    # env var name; takes precedence over oneinch_api_key below
+  oneinch_api_key: ""                     # inline (avoid; prefer the env var)
+  oneinch_base_url: ""                    # leave empty for the public api.1inch.dev
+  default_slippage_bps: 50                # 0.5% — applied when SwapIntent.SlippageBps is unset
+  confirmation_timeout_secs: 90
+  chains:
+    # Omit a chain to disable it. The runtime falls back to paper-spot
+    # (records intent, never broadcasts) for any chain not listed here.
+    ethereum:
+      rpc_url: https://ethereum-rpc.publicnode.com
+    base:
+      rpc_url: https://mainnet.base.org
+    avalanche:
+      rpc_url: https://api.avax.network/ext/bc/C/rpc
+    bsc:
+      rpc_url: https://bsc-rpc.publicnode.com

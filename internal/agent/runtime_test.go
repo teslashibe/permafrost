@@ -10,6 +10,7 @@ import (
 	exchangenoop "github.com/teslashibe/permafrost/internal/exchange/noop"
 	"github.com/teslashibe/permafrost/internal/risk"
 	"github.com/teslashibe/permafrost/internal/strategy"
+	"github.com/teslashibe/permafrost/internal/swap"
 	swapnoop "github.com/teslashibe/permafrost/internal/swap/noop"
 	"github.com/teslashibe/permafrost/internal/types"
 )
@@ -56,7 +57,7 @@ func TestTickOnce_PaperMode_RecordsButDoesNotCallVenues(t *testing.T) {
 	r := NewRuntime(a, Deps{
 		Strategy: strat,
 		Perp:     perp,
-		Swap:     swp,
+		Swaps:    map[types.ChainID]swap.SwapVenue{types.ChainSolana: swp},
 	})
 	r.SetClock(func() time.Time { return time.Unix(1_700_000_000, 0).UTC() })
 
@@ -97,7 +98,7 @@ func TestTickOnce_LiveMode_CallsVenues(t *testing.T) {
 	r := NewRuntime(a, Deps{
 		Strategy: strat,
 		Perp:     perp,
-		Swap:     swp,
+		Swaps:    map[types.ChainID]swap.SwapVenue{types.ChainSolana: swp},
 	})
 
 	if _, err := r.TickOnce(context.Background()); err != nil {
@@ -265,7 +266,7 @@ func TestTickOnce_RiskCapBlocksThirdOpenInSameTick(t *testing.T) {
 	rt := NewRuntime(a, Deps{
 		Strategy: &scriptedStrategy{name: "x", decision: dec},
 		Perp:     perp,
-		Swap:     swp,
+		Swaps:    map[types.ChainID]swap.SwapVenue{types.ChainSolana: swp},
 		Risk:     policy,
 	})
 

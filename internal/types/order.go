@@ -45,6 +45,12 @@ const (
 // OrderIntent is what a Strategy proposes. The agent runtime is responsible
 // for stamping ClientID (deterministic), validating with Risk, and submitting
 // to the Venue.
+//
+// BasisKey, when set, identifies the basis position this order belongs to.
+// Strategies that emit paired swap+order intents set the same BasisKey on
+// both legs so the runtime can reconcile them — necessary for multi-chain
+// where the spot OutToken.Symbol (e.g. "ETH-BASE") differs from the perp
+// Symbol (e.g. "ETH"). Single-chain strategies may leave it empty.
 type OrderIntent struct {
 	Venue       string          `json:"venue"`
 	Symbol      string          `json:"symbol"`
@@ -58,6 +64,7 @@ type OrderIntent struct {
 	PositionID  string          `json:"position_id"`      // links order to a strategy_position
 	DecisionID  string          `json:"decision_id"`      // links order to an agent_decision
 	Slot        int             `json:"slot"`             // ordinal within a decision
+	BasisKey    string          `json:"basis_key,omitempty"`
 	Tag         string          `json:"tag,omitempty"`    // strategy-defined annotation
 }
 

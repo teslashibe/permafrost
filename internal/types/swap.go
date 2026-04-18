@@ -40,6 +40,12 @@ type Quote struct {
 // on-chain asset. The agent runtime requests a Quote, validates it against
 // risk, then submits the Swap and waits for confirmation. ClientID is set by
 // the runtime for idempotency.
+//
+// BasisKey identifies the basis position this leg belongs to. Strategies
+// that emit paired swap+order intents (funding_arb_basic) set the same
+// BasisKey on both legs so the runtime can reconcile them — necessary
+// for multi-chain where the spot OutToken.Symbol (registry name like
+// "ETH-BASE") differs from the perp Symbol (HL name like "ETH").
 type SwapIntent struct {
 	Chain        ChainID         `json:"chain"`
 	InToken      Asset           `json:"in_token"`
@@ -51,6 +57,7 @@ type SwapIntent struct {
 	PositionID   string          `json:"position_id"`
 	DecisionID   string          `json:"decision_id"`
 	Slot         int             `json:"slot"`
+	BasisKey     string          `json:"basis_key,omitempty"`
 	Tag          string          `json:"tag,omitempty"`
 }
 
