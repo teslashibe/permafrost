@@ -8,11 +8,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
 	"github.com/teslashibe/permafrost/internal/types"
 )
+
+// errNoRowsSentinel is what pgx returns from QueryRow.Scan when no row
+// matched. Aliased here so the LatestNAVSnapshot caller doesn't have
+// to import pgx.
+var errNoRowsSentinel = pgx.ErrNoRows
 
 // Store wraps DB access for agent lifecycle and the decision/order/swap
 // audit logs.
@@ -337,6 +343,147 @@ WHERE agent_id = $1 AND underlying = $2 AND state IN ('open', 'opening', 'closin
 // ErrNoOpenBasis is returned by CloseBasis when no open row exists for the
 // supplied agent + underlying. Callers may treat this as a no-op.
 var ErrNoOpenBasis = errors.New("agent: no open basis to close")
+
+// PnLAggregates is what the runtime needs from the audit ledgers to
+// compute a NAV snapshot: cumulative realized P&L since agent inception
+// + cumulative gas + fees across every swap and order.
+type PnLAggregates struct {
+	RealizedPnLUSDC   decimal.Decimal // sum over closed strategy_positions
+	CumulativeGasUSDC decimal.Decimal // gas_paid across every swap
+}
+
+// AggregatesForAgent computes cumulative realized + gas figures for a
+// single agent. Cheap (two indexed scans) so safe to call per-tick.
+func (s *Store) AggregatesForAgent(ctx context.Context, agentID string) (PnLAggregates, error) {
+	var out PnLAggregates
+	const realizedQ = `
+SELECT COALESCE(SUM(realized_basis_pnl + realized_funding - realized_fees - realized_gas), 0)
+FROM strategy_positions
+WHERE agent_id = $1 AND state = 'closed';`
+	if err := s.pool.QueryRow(ctx, realizedQ, agentID).Scan(&out.RealizedPnLUSDC); err != nil {
+		return out, fmt.Errorf("agent: realized aggregate: %w", err)
+	}
+	const gasQ = `SELECT COALESCE(SUM(gas_paid), 0) FROM swaps WHERE agent_id = $1;`
+	if err := s.pool.QueryRow(ctx, gasQ, agentID).Scan(&out.CumulativeGasUSDC); err != nil {
+		return out, fmt.Errorf("agent: gas aggregate: %w", err)
+	}
+	return out, nil
+}
+
+// PersistNAVSnapshotInput is one row in agent_nav_snapshots.
+type PersistNAVSnapshotInput struct {
+	Time                time.Time
+	AgentID             string
+	NAVUSDC             decimal.Decimal
+	SpotValueUSDC       decimal.Decimal
+	PerpUnrealizedUSDC  decimal.Decimal
+	FundingAccruedUSDC  decimal.Decimal
+	RealizedPnLUSDC     decimal.Decimal
+	CumulativeGasUSDC   decimal.Decimal
+	OpenPositions       int
+	PositionsJSON       []byte // serialised []pnl.BasisValuation
+}
+
+// PersistNAVSnapshot inserts (or no-ops on dup) a NAV snapshot row.
+// Idempotent on (agent_id, time) — re-runs at the exact same instant
+// are silently dropped, which matches how the runtime can spam ticks
+// in tests.
+func (s *Store) PersistNAVSnapshot(ctx context.Context, in PersistNAVSnapshotInput) error {
+	const q = `
+INSERT INTO agent_nav_snapshots
+    (time, agent_id, nav_usdc, spot_value_usdc, perp_unrealized_usdc,
+     funding_accrued_usdc, realized_pnl_usdc, cumulative_gas_usdc,
+     open_positions, positions)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+ON CONFLICT (agent_id, time) DO NOTHING;`
+	if _, err := s.pool.Exec(ctx, q,
+		in.Time.UTC(), in.AgentID,
+		in.NAVUSDC, in.SpotValueUSDC, in.PerpUnrealizedUSDC,
+		in.FundingAccruedUSDC, in.RealizedPnLUSDC, in.CumulativeGasUSDC,
+		in.OpenPositions, in.PositionsJSON,
+	); err != nil {
+		return fmt.Errorf("agent: persist nav snapshot: %w", err)
+	}
+	return nil
+}
+
+// NAVSnapshotRow is a single row read back from agent_nav_snapshots.
+type NAVSnapshotRow struct {
+	Time                time.Time
+	AgentID             string
+	NAVUSDC             decimal.Decimal
+	SpotValueUSDC       decimal.Decimal
+	PerpUnrealizedUSDC  decimal.Decimal
+	FundingAccruedUSDC  decimal.Decimal
+	RealizedPnLUSDC     decimal.Decimal
+	CumulativeGasUSDC   decimal.Decimal
+	OpenPositions       int
+	PositionsJSON       []byte
+}
+
+// LatestNAVSnapshot returns the most recent NAV snapshot for an agent,
+// or (nil, nil) if none exists.
+func (s *Store) LatestNAVSnapshot(ctx context.Context, agentID string) (*NAVSnapshotRow, error) {
+	const q = `
+SELECT time, agent_id, nav_usdc, spot_value_usdc, perp_unrealized_usdc,
+       funding_accrued_usdc, realized_pnl_usdc, cumulative_gas_usdc,
+       open_positions, positions
+FROM agent_nav_snapshots
+WHERE agent_id = $1
+ORDER BY time DESC
+LIMIT 1;`
+	var r NAVSnapshotRow
+	if err := s.pool.QueryRow(ctx, q, agentID).Scan(
+		&r.Time, &r.AgentID, &r.NAVUSDC, &r.SpotValueUSDC, &r.PerpUnrealizedUSDC,
+		&r.FundingAccruedUSDC, &r.RealizedPnLUSDC, &r.CumulativeGasUSDC,
+		&r.OpenPositions, &r.PositionsJSON,
+	); err != nil {
+		if errors.Is(err, errNoRows()) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("agent: latest nav: %w", err)
+	}
+	return &r, nil
+}
+
+// NAVHistory returns NAV snapshots since `since` (oldest first), capped
+// to the configured limit. Used by the CLI for time-series printing.
+func (s *Store) NAVHistory(ctx context.Context, agentID string, since time.Time, limit int) ([]NAVSnapshotRow, error) {
+	if limit <= 0 || limit > 10_000 {
+		limit = 1_000
+	}
+	const q = `
+SELECT time, agent_id, nav_usdc, spot_value_usdc, perp_unrealized_usdc,
+       funding_accrued_usdc, realized_pnl_usdc, cumulative_gas_usdc,
+       open_positions, positions
+FROM agent_nav_snapshots
+WHERE agent_id = $1 AND time >= $2
+ORDER BY time ASC
+LIMIT $3;`
+	rows, err := s.pool.Query(ctx, q, agentID, since.UTC(), limit)
+	if err != nil {
+		return nil, fmt.Errorf("agent: nav history: %w", err)
+	}
+	defer rows.Close()
+	var out []NAVSnapshotRow
+	for rows.Next() {
+		var r NAVSnapshotRow
+		if err := rows.Scan(
+			&r.Time, &r.AgentID, &r.NAVUSDC, &r.SpotValueUSDC, &r.PerpUnrealizedUSDC,
+			&r.FundingAccruedUSDC, &r.RealizedPnLUSDC, &r.CumulativeGasUSDC,
+			&r.OpenPositions, &r.PositionsJSON,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// errNoRows is a tiny shim that returns pgx's ErrNoRows without forcing
+// every caller to import the driver. Used only by the nil-result paths
+// above.
+func errNoRows() error { return errNoRowsSentinel }
 
 // LoadOpenBasis returns all currently-open BasisPositions for the agent.
 // Used by the runtime to hydrate its in-memory view on startup.

@@ -416,6 +416,58 @@ POST   /v1/swap/quote                       # passthrough for testing
 
 ---
 
+## 10.5 P&L and reconciliation
+
+Operators need two questions answered without psql gymnastics: *is this strategy making money?* and *do my books match the venues?*. Two read-only systems answer them.
+
+### Per-tick NAV
+
+Every agent tick computes a NAV snapshot via `internal/pnl.Engine.ValueAgent` and persists it to `agent_nav_snapshots`. Each row carries:
+
+- `nav_usdc` — bottom-line equity if everything closed right now
+- `realized_pnl_usdc` — cumulative realized since agent inception (sum of `strategy_positions.realized_*` for closed rows)
+- `spot_value_usdc`, `perp_unrealized_usdc`, `funding_accrued_usdc` — components of unrealized
+- `cumulative_gas_usdc` — gas + fees across every swap/order
+- `positions` — JSONB array of per-basis valuations for ad-hoc inspection
+
+**Mark sources** (configurable per agent in v2; for v1):
+- Spot leg: live quote from the chain's SwapVenue (`token → USDC` for the held quantity), falling back to cost basis when no venue is wired.
+- Perp leg: Hyperliquid's `UnrealizedPnl` directly (it already accounts for funding-paid-during-position), falling back to zero when no Address is configured.
+- Funding accrual: cumulative `realized_funding` from the position; HL `userFunding` integration deferred.
+
+NAV computation NEVER blocks the tick — failures are logged at WARN and the tick continues.
+
+### CLI surface
+
+```
+permafrost pnl summary                     # all agents, latest snapshot
+permafrost pnl summary --live              # recompute against current marks
+permafrost pnl positions <agent>           # per-basis breakdown
+permafrost pnl history <agent> --since 7d  # NAV time series
+```
+
+### Reconciliation
+
+`internal/reconcile.Engine` walks an agent's open `BasisPositions` and verifies each leg against its venue:
+
+- **Perp leg**: HL position must exist with the right side and (within tolerance) the right size.
+- **Spot leg**: on-chain ERC-20/SPL balance must be ≥ expected (over-balance is fine — operator may have manually topped up).
+
+Findings are graded:
+- `info`     — could not verify (no venue wired); not actionable
+- `warning`  — drift within 100bps; operator should look
+- `critical` — leg missing entirely OR side flipped OR drift > 100bps; operator MUST act
+
+```
+permafrost reconcile <agent>             # human table
+permafrost reconcile --json              # machine output
+permafrost reconcile --fail-on-drift     # exit non-zero (cron / CI)
+```
+
+Default tolerance: 25bps; below = silent OK, above = warning, > 100bps = critical.
+
+---
+
 ## 11. Safety rails (non-negotiable)
 
 A leveraged AI agent will absolutely try to nuke the vault if you let it. Day-one requirements:
