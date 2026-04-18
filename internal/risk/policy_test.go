@@ -48,6 +48,44 @@ func TestPolicy_PreTrade_ConcurrentPositions(t *testing.T) {
 	}
 }
 
+// TestPolicy_PreTrade_ClosesAlwaysAllowed: even at cap, reduce-only
+// orders MUST pass — you have to be able to unwind.
+func TestPolicy_PreTrade_ClosesAlwaysAllowed(t *testing.T) {
+	p := NewPolicy(types.RiskLimits{MaxConcurrentPositions: 2})
+	snap := types.PortfolioSnapshot{
+		OpenBasis: []types.BasisPosition{{ID: "1"}, {ID: "2"}, {ID: "3"}}, // even over cap
+	}
+	close := types.OrderIntent{ReduceOnly: true}
+	v := p.PreTrade(context.Background(), "a", close, snap)
+	if v.IsBlock() {
+		t.Errorf("reduce-only order must pass at any open count, got %+v", v)
+	}
+}
+
+// TestPolicy_PreTrade_ClosingSwapAllowed: token→USDC swap is closing,
+// shouldn't be blocked by the position cap.
+func TestPolicy_PreTrade_ClosingSwapAllowed(t *testing.T) {
+	p := NewPolicy(types.RiskLimits{MaxConcurrentPositions: 1})
+	snap := types.PortfolioSnapshot{OpenBasis: []types.BasisPosition{{ID: "1"}}}
+	closingSwap := types.SwapIntent{
+		InToken:  types.Asset{Symbol: "WIF"},
+		OutToken: types.Asset{Symbol: "USDC"},
+		InAmount: d("100"),
+	}
+	if v := p.PreTrade(context.Background(), "a", closingSwap, snap); v.IsBlock() {
+		t.Errorf("closing swap must pass at cap, got %+v", v)
+	}
+
+	openingSwap := types.SwapIntent{
+		InToken:  types.Asset{Symbol: "USDC"},
+		OutToken: types.Asset{Symbol: "WIF"},
+		InAmount: d("100"),
+	}
+	if v := p.PreTrade(context.Background(), "a", openingSwap, snap); !v.IsBlock() {
+		t.Errorf("opening swap MUST be blocked at cap, got %+v", v)
+	}
+}
+
 func TestPolicy_PreTrade_SwapSlippage(t *testing.T) {
 	p := NewPolicy(types.RiskLimits{MaxSpotSlippageBps: 50})
 	intent := types.SwapIntent{SlippageBps: 100, InAmount: d("100")}

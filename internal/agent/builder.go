@@ -13,6 +13,7 @@ import (
 	"github.com/teslashibe/permafrost/internal/exchange"
 	"github.com/teslashibe/permafrost/internal/exchange/hyperliquid"
 	"github.com/teslashibe/permafrost/internal/inference"
+	"github.com/teslashibe/permafrost/internal/risk"
 	"github.com/teslashibe/permafrost/internal/strategy"
 	fab "github.com/teslashibe/permafrost/internal/strategy/funding_arb_basic"
 	"github.com/teslashibe/permafrost/internal/swap"
@@ -91,9 +92,71 @@ func BuildDeps(
 		Strategy: strat,
 		Perp:     venue,
 		Swap:     swapVenue,
+		Risk:     BuildRiskEngine(a),
 		Store:    store,
 		Logger:   log.With("agent_id", a.ID, "network", network, "mode", a.Mode),
 	}, nil
+}
+
+// BuildRiskEngine constructs a risk.Policy from the agent's persisted
+// risk-limit overrides (agent.Config["risk"] keys). Sensible defaults
+// fill in anything the operator omitted; passing zero everywhere
+// effectively disables checks (cap=0, exposure=0, etc.) — explicit opt-in.
+//
+// Recognised keys under agent.Config["risk"] (all optional):
+//
+//	max_concurrent_positions: int
+//	max_notional_per_leg:     decimal/string/number (USDC)
+//	max_total_basis_exposure: decimal/string/number (USDC)
+//	max_daily_loss:           decimal/string/number (USDC)
+//	max_spot_slippage_bps:    int
+//	max_drawdown:             decimal/string/number (fraction, e.g. 0.10 = 10%)
+//
+// The drawdown breaker is always installed; max_drawdown=0 disables it.
+// The daily-loss breaker is always installed; max_daily_loss=0 disables it.
+func BuildRiskEngine(a Agent) *risk.Policy {
+	limits := types.RiskLimits{}
+	maxDrawdown := decimal.Zero
+
+	if rawAny, ok := a.Config["risk"]; ok {
+		if rawMap, ok := rawAny.(map[string]any); ok {
+			if v, ok := rawMap["max_concurrent_positions"]; ok {
+				if i, err := intFromAny(v); err == nil {
+					limits.MaxConcurrentPositions = i
+				}
+			}
+			if v, ok := rawMap["max_notional_per_leg"]; ok {
+				if d, err := decimalFromAny(v); err == nil {
+					limits.MaxNotionalPerLeg = d
+				}
+			}
+			if v, ok := rawMap["max_total_basis_exposure"]; ok {
+				if d, err := decimalFromAny(v); err == nil {
+					limits.MaxTotalBasisExposure = d
+				}
+			}
+			if v, ok := rawMap["max_daily_loss"]; ok {
+				if d, err := decimalFromAny(v); err == nil {
+					limits.MaxDailyLoss = d
+				}
+			}
+			if v, ok := rawMap["max_spot_slippage_bps"]; ok {
+				if i, err := intFromAny(v); err == nil {
+					limits.MaxSpotSlippageBps = i
+				}
+			}
+			if v, ok := rawMap["max_drawdown"]; ok {
+				if d, err := decimalFromAny(v); err == nil {
+					maxDrawdown = d
+				}
+			}
+		}
+	}
+
+	return risk.NewPolicy(limits,
+		risk.MaxDrawdownBreaker{MaxFraction: maxDrawdown},
+		risk.DailyLossBreaker{},
+	)
 }
 
 // ErrNoSolanaSigner is returned by BuildSolanaSwapVenue when the

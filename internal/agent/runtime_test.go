@@ -8,10 +8,18 @@ import (
 	"github.com/shopspring/decimal"
 
 	exchangenoop "github.com/teslashibe/permafrost/internal/exchange/noop"
+	"github.com/teslashibe/permafrost/internal/risk"
 	"github.com/teslashibe/permafrost/internal/strategy"
 	swapnoop "github.com/teslashibe/permafrost/internal/swap/noop"
 	"github.com/teslashibe/permafrost/internal/types"
 )
+
+// risknew is a small helper for runtime tests: builds a risk.Policy with
+// just MaxConcurrentPositions set and no breakers (zero drawdown
+// disables it).
+func risknew(maxConcurrent int) *risk.Policy {
+	return risk.NewPolicy(types.RiskLimits{MaxConcurrentPositions: maxConcurrent})
+}
 
 // scriptedStrategy returns the same Decision every tick.
 type scriptedStrategy struct {
@@ -217,6 +225,92 @@ func TestReconcileOpenBasis_SkipsHalfOpenAfterFailedSwap(t *testing.T) {
 		map[string]bool{"WIF": true})       // orderOK: WIF placed
 	if got := len(r.snapshotOpenBasis()); got != 0 {
 		t.Errorf("expected NO basis when swap failed, got %d", got)
+	}
+}
+
+// TestTickOnce_RiskCapBlocksThirdOpenInSameTick is the integration
+// proof for the new wiring. Strategy emits 3 paired opens in one tick
+// with MaxConcurrentPositions=2 — only the first 2 should reach the
+// venue; the 3rd is blocked at the risk gate.
+func TestTickOnce_RiskCapBlocksThirdOpenInSameTick(t *testing.T) {
+	mk := func(sym string) (types.SwapIntent, types.OrderIntent) {
+		return types.SwapIntent{
+				Chain:    types.ChainSolana,
+				InToken:  types.Asset{Symbol: "USDC", Chain: types.ChainSolana},
+				OutToken: types.Asset{Symbol: sym, Chain: types.ChainSolana, Mint: sym + "_mint"},
+				InAmount: decimal.NewFromInt(100),
+			},
+			types.OrderIntent{
+				Venue: "hyperliquid", Symbol: sym, Side: types.SideSell,
+				Type: types.OrderTypeLimit, Price: decimal.NewFromInt(1), Size: decimal.NewFromInt(100),
+			}
+	}
+	swapWIF, orderWIF := mk("WIF")
+	swapBONK, orderBONK := mk("BONK")
+	swapPOPCAT, orderPOPCAT := mk("POPCAT")
+
+	dec := strategy.Decision{
+		Notes:  "open 3",
+		Swaps:  []types.SwapIntent{swapWIF, swapBONK, swapPOPCAT},
+		Orders: []types.OrderIntent{orderWIF, orderBONK, orderPOPCAT},
+	}
+
+	perp := exchangenoop.New()
+	swp := swapnoop.New()
+	a := Agent{ID: "a", Strategy: "x", Mode: ModeLive}
+
+	// Cap at 2 concurrent positions. No drawdown breaker (zero MaxFraction).
+	policy := risknew(2)
+
+	rt := NewRuntime(a, Deps{
+		Strategy: &scriptedStrategy{name: "x", decision: dec},
+		Perp:     perp,
+		Swap:     swp,
+		Risk:     policy,
+	})
+
+	if _, err := rt.TickOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	// Two pairs (WIF, BONK) should have hit the venues; POPCAT blocked.
+	if got := len(swp.Submitted()); got != 2 {
+		t.Errorf("swaps submitted: got %d want 2", got)
+	}
+	if got := len(perp.Placed()); got != 2 {
+		t.Errorf("orders placed: got %d want 2", got)
+	}
+
+	// Open basis (after reconcile) should be exactly 2.
+	if got := len(rt.snapshotOpenBasis()); got != 2 {
+		t.Errorf("open basis after tick: got %d want 2", got)
+	}
+}
+
+// TestTickOnce_RiskAllowsCloseAtCap: at cap, a reduce-only close MUST
+// still pass even though MaxConcurrentPositions is hit.
+func TestTickOnce_RiskAllowsCloseAtCap(t *testing.T) {
+	perp := exchangenoop.New()
+	a := Agent{ID: "a", Strategy: "x", Mode: ModeLive}
+
+	rt := NewRuntime(a, Deps{
+		Strategy: &scriptedStrategy{name: "x", decision: strategy.Decision{
+			Orders: []types.OrderIntent{{
+				Venue: "hyperliquid", Symbol: "WIF", Side: types.SideBuy,
+				ReduceOnly: true, Type: types.OrderTypeMarket, Size: decimal.NewFromInt(100),
+			}},
+		}},
+		Perp: perp,
+		Risk: risknew(1),
+	})
+	// Pre-fill openBasis to cap.
+	rt.openBasis["WIF"] = types.BasisPosition{Underlying: "WIF", State: types.BasisStateOpen}
+
+	if _, err := rt.TickOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(perp.Placed()); got != 1 {
+		t.Errorf("close should pass risk; got %d placed", got)
 	}
 }
 

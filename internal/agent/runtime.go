@@ -253,24 +253,83 @@ func (r *Runtime) persistDecision(ctx context.Context, now time.Time, decisionID
 // status but does not produce a basis-position row — leaving the strategy
 // free to retry on the next tick instead of believing it already has the
 // position.
+//
+// Risk PreTrade is evaluated per intent against a fresh PortfolioSnapshot
+// that includes any in-flight opens accepted earlier in this tick. This
+// matters for MaxConcurrentPositions: with cap=2 and the strategy
+// emitting 5 opens, the first 2 pass and the 3rd-5th get blocked.
+//
+// Inflight is tracked per-symbol (not just a count) so the perp order leg
+// for an already-accepted spot leg doesn't double-count against the cap —
+// they're two legs of one basis.
 func (r *Runtime) executeSwapsThenOrders(ctx context.Context, now time.Time, decisionID string, _ strategy.DecisionInput, dec strategy.Decision) {
-	swapOK := map[string]bool{}  // keyed by uppercased OUT-token symbol
-	orderOK := map[string]bool{} // keyed by uppercased perp symbol
+	swapOK := map[string]bool{}        // keyed by uppercased OUT-token symbol
+	orderOK := map[string]bool{}       // keyed by uppercased perp symbol
+	inflightOpens := map[string]bool{} // symbols whose open was accepted this tick
 
 	for i, s := range dec.Swaps {
-		if r.executeSwap(ctx, now, decisionID, i, s) {
-			swapOK[strings.ToUpper(s.OutToken.Symbol)] = true
+		snap := r.riskSnapshot(inflightOpens, "")
+		if r.executeSwap(ctx, now, decisionID, i, s, snap) {
+			key := strings.ToUpper(s.OutToken.Symbol)
+			swapOK[key] = true
+			if isOpeningSwap(s) {
+				inflightOpens[key] = true
+			}
 		}
 	}
 	for i, o := range dec.Orders {
-		if r.executeOrder(ctx, now, decisionID, i, o) {
-			orderOK[strings.ToUpper(o.Symbol)] = true
+		// If this order's perp leg is paired with a swap already accepted
+		// in this tick, exclude its symbol from the inflight count — the
+		// swap leg already claimed the cap slot for this basis.
+		key := strings.ToUpper(o.Symbol)
+		exclude := ""
+		if !o.ReduceOnly && o.Side == types.SideSell && inflightOpens[key] {
+			exclude = key
+		}
+		snap := r.riskSnapshot(inflightOpens, exclude)
+		if r.executeOrder(ctx, now, decisionID, i, o, snap) {
+			orderOK[key] = true
+			// If this order opened WITHOUT a paired swap (no inflight
+			// match), it counts as a brand-new open for subsequent
+			// intents in this tick.
+			if !o.ReduceOnly && o.Side == types.SideSell && !swapOK[key] {
+				inflightOpens[key] = true
+			}
 		}
 	}
 	for _, c := range dec.Cancels {
 		r.executeCancel(ctx, c)
 	}
 	r.reconcileOpenBasis(ctx, now, decisionID, dec, swapOK, orderOK)
+}
+
+// riskSnapshot builds a PortfolioSnapshot for risk evaluation. It includes
+// the runtime's currently-tracked open basis positions PLUS phantom
+// "opening" entries for symbols accepted earlier in this tick, so
+// MaxConcurrentPositions accumulates intra-tick. excludeSymbol (uppercase)
+// lets the perp leg of a paired open avoid double-counting its own swap.
+func (r *Runtime) riskSnapshot(inflightOpens map[string]bool, excludeSymbol string) types.PortfolioSnapshot {
+	snap := types.PortfolioSnapshot{
+		Time:      r.now(),
+		OpenBasis: r.snapshotOpenBasis(),
+	}
+	for sym := range inflightOpens {
+		if sym == excludeSymbol {
+			continue
+		}
+		snap.OpenBasis = append(snap.OpenBasis, types.BasisPosition{
+			Underlying: sym,
+			State:      types.BasisStateOpening,
+		})
+	}
+	return snap
+}
+
+// isOpeningSwap reports whether a SwapIntent represents the spot leg of
+// opening a new basis (USDC → non-USDC). Mirrors the helper in
+// risk/policy.go so the runtime can count opens consistently.
+func isOpeningSwap(s types.SwapIntent) bool {
+	return s.InToken.Symbol == "USDC" && s.OutToken.Symbol != "USDC"
 }
 
 // reconcileOpenBasis maintains the runtime's in-memory view of open basis
@@ -373,14 +432,18 @@ func (r *Runtime) reconcileOpenBasis(ctx context.Context, now time.Time, decisio
 // or confirmed on chain (live). A return of false means the basis pair
 // MUST NOT be reconciled into the open-basis set — the position would be
 // half-open at best, which is worse than retrying on the next tick.
-func (r *Runtime) executeSwap(ctx context.Context, now time.Time, decisionID string, slot int, s types.SwapIntent) bool {
+func (r *Runtime) executeSwap(ctx context.Context, now time.Time, decisionID string, slot int, s types.SwapIntent, snap types.PortfolioSnapshot) bool {
 	if s.ClientID == "" {
 		s.ClientID = clientIDFromSwap(r.agent.ID, decisionID, slot, s)
 	}
 	if r.deps.Risk != nil {
-		v := r.deps.Risk.PreTrade(ctx, r.agent.ID, s, types.PortfolioSnapshot{})
+		v := r.deps.Risk.PreTrade(ctx, r.agent.ID, s, snap)
 		if v.IsBlock() {
-			r.deps.Logger.Warn("swap blocked by risk", "agent_id", r.agent.ID, "reason", v.Reason)
+			r.deps.Logger.Warn("swap blocked by risk",
+				"agent_id", r.agent.ID,
+				"reason", v.Reason,
+				"detail", v.Detail,
+				"out_token", s.OutToken.Symbol)
 			return false
 		}
 	}
@@ -416,16 +479,20 @@ func (r *Runtime) executeSwap(ctx context.Context, now time.Time, decisionID str
 // executeOrder returns true iff the order was accepted (paper "open" or
 // live ack with non-rejected status). False means the basis pair must
 // not be reconciled.
-func (r *Runtime) executeOrder(ctx context.Context, now time.Time, decisionID string, slot int, o types.OrderIntent) bool {
+func (r *Runtime) executeOrder(ctx context.Context, now time.Time, decisionID string, slot int, o types.OrderIntent, snap types.PortfolioSnapshot) bool {
 	if o.ClientID == "" {
 		o.ClientID = types.DeriveClientID(r.agent.ID, decisionID, slot, o.Venue, o.Symbol, o.Side, o.Size)
 	}
 	o.DecisionID = decisionID
 	o.Slot = slot
 	if r.deps.Risk != nil {
-		v := r.deps.Risk.PreTrade(ctx, r.agent.ID, o, types.PortfolioSnapshot{})
+		v := r.deps.Risk.PreTrade(ctx, r.agent.ID, o, snap)
 		if v.IsBlock() {
-			r.deps.Logger.Warn("order blocked by risk", "agent_id", r.agent.ID, "reason", v.Reason)
+			r.deps.Logger.Warn("order blocked by risk",
+				"agent_id", r.agent.ID,
+				"reason", v.Reason,
+				"detail", v.Detail,
+				"symbol", o.Symbol)
 			return false
 		}
 	}
