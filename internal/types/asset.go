@@ -6,12 +6,40 @@ package types
 import "fmt"
 
 // ChainID identifies a settlement venue or chain.
+//
+// Conventions:
+//   - lowercase short name
+//   - perp venues are still ChainIDs (Hyperliquid)
+//   - EVM chain ids match the human-readable name (ethereum/base/avalanche/bsc),
+//     not the numeric chain id; the numeric id lives in chain/evm/chains.go.
 type ChainID string
 
 const (
 	ChainHyperliquid ChainID = "hyperliquid"
 	ChainSolana      ChainID = "solana"
+
+	// EVM chains supported for spot legs via DEX aggregators.
+	ChainEthereum  ChainID = "ethereum"
+	ChainBase      ChainID = "base"
+	ChainAvalanche ChainID = "avalanche"
+	ChainBSC       ChainID = "bsc"
 )
+
+// IsEVM reports whether the chain settles via the EVM execution model
+// (so the EVM signer + JSON-RPC stack apply).
+func (c ChainID) IsEVM() bool {
+	switch c {
+	case ChainEthereum, ChainBase, ChainAvalanche, ChainBSC:
+		return true
+	}
+	return false
+}
+
+// IsSpotChain reports whether the chain hosts spot tokens that the
+// strategy can route through (i.e. has a SwapVenue adapter).
+func (c ChainID) IsSpotChain() bool {
+	return c == ChainSolana || c.IsEVM()
+}
 
 // Asset is a chain-bound token. For perpetual symbols traded on Hyperliquid,
 // Mint holds the perp symbol (e.g. "WIF-PERP") and Decimals holds the on-venue

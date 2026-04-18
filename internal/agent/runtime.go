@@ -26,13 +26,33 @@ import (
 // The intention is one Runtime per Agent; the Supervisor builds Deps from
 // the global registries (venues, inference, etc.).
 type Deps struct {
-	Strategy   strategy.Strategy
-	Perp       exchange.Venue
-	Swap       swap.SwapVenue
-	Inference  inference.Provider
-	Risk       risk.Engine
-	Store      *Store
-	Logger     *slog.Logger
+	Strategy strategy.Strategy
+	Perp     exchange.Venue
+
+	// Swaps routes a SwapIntent to the appropriate on-chain venue by
+	// the intent's Chain field. v1 supports:
+	//   - types.ChainSolana    → Jupiter (internal/swap/jupiter)
+	//   - types.ChainEthereum  → 1inch
+	//   - types.ChainBase      → 1inch
+	//   - types.ChainAvalanche → 1inch
+	//   - types.ChainBSC       → 1inch
+	// Empty map / missing entry for a given chain → the runtime
+	// downgrades that intent to paper-spot bookkeeping.
+	Swaps map[types.ChainID]swap.SwapVenue
+
+	Inference inference.Provider
+	Risk      risk.Engine
+	Store     *Store
+	Logger    *slog.Logger
+}
+
+// SwapVenueForChain returns the venue routed for the given chain or nil
+// if none is configured.
+func (d Deps) SwapVenueForChain(c types.ChainID) swap.SwapVenue {
+	if d.Swaps == nil {
+		return nil
+	}
+	return d.Swaps[c]
 }
 
 // Runtime drives the tick loop for one Agent.
@@ -172,13 +192,16 @@ func (r *Runtime) tickOnce(ctx context.Context) (strategy.Decision, error) {
 
 	// One concise per-tick log so operators can see the daemon working
 	// without enabling debug. This is the only INFO line emitted per tick.
+	// open_basis is the post-tick count (after reconcile), not the
+	// pre-tick snapshot — operators care about "what state did this tick
+	// leave us in".
 	r.deps.Logger.Info("tick",
 		"agent_id", r.agent.ID,
 		"decision_id", decisionID,
 		"swaps", len(dec.Swaps),
 		"orders", len(dec.Orders),
 		"cancels", len(dec.Cancels),
-		"open_basis", len(in.BasisPositions),
+		"open_basis", len(r.snapshotOpenBasis()),
 	)
 	return dec, nil
 }
@@ -259,18 +282,20 @@ func (r *Runtime) persistDecision(ctx context.Context, now time.Time, decisionID
 // matters for MaxConcurrentPositions: with cap=2 and the strategy
 // emitting 5 opens, the first 2 pass and the 3rd-5th get blocked.
 //
-// Inflight is tracked per-symbol (not just a count) so the perp order leg
-// for an already-accepted spot leg doesn't double-count against the cap —
-// they're two legs of one basis.
+// Inflight + success are tracked per BasisKey when the strategy supplies
+// it (multi-chain pairs like ETH-BASE need an explicit key because the
+// spot OutToken.Symbol differs from the perp Symbol). Falls back to the
+// symbol-based key for legacy/single-chain strategies that don't set
+// BasisKey.
 func (r *Runtime) executeSwapsThenOrders(ctx context.Context, now time.Time, decisionID string, _ strategy.DecisionInput, dec strategy.Decision) {
-	swapOK := map[string]bool{}        // keyed by uppercased OUT-token symbol
-	orderOK := map[string]bool{}       // keyed by uppercased perp symbol
-	inflightOpens := map[string]bool{} // symbols whose open was accepted this tick
+	swapOK := map[string]bool{}        // keyed by basis key (or out-token symbol if missing)
+	orderOK := map[string]bool{}       // keyed by basis key (or perp symbol if missing)
+	inflightOpens := map[string]bool{} // basis keys (or symbols) accepted this tick
 
 	for i, s := range dec.Swaps {
 		snap := r.riskSnapshot(inflightOpens, "")
 		if r.executeSwap(ctx, now, decisionID, i, s, snap) {
-			key := strings.ToUpper(s.OutToken.Symbol)
+			key := swapBasisKey(s)
 			swapOK[key] = true
 			if isOpeningSwap(s) {
 				inflightOpens[key] = true
@@ -279,9 +304,9 @@ func (r *Runtime) executeSwapsThenOrders(ctx context.Context, now time.Time, dec
 	}
 	for i, o := range dec.Orders {
 		// If this order's perp leg is paired with a swap already accepted
-		// in this tick, exclude its symbol from the inflight count — the
-		// swap leg already claimed the cap slot for this basis.
-		key := strings.ToUpper(o.Symbol)
+		// in this tick (same BasisKey), exclude that key from the inflight
+		// count — the swap leg already claimed the cap slot for this basis.
+		key := orderBasisKey(o)
 		exclude := ""
 		if !o.ReduceOnly && o.Side == types.SideSell && inflightOpens[key] {
 			exclude = key
@@ -301,6 +326,26 @@ func (r *Runtime) executeSwapsThenOrders(ctx context.Context, now time.Time, dec
 		r.executeCancel(ctx, c)
 	}
 	r.reconcileOpenBasis(ctx, now, decisionID, dec, swapOK, orderOK)
+}
+
+// swapBasisKey returns the canonical basis-pair key for a swap intent.
+// Strategies that emit paired swap+order intents set BasisKey; we
+// fall back to OutToken.Symbol so older single-chain code still works.
+func swapBasisKey(s types.SwapIntent) string {
+	if s.BasisKey != "" {
+		return strings.ToUpper(s.BasisKey)
+	}
+	return strings.ToUpper(s.OutToken.Symbol)
+}
+
+// orderBasisKey returns the canonical basis-pair key for an order intent.
+// Strategies that emit paired swap+order intents set BasisKey; we fall
+// back to Symbol so single-symbol-equals-everything strategies still work.
+func orderBasisKey(o types.OrderIntent) string {
+	if o.BasisKey != "" {
+		return strings.ToUpper(o.BasisKey)
+	}
+	return strings.ToUpper(o.Symbol)
 }
 
 // riskSnapshot builds a PortfolioSnapshot for risk evaluation. It includes
@@ -348,14 +393,16 @@ func (r *Runtime) reconcileOpenBasis(ctx context.Context, now time.Time, decisio
 	defer r.posMu.Unlock()
 
 	// Closes first — for any reduce-only order where we already track an
-	// open basis on that symbol, drop it. This matches funding_arb_basic's
-	// closeIntents shape (reduce-only buy + spot→USDC swap).
+	// open basis on that BasisKey (or perp symbol fallback), drop it.
+	// This matches funding_arb_basic's closeIntents shape (reduce-only
+	// buy + spot→USDC swap).
 	for _, o := range dec.Orders {
 		if !o.ReduceOnly {
 			continue
 		}
-		key := strings.ToUpper(o.Symbol)
-		if _, ok := r.openBasis[key]; !ok {
+		key := orderBasisKey(o)
+		bp, ok := r.openBasis[key]
+		if !ok {
 			continue
 		}
 		// Only close on a successful reduce-only order; a failed close
@@ -363,32 +410,34 @@ func (r *Runtime) reconcileOpenBasis(ctx context.Context, now time.Time, decisio
 		// drop our local view.
 		if orderOK != nil && !orderOK[key] {
 			r.deps.Logger.Warn("close intent failed; basis remains open in our view",
-				"agent_id", r.agent.ID, "underlying", o.Symbol)
+				"agent_id", r.agent.ID, "underlying", bp.Underlying)
 			continue
 		}
 		delete(r.openBasis, key)
 		if r.deps.Store != nil {
-			if err := r.deps.Store.CloseBasis(ctx, r.agent.ID, o.Symbol); err != nil && !errors.Is(err, ErrNoOpenBasis) {
+			if err := r.deps.Store.CloseBasis(ctx, r.agent.ID, bp.Underlying); err != nil && !errors.Is(err, ErrNoOpenBasis) {
 				r.deps.Logger.Warn("persist close basis failed",
-					"agent_id", r.agent.ID, "underlying", o.Symbol, "err", err)
+					"agent_id", r.agent.ID, "underlying", bp.Underlying, "err", err)
 			}
 		}
 	}
 
-	// Opens — pair non-reduce-only sell orders with USDC→token swaps in the
-	// same Decision.
-	swapsByOut := map[string]types.SwapIntent{}
+	// Opens — pair USDC→token swaps with non-reduce-only sell orders by
+	// BasisKey. Strategies that don't set BasisKey fall back to symbol
+	// matching (out-token symbol == perp symbol), which still works for
+	// single-chain Solana entries where they coincide.
+	swapsByKey := map[string]types.SwapIntent{}
 	for _, s := range dec.Swaps {
 		if s.InToken.Symbol == "USDC" && s.OutToken.Symbol != "USDC" {
-			swapsByOut[strings.ToUpper(s.OutToken.Symbol)] = s
+			swapsByKey[swapBasisKey(s)] = s
 		}
 	}
 	for _, o := range dec.Orders {
 		if o.ReduceOnly || o.Side != types.SideSell {
 			continue
 		}
-		key := strings.ToUpper(o.Symbol)
-		s, ok := swapsByOut[key]
+		key := orderBasisKey(o)
+		s, ok := swapsByKey[key]
 		if !ok {
 			continue
 		}
@@ -403,14 +452,21 @@ func (r *Runtime) reconcileOpenBasis(ctx context.Context, now time.Time, decisio
 		perpSucceeded := orderOK == nil || orderOK[key]
 		if !spotSucceeded || !perpSucceeded {
 			r.deps.Logger.Warn("partial open; skipping basis reconcile",
-				"agent_id", r.agent.ID, "underlying", o.Symbol,
+				"agent_id", r.agent.ID, "basis_key", key,
 				"spot_ok", spotSucceeded, "perp_ok", perpSucceeded)
 			continue
+		}
+		// underlying is the BasisKey when the strategy supplied one
+		// (so multi-chain entries are uniquely named like ETH-BASE);
+		// otherwise the perp symbol, preserving v1 behaviour.
+		underlying := o.Symbol
+		if o.BasisKey != "" {
+			underlying = o.BasisKey
 		}
 		bp := types.BasisPosition{
 			ID:         "bp:" + r.agent.ID + ":" + key + ":" + safeShortID(decisionID),
 			AgentID:    r.agent.ID,
-			Underlying: o.Symbol,
+			Underlying: underlying,
 			State:      types.BasisStateOpen,
 			OpenedAt:   now,
 			Legs: []types.BasisLeg{
@@ -447,32 +503,37 @@ func (r *Runtime) executeSwap(ctx context.Context, now time.Time, decisionID str
 			return false
 		}
 	}
-	if r.agent.Mode == ModePaper || r.deps.Swap == nil {
-		r.recordSwap(ctx, now, decisionID, s, "", types.SwapStatusConfirmed, true, s.InAmount, decimal.Zero)
+	venue := r.deps.SwapVenueForChain(s.Chain)
+	if r.agent.Mode == ModePaper || venue == nil {
+		dex := ""
+		if venue != nil {
+			dex = venue.Name()
+		}
+		r.recordSwapWithDEX(ctx, now, decisionID, s, dex, "", types.SwapStatusConfirmed, true, s.InAmount, decimal.Zero)
 		return true
 	}
 
-	q, err := r.deps.Swap.Quote(ctx, types.QuoteRequest{
+	q, err := venue.Quote(ctx, types.QuoteRequest{
 		InToken: s.InToken, OutToken: s.OutToken, Amount: s.InAmount, Mode: types.QuoteExactIn,
 	})
 	if err != nil {
-		r.deps.Logger.Error("swap quote failed", "err", err)
-		r.recordSwap(ctx, now, decisionID, s, "", types.SwapStatusFailed, false, decimal.Zero, decimal.Zero)
+		r.deps.Logger.Error("swap quote failed", "chain", s.Chain, "err", err)
+		r.recordSwapWithDEX(ctx, now, decisionID, s, venue.Name(), "", types.SwapStatusFailed, false, decimal.Zero, decimal.Zero)
 		return false
 	}
-	tx, err := r.deps.Swap.Swap(ctx, q, s.SlippageBps)
+	tx, err := venue.Swap(ctx, q, s.SlippageBps)
 	if err != nil {
-		r.deps.Logger.Error("swap submit failed", "err", err)
-		r.recordSwap(ctx, now, decisionID, s, "", types.SwapStatusFailed, false, decimal.Zero, decimal.Zero)
+		r.deps.Logger.Error("swap submit failed", "chain", s.Chain, "err", err)
+		r.recordSwapWithDEX(ctx, now, decisionID, s, venue.Name(), "", types.SwapStatusFailed, false, decimal.Zero, decimal.Zero)
 		return false
 	}
-	res, err := r.deps.Swap.WaitConfirm(ctx, tx)
+	res, err := venue.WaitConfirm(ctx, tx)
 	if err != nil {
-		r.deps.Logger.Error("swap confirm failed", "err", err)
-		r.recordSwap(ctx, now, decisionID, s, string(tx), types.SwapStatusFailed, false, decimal.Zero, decimal.Zero)
+		r.deps.Logger.Error("swap confirm failed", "chain", s.Chain, "err", err)
+		r.recordSwapWithDEX(ctx, now, decisionID, s, venue.Name(), string(tx), types.SwapStatusFailed, false, decimal.Zero, decimal.Zero)
 		return false
 	}
-	r.recordSwap(ctx, now, decisionID, s, string(res.TxHash), res.Status, false, res.OutAmount, res.GasNative)
+	r.recordSwapWithDEX(ctx, now, decisionID, s, venue.Name(), string(res.TxHash), res.Status, false, res.OutAmount, res.GasNative)
 	return res.Status == types.SwapStatusConfirmed
 }
 
@@ -520,12 +581,19 @@ func (r *Runtime) executeCancel(ctx context.Context, id types.OrderID) {
 }
 
 func (r *Runtime) recordSwap(ctx context.Context, now time.Time, decisionID string, s types.SwapIntent, txHash string, status types.SwapStatus, paper bool, outAmt, gas decimal.Decimal) {
+	r.recordSwapWithDEX(ctx, now, decisionID, s, "", txHash, status, paper, outAmt, gas)
+}
+
+// recordSwapWithDEX persists a swap with an explicit DEX label (the
+// venue's Name() if known). The variant exists so multi-chain routing
+// can record the right venue per chain instead of always pointing at
+// the first one in the map.
+func (r *Runtime) recordSwapWithDEX(ctx context.Context, now time.Time, decisionID string, s types.SwapIntent, dex, txHash string, status types.SwapStatus, paper bool, outAmt, gas decimal.Decimal) {
 	if r.deps.Store == nil {
 		return
 	}
-	dex := "noop"
-	if r.deps.Swap != nil {
-		dex = r.deps.Swap.Name()
+	if dex == "" {
+		dex = "noop"
 	}
 	if err := r.deps.Store.PersistSwap(ctx, PersistSwapInput{
 		Time:        now,

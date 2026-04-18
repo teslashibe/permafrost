@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/teslashibe/permafrost/internal/assets"
+	"github.com/teslashibe/permafrost/internal/types"
 	walletnoop "github.com/teslashibe/permafrost/internal/wallet/noop"
 )
 
@@ -200,8 +201,8 @@ func TestBuildDeps_PopulatesSwapWhenSolanaConfigured(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if deps.Swap == nil {
-		t.Fatal("expected Deps.Swap to be populated")
+	if deps.SwapVenueForChain(types.ChainSolana) == nil {
+		t.Fatal("expected Deps.Swaps[solana] to be populated")
 	}
 	if deps.Perp == nil {
 		t.Fatal("expected Deps.Perp to be populated")
@@ -215,8 +216,11 @@ func TestBuildDeps_LeavesSwapNilWhenSolanaUnconfigured(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if deps.Swap != nil {
-		t.Error("Swap should be nil when Solana is unconfigured (paper-spot fallback)")
+	if deps.SwapVenueForChain(types.ChainSolana) != nil {
+		t.Error("Solana venue should be nil when unconfigured (paper-spot fallback)")
+	}
+	if len(deps.Swaps) != 0 {
+		t.Errorf("Swaps map should be empty, got %d entries", len(deps.Swaps))
 	}
 }
 
@@ -229,8 +233,27 @@ func TestBuildDeps_DegradesWhenSolanaConfiguredButNoSigner(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildDeps should not error when degrading to paper-spot: %v", err)
 	}
-	if deps.Swap != nil {
-		t.Error("Swap should be nil when no Solana signer available")
+	if deps.SwapVenueForChain(types.ChainSolana) != nil {
+		t.Error("Solana venue should be nil when no Solana signer available")
+	}
+}
+
+// TestBuildDeps_DegradesWhenEVMConfiguredButNoSigner verifies the same
+// graceful-degradation pattern for EVM chains: configured but no
+// keystore = warn + skip, never error.
+func TestBuildDeps_DegradesWhenEVMConfiguredButNoSigner(t *testing.T) {
+	reg, _ := assets.LoadEmbedded()
+	a := Agent{ID: "ag", Strategy: "funding_arb_basic", Universe: []string{"WIF"}}
+	deps, err := BuildDeps(a, reg, nil, nil, nil, BuildOptions{
+		EVM: map[types.ChainID]EVMSpot{
+			types.ChainBase: {RPCURL: "https://mainnet.base.org", OneInchAPIKey: "stub"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("BuildDeps should not error when degrading EVM to paper-spot: %v", err)
+	}
+	if deps.SwapVenueForChain(types.ChainBase) != nil {
+		t.Error("Base venue should be nil when no EVM signer available")
 	}
 }
 
@@ -240,6 +263,21 @@ func TestSolanaSpot_IsEnabled(t *testing.T) {
 	}
 	if !(SolanaSpot{RPCURL: "x"}).IsEnabled() {
 		t.Error("RPCURL alone must enable")
+	}
+}
+
+func TestEVMSpot_IsEnabled(t *testing.T) {
+	if (EVMSpot{}).IsEnabled() {
+		t.Error("zero EVMSpot must be disabled")
+	}
+	if (EVMSpot{RPCURL: "x"}).IsEnabled() {
+		t.Error("RPCURL alone is not enough; need API key")
+	}
+	if (EVMSpot{OneInchAPIKey: "k"}).IsEnabled() {
+		t.Error("API key alone is not enough; need RPC URL")
+	}
+	if !(EVMSpot{RPCURL: "x", OneInchAPIKey: "k"}).IsEnabled() {
+		t.Error("RPCURL + API key must enable")
 	}
 }
 

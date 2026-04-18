@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -415,6 +416,7 @@ Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 				HyperliquidNetwork: networkOverride,
 				HyperliquidAddress: hlAddress,
 				Solana:             solanaSpotFromConfig(g.Config.Solana),
+				EVM:                evmSpotsFromConfig(g.Config.EVM, os.Getenv),
 			})
 			if err != nil {
 				return err
@@ -584,18 +586,21 @@ func parseFundingArgs(args []string) []agentFundingArg {
 }
 
 // FundingRates implements the Venue method we override; it returns synthetic
-// per-hour rates derived from the requested annualised values.
+// per-hour rates derived from the requested annualised values. MarkPrice
+// defaults to 1.0 so the strategy can size the perp leg (cap_usdc / mark)
+// without an explicit price feed — fine for paper-mode plumbing tests.
 func (v *tickFundingVenue) FundingRates(_ context.Context, _ []string) ([]types.FundingRate, error) {
 	now := time.Now().UTC()
 	hoursPerYear := decimal.NewFromInt(24 * 365)
 	out := make([]types.FundingRate, 0, len(v.rates))
 	for _, r := range v.rates {
 		out = append(out, types.FundingRate{
-			Time:     now,
-			Venue:    "synthetic",
-			Symbol:   r.Symbol,
-			Rate:     r.Annualised.Div(hoursPerYear),
-			Interval: time.Hour,
+			Time:      now,
+			Venue:     "synthetic",
+			Symbol:    r.Symbol,
+			Rate:      r.Annualised.Div(hoursPerYear),
+			Interval:  time.Hour,
+			MarkPrice: decimal.NewFromInt(1),
 		})
 	}
 	return out, nil
@@ -629,6 +634,38 @@ func solanaSpotFromConfig(cfg config.SolanaConfig) agent.SolanaSpot {
 		PriorityFeeMicroLamports: cfg.PriorityFeeMicroLamports,
 		ConfirmationTimeoutSecs:  cfg.ConfirmationTimeoutSecs,
 	}
+}
+
+// evmSpotsFromConfig translates the cli config view into the agent
+// builder's per-chain map. Unknown chain names in evm.chains.{name}
+// are skipped with a no-op (operators are warned via a log line in
+// the supervisor — here we silently drop to keep the helper pure).
+//
+// API key resolution: env var OneInchAPIKeyEnv wins over inline
+// OneInchAPIKey; both empty disables EVM swaps entirely.
+func evmSpotsFromConfig(cfg config.EVMConfig, getenv func(string) string) map[types.ChainID]agent.EVMSpot {
+	if len(cfg.Chains) == 0 {
+		return nil
+	}
+	apiKey := cfg.ResolvedOneInchAPIKey(getenv)
+	if apiKey == "" {
+		return nil
+	}
+	out := map[types.ChainID]agent.EVMSpot{}
+	for name, c := range cfg.Chains {
+		chain := types.ChainID(strings.ToLower(name))
+		if !chain.IsEVM() {
+			continue
+		}
+		out[chain] = agent.EVMSpot{
+			RPCURL:                  c.RPCURL,
+			OneInchAPIKey:           apiKey,
+			OneInchBaseURL:          cfg.OneInchBaseURL,
+			DefaultSlippageBps:      cfg.DefaultSlippageBps,
+			ConfirmationTimeoutSecs: cfg.ConfirmationTimeoutSecs,
+		}
+	}
+	return out
 }
 
 func splitCSV(s string) []string {

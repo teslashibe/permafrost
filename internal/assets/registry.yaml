@@ -102,3 +102,59 @@ assets:
       mint: Df6yfrKC8kZE3KNkrHERKzAetSxbrWeniQfyJY4Jpump
       decimals: 6
     notes: Just a chill guy.
+
+  # ─── EVM-spot entries (paired with Hyperliquid perps) ──────────────────
+  # Naming convention: <PERP>-<CHAIN-SHORT>. The strategy uses the
+  # symbol's spot.chain field to pick which SwapVenue to route through,
+  # so an agent can hedge HL's ETH perp via either ETH-mainnet spot or
+  # ETH-base spot depending on which has fewer fees.
+
+  - symbol: ETH-MAINNET
+    perp:
+      venue: hyperliquid
+      symbol: ETH
+    spot:
+      chain: ethereum
+      mint: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"  # WETH (1inch wraps native automatically)
+      decimals: 18
+    notes: Hedge HL ETH perp via WETH on Ethereum mainnet.
+
+  - symbol: ETH-BASE
+    perp:
+      venue: hyperliquid
+      symbol: ETH
+    spot:
+      chain: base
+      mint: "0x4200000000000000000000000000000000000006"  # WETH on Base
+      decimals: 18
+    notes: Hedge HL ETH perp via WETH on Base — typically 100x cheaper gas.
+
+  - symbol: BTC-MAINNET
+    perp:
+      venue: hyperliquid
+      symbol: BTC
+    spot:
+      chain: ethereum
+      mint: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"  # WBTC
+      decimals: 8
+    notes: Hedge HL BTC perp via WBTC on Ethereum mainnet.
+
+  - symbol: AVAX-MAINNET
+    perp:
+      venue: hyperliquid
+      symbol: AVAX
+    spot:
+      chain: avalanche
+      mint: "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7"  # WAVAX
+      decimals: 18
+    notes: Hedge HL AVAX perp via WAVAX on Avalanche C-Chain.
+
+  - symbol: BNB-MAINNET
+    perp:
+      venue: hyperliquid
+      symbol: BNB
+    spot:
+      chain: bsc
+      mint: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"  # WBNB
+      decimals: 18
+    notes: Hedge HL BNB perp via WBNB on BSC.

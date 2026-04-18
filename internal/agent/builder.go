@@ -18,6 +18,7 @@ import (
 	fab "github.com/teslashibe/permafrost/internal/strategy/funding_arb_basic"
 	"github.com/teslashibe/permafrost/internal/swap"
 	"github.com/teslashibe/permafrost/internal/swap/jupiter"
+	"github.com/teslashibe/permafrost/internal/swap/oneinch"
 	"github.com/teslashibe/permafrost/internal/types"
 	"github.com/teslashibe/permafrost/internal/wallet"
 )
@@ -69,17 +70,18 @@ func BuildDeps(
 		log = slog.Default()
 	}
 
-	// Build the spot SwapVenue if Solana config is provided. We only
-	// surface the venue when both RPC and a Solana signer are available;
-	// without a signer there's nothing to sign Jupiter swap transactions
-	// with, so leaving it nil is the only safe choice (runtime falls
-	// back to paper-spot recording).
-	var swapVenue swap.SwapVenue
+	// Build per-chain SwapVenues. A chain is wired iff:
+	//   1) the operator supplied the chain config (RPC URL etc.), AND
+	//   2) the keystore has the appropriate signer.
+	// Missing chains downgrade to paper-spot bookkeeping (the runtime
+	// records the swap intent but doesn't broadcast).
+	swaps := map[types.ChainID]swap.SwapVenue{}
+
 	if opts.Solana.IsEnabled() {
 		v, err := BuildSolanaSwapVenue(opts.Solana, keystore)
 		switch {
 		case err == nil:
-			swapVenue = v
+			swaps[types.ChainSolana] = v
 		case errors.Is(err, ErrNoSolanaSigner):
 			log.Warn("solana swap disabled: no Solana signer in keystore",
 				"agent_id", a.ID)
@@ -88,10 +90,26 @@ func BuildDeps(
 		}
 	}
 
+	for chainID, ec := range opts.EVM {
+		if !ec.IsEnabled() {
+			continue
+		}
+		v, err := BuildEVMSwapVenue(chainID, ec, keystore)
+		switch {
+		case err == nil:
+			swaps[chainID] = v
+		case errors.Is(err, wallet.ErrNoEVMSigner):
+			log.Warn("evm swap disabled: no EVM-capable signer in keystore",
+				"agent_id", a.ID, "chain", chainID)
+		default:
+			return Deps{}, fmt.Errorf("evm swap venue %s: %w", chainID, err)
+		}
+	}
+
 	return Deps{
 		Strategy: strat,
 		Perp:     venue,
-		Swap:     swapVenue,
+		Swaps:    swaps,
 		Risk:     BuildRiskEngine(a),
 		Store:    store,
 		Logger:   log.With("agent_id", a.ID, "network", network, "mode", a.Mode),
@@ -202,13 +220,18 @@ func BuildSolanaSwapVenue(cfg SolanaSpot, keystore wallet.Keystore) (swap.SwapVe
 // `agent run` command's --network flag. The daemon supervisor leaves it
 // empty so each agent runs on its own configured network.
 //
-// Solana enables the live spot leg. When zero, the Runtime falls back
-// to paper-spot (records intent, never quotes Jupiter, never broadcasts).
-// Required for any agent that emits SwapIntents in mode=live.
+// Solana enables the live spot leg on Solana via Jupiter.
+// EVM enables live spot legs on EVM chains via 1inch — keyed by
+// ChainEthereum / ChainBase / ChainAvalanche / ChainBSC.
+//
+// When a chain's config is missing or its IsEnabled() is false the
+// Runtime falls back to paper-spot for that chain (records intent,
+// never quotes/broadcasts).
 type BuildOptions struct {
 	HyperliquidNetwork string // empty → use Agent.Network
 	HyperliquidAddress string // empty → derive from keystore (or no address)
 	Solana             SolanaSpot
+	EVM                map[types.ChainID]EVMSpot
 }
 
 // SolanaSpot captures everything the Jupiter SwapVenue needs to settle
@@ -227,6 +250,42 @@ type SolanaSpot struct {
 // IsEnabled reports whether the operator has provided enough config for
 // the SwapVenue to be constructed. RPCURL is the bare minimum.
 func (s SolanaSpot) IsEnabled() bool { return s.RPCURL != "" }
+
+// EVMSpot captures one EVM chain's swap configuration: an RPC endpoint
+// + 1inch API key. The signer is sourced from the keystore (the same
+// secp256k1 key as Hyperliquid).
+type EVMSpot struct {
+	RPCURL                  string
+	OneInchAPIKey           string
+	OneInchBaseURL          string // optional override (proxy)
+	DefaultSlippageBps      int    // default slippage if SwapIntent doesn't set one (0 ⇒ 50)
+	ConfirmationTimeoutSecs int    // 0 ⇒ 90s
+}
+
+// IsEnabled reports whether the operator has provided enough config for
+// the EVM SwapVenue to be constructed.
+func (e EVMSpot) IsEnabled() bool { return e.RPCURL != "" && e.OneInchAPIKey != "" }
+
+// BuildEVMSwapVenue constructs a 1inch-backed SwapVenue for one EVM
+// chain. Returns wallet.ErrNoEVMSigner if the keystore has no
+// EVM-capable key.
+func BuildEVMSwapVenue(chain types.ChainID, cfg EVMSpot, keystore wallet.Keystore) (swap.SwapVenue, error) {
+	if !cfg.IsEnabled() {
+		return nil, fmt.Errorf("agent: EVMSpot for %s is not configured", chain)
+	}
+	signer, err := wallet.EVMSignerFromKeystore(keystore, chain)
+	if err != nil {
+		return nil, err
+	}
+	return oneinch.New(oneinch.Config{
+		OneInchAPIKey:   cfg.OneInchAPIKey,
+		OneInchBaseURL:  cfg.OneInchBaseURL,
+		RPCURL:          cfg.RPCURL,
+		Chain:           chain,
+		DefaultSlippage: cfg.DefaultSlippageBps,
+		PollTimeout:     time.Duration(cfg.ConfirmationTimeoutSecs) * time.Second,
+	}, signer)
+}
 
 // BuildStrategy is the strategy-construction switch shared between the
 // foreground CLI and the supervisor. Currently funding_arb_basic is the
