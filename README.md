@@ -104,22 +104,50 @@ For the full architectural specification, the agent runtime, the strategy SAPI, 
 ```bash
 git clone https://github.com/teslashibe/permafrost.git
 cd permafrost
-cp config.example.yaml config.yaml          # edit with your keys & RPC URLs
-make up                                      # bring up Timescale + permafrostd
-permafrost wallet import --chain solana --from <keypair.json>
-permafrost vault init
-permafrost agent create \
-    --strategy noop \
-    --perp hyperliquid \
-    --alloc 5000
-permafrost agent start <id>
+
+# Build the CLI + daemon binaries.
+make build
+export PATH=$PWD/bin:$PATH
+
+# Bring up Postgres + permafrostd in Docker.
+make up
+
+# The keystore is unlocked from this env var. Any reasonably strong string is fine
+# for the noop quickstart (noop never signs anything). Save it somewhere safe.
+export PERMAFROST_KEYSTORE_PASSPHRASE=$(uuidgen 2>/dev/null || openssl rand -hex 16)
+
+# Create and start a paper-mode noop agent.
+permafrost agent create --strategy noop --perp hyperliquid --alloc 1000
+# → "created agent id=ag-... ..."
+permafrost agent start ag-...
+permafrost agent decisions ag-...
 ```
 
-`agent start` marks the agent runnable so the daemon supervisor (`permafrost serve` / `make up`) picks it up. For one-shot foreground iteration in a single shell without the daemon, use `permafrost agent run <id>` instead.
+`agent start` marks the agent runnable so the daemon (started by `make up`) picks it up. For one-shot foreground iteration in a single shell without the daemon, use `permafrost agent run ag-...` instead — that runs the tick loop in the foreground and exits on SIGINT.
 
 The OSS build ships with `noop` registered; that's enough to confirm your install, database, and venue connections are working. To run a real strategy, see the [strategy authors guide](https://teslashibe.github.io/permafrost/strategies/sapi) — adding one is a folder + a registration call + one import line per binary.
 
-Default mode is `paper` — no real orders are placed until the agent is explicitly promoted to `live`.
+Default mode is `paper` — no real orders are placed until the agent is explicitly promoted to `live` (which requires `--confirm-live`).
+
+### Going live
+
+For real-money operation you'll also need:
+
+```bash
+# Import a Solana keypair (for the spot leg of any basis-style strategy)
+permafrost wallet import --chain solana --from ~/.config/solana/id.json
+
+# Import a Hyperliquid signer key (for placing real perp orders)
+permafrost wallet import --chain hyperliquid --hex 0x...
+
+# Initialize vault accounting (off-chain in v1)
+permafrost vault init
+
+# Promote the agent to live (asks for explicit confirmation)
+permafrost agent set-mode ag-... live --confirm-live
+```
+
+**EVM RPCs**: pick fresh ones from [chainlist.org](https://chainlist.org/) and drop them into `config.yaml` under `evm.chains.<name>.rpc_url`. Public defaults work for testing but rate-limit aggressively in production.
 
 ---
 
@@ -145,35 +173,39 @@ See the [CLI reference](https://teslashibe.github.io/permafrost/reference/cli) f
 
 ## Roadmap
 
+What's shipped in `main` today:
+
 | Milestone | Description | Status |
 |---|---|---|
-| M0 | Skeleton (config, logging, compose, migrations, health endpoint) | Planned |
-| M1 | Core interfaces (`Strategy`, `Venue`, `SwapVenue`, `Provider`, `Signer`, `Risk`) | Planned |
-| M2 | Hyperliquid adapter | Planned |
-| M3 | Inference (OpenAI-compatible client + mock) | Planned |
-| M4 | Wallet & keystore | Planned |
-| M5 | Solana SwapVenue (Jupiter + Jito) | Planned |
-| M6 | Asset registry | Planned |
-| M7 | Vault & accounting | Planned |
-| M8 | Agent runtime | Planned |
-| M9 | Risk + circuit breakers + kill switch | Planned |
-| M10 | Backtest harness | Planned |
+| M0 | Skeleton (config, logging, compose, migrations, health endpoint) | ✅ |
+| M1 | Core interfaces (`Strategy`, `Venue`, `SwapVenue`, `Provider`, `Signer`, `Risk`) | ✅ |
+| M2 | Hyperliquid adapter | ✅ |
+| M3 | Inference (OpenAI-compatible client + mock) | ✅ |
+| M4 | Wallet & keystore | ✅ |
+| M5 | Solana SwapVenue (Jupiter + Jito) | ✅ |
+| M6 | Asset registry | ✅ |
+| M7 | Vault & accounting | ✅ |
+| M8 | Agent runtime | ✅ |
+| M9 | Risk + circuit breakers + kill switch | ✅ (kill switch order-cancel + spot-liquidation are partial — see [#38](https://github.com/teslashibe/permafrost/issues/38)) |
+| M10 | Backtest harness | ✅ |
 
-After v1: additional chains (Base, Arbitrum), auto-bridging via CCTP, hosted deployments, on-chain vault contracts, additional strategies.
+What's next: the [Trading Desk epic (#30)](https://github.com/teslashibe/permafrost/issues/30) — onboarding polish, web dashboard, hosted demo, brand narrative.
 
 ---
 
 ## Safety
 
-A leveraged AI agent will absolutely try to nuke a vault if you let it. Permafrost ships with non-negotiable guardrails:
+A leveraged AI agent will absolutely try to nuke a vault if you let it. Permafrost ships with these guardrails:
 
 - **Spot-first execution** — DEX swap must confirm before the perp short is sent.
 - **Idempotent intents** — every order and swap carries a deterministic client ID.
 - **Decision provenance** — every order links back to the exact prompt + model response.
-- **Paper mode by default** — no real orders until explicitly promoted to `live`.
-- **Circuit breakers** — NAV drawdown, funding flip, basis blowout, RPC errors, margin buffer, inference error rate.
-- **Kill switch** — `permafrost agent stop --all` cancels orders, closes shorts, and (configurably) liquidates spot legs.
-- **Mainnet gating** — Hyperliquid mainnet behind an explicit config flag; default is testnet.
+- **Paper mode by default** — no real orders until explicitly promoted to `live` with `--confirm-live`.
+- **Per-agent circuit breakers** — NAV drawdown and daily loss are wired and configurable via the agent's `risk` config block; additional breakers (funding flip, RPC errors) tracked on the [Trading Desk epic](https://github.com/teslashibe/permafrost/issues/30).
+- **Kill switch** — `permafrost agent stop --all` halts every agent and (when the daemon is running) flattens open perp positions via reduce-only market orders. **Open-order cancellation and spot-leg liquidation are partial in v1** — tracked by [#38](https://github.com/teslashibe/permafrost/issues/38). Until that lands, cancel resting orders manually via the exchange UI if needed.
+- **Mainnet gating** — Hyperliquid live mode behind explicit `--confirm-live` per agent.
+
+For full killswitch behaviour, configurable knobs, and current limits, see the [killswitch tuning page](https://teslashibe.github.io/permafrost/operations/killswitch-tuning).
 
 ---
 
