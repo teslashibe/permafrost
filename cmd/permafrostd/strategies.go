@@ -7,7 +7,8 @@ package main
 // it to the public repo (each new strategy gets one line).
 //
 // Private strategies you do not want in the public repo go in the sibling
-// strategies_local.go file, which is gitignored. See STRATEGY_AUTHORS.md
+// strategies_local.go file, which is gitignored. See
+// https://teslashibe.github.io/permafrost/strategies/private-strategies
 // for the full extension flow.
 
 import (

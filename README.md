@@ -19,7 +19,7 @@
 
 Permafrost is a self-custodied, locally-runnable trading framework. It is an open agent runtime around the Strategy SAPI: write a deterministic Go strategy, register it, and the framework handles exchange adapters, swap routing, reconciliation, PnL accounting, risk gates, the killswitch, decision provenance, and LLM augmentation.
 
-Strategies are first-class extensions, not patches: each one lives as its own subdirectory under `strategies/`, calls `strategy.Register` in `init()`, and is enabled by adding one blank-import line to `cmd/permafrostd/strategies.go`. See [`STRATEGY_AUTHORS.md`](STRATEGY_AUTHORS.md) for the full extension flow.
+Strategies are first-class extensions, not patches: each one lives as its own subdirectory under `strategies/`, calls `strategy.Register` in `init()`, and is enabled by adding one blank-import line to `cmd/permafrostd/strategies.go`. See the [strategy authors guide](https://teslashibe.github.io/permafrost/strategies/sapi) for the full extension flow.
 
 The framework ships with `noop` as the reference implementation. Real strategies — basis trades, market makers, anything you can express as Go — are yours to build, share, or keep private.
 
@@ -113,7 +113,7 @@ permafrost agent create \
 permafrost agent start <id>
 ```
 
-The OSS build ships with `noop` registered; that's enough to confirm your install, database, and venue connections are working. To run a real strategy, see [`STRATEGY_AUTHORS.md`](STRATEGY_AUTHORS.md) — adding one is a folder + a registration call + one import line.
+The OSS build ships with `noop` registered; that's enough to confirm your install, database, and venue connections are working. To run a real strategy, see the [strategy authors guide](https://teslashibe.github.io/permafrost/strategies/sapi) — adding one is a folder + a registration call + one import line per binary.
 
 Default mode is `paper` — no real orders are placed until the agent is explicitly promoted to `live`.
 
@@ -171,7 +171,7 @@ A leveraged AI agent will absolutely try to nuke a vault if you let it. Permafro
 
 ## Contributing
 
-This is an open-source project and contributions are welcome. Please read [`STRATEGY_AUTHORS.md`](STRATEGY_AUTHORS.md) (for new strategies) and the [architecture docs](https://teslashibe.github.io/permafrost/introduction/architecture) before opening a PR.
+This is an open-source project and contributions are welcome. Please read the [strategy authors guide](https://teslashibe.github.io/permafrost/strategies/sapi) (for new strategies) and the [architecture docs](https://teslashibe.github.io/permafrost/introduction/architecture) before opening a PR.
 
 ---
 

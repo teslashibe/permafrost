@@ -36,7 +36,8 @@ config.local.yaml
 keystore.json
 ~/.permafrost/
 
-## Private strategies (Hummingbot-style local extension; see STRATEGY_AUTHORS.md)
+## Private strategies (Hummingbot-style local extension)
+## Docs: https://teslashibe.github.io/permafrost/strategies/private-strategies
 /strategies/private/
 /cmd/permafrost/strategies_local.go
 /cmd/permafrostd/strategies_local.go

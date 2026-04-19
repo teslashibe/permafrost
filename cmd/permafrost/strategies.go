@@ -11,7 +11,8 @@ package main
 // each). When you keep a strategy private, add it to BOTH
 // strategies_local.go files (each gitignored).
 //
-// See STRATEGY_AUTHORS.md for the full extension flow.
+// See https://teslashibe.github.io/permafrost/strategies/sapi for the
+// full extension flow.
 
 import (
 	_ "github.com/teslashibe/permafrost/strategies/noop"

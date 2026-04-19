@@ -13,7 +13,8 @@ import (
 	// Register noop so we can construct a minimal strategy here without
 	// pulling in any private/community strategy package. End-to-end
 	// runner tests with real strategies live in those strategies' own
-	// test packages (see STRATEGY_AUTHORS.md for the pattern).
+	// test packages (see https://teslashibe.github.io/permafrost/strategies/testing
+	// for the pattern).
 	_ "github.com/teslashibe/permafrost/strategies/noop"
 )
 
