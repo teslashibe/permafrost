@@ -65,9 +65,13 @@ func newInferenceTestCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&providerName, "provider", "", "provider name (defaults to inference.default)")
-	cmd.Flags().StringVar(&model, "model", "", "model identifier (provider-specific)")
+	cmd.Flags().StringVar(&model, "model", "", "model identifier (provider-specific). If empty, the provider's API will use its own default model — handy for a quick connectivity smoke test.")
 	cmd.Flags().StringVar(&prompt, "prompt", "Say hello in exactly five words.", "prompt to send")
-	_ = cmd.MarkFlagRequired("model")
+	// --model is deliberately optional: a no-model smoke test exercises
+	// the auth + transport path even if the provider rejects the empty
+	// model field with a clear error. Providers that require a model
+	// will surface their own message; that's still more useful than
+	// "missing required flag" before any network call happens.
 	return cmd
 }
 

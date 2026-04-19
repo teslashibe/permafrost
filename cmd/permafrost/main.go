@@ -1,8 +1,11 @@
 // Command permafrost is the operator CLI for the Permafrost protocol.
 //
-// See `permafrost --help` for the available subcommands. Most commands talk
-// to the running permafrostd daemon via REST; some (db migrate, backtest,
-// wallet) operate locally without a daemon.
+// See `permafrost --help` for the available subcommands. Most commands
+// open the configured TimescaleDB directly (mutating agent / vault state,
+// reading decisions and PnL); a few (`db migrate`, `strategy backtest`,
+// `wallet`) operate purely locally. The `serve` subcommand runs the
+// daemon in the foreground and is functionally identical to the
+// dedicated permafrostd binary.
 package main
 
 import (
