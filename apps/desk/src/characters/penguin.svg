@@ -1,0 +1,53 @@
+<!--
+  Penguin trader. One per running agent. Scarf colour distinguishes
+  multiple penguins on the same map; default is aurora-cyan #50D2C2.
+  Override at use-site by overlaying a <rect> with class="scarf" or
+  by passing a CSS variable.
+
+  Hand-authored pixel art, 32×32 logical grid.
+  Palette: black #1B1F2A, white belly #ECF6FF, beak orange #F0A24A,
+           feet orange-red #E67D3A, scarf cyan #50D2C2.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="256" height="256" shape-rendering="crispEdges" role="img" aria-label="Penguin trader">
+  <title>Penguin trader</title>
+  <desc>One penguin per running strategy agent. Scarf colour distinguishes peers.</desc>
+
+  <!-- Head -->
+  <rect x="11" y="3"  width="10" height="1" fill="#1B1F2A"/>
+  <rect x="10" y="4"  width="12" height="6" fill="#1B1F2A"/>
+
+  <!-- Eyes (white-of-eye) -->
+  <rect x="12" y="6"  width="3"  height="3" fill="#ECF6FF"/>
+  <rect x="17" y="6"  width="3"  height="3" fill="#ECF6FF"/>
+  <!-- Pupils -->
+  <rect x="13" y="7"  width="1"  height="1" fill="#1B1F2A"/>
+  <rect x="18" y="7"  width="1"  height="1" fill="#1B1F2A"/>
+
+  <!-- Beak -->
+  <rect x="14" y="9"  width="4"  height="1" fill="#F0A24A"/>
+  <rect x="15" y="10" width="2"  height="1" fill="#E67D3A"/>
+
+  <!-- Scarf (configurable; default aurora cyan) -->
+  <rect x="9"  y="11" width="14" height="2" fill="#50D2C2" class="scarf"/>
+  <rect x="20" y="13" width="3"  height="3" fill="#50D2C2" class="scarf"/>
+
+  <!-- Body outline + back -->
+  <rect x="9"  y="13" width="14" height="1" fill="#1B1F2A"/>
+  <rect x="9"  y="14" width="1"  height="9" fill="#1B1F2A"/>
+  <rect x="22" y="14" width="1"  height="9" fill="#1B1F2A"/>
+  <rect x="9"  y="23" width="14" height="1" fill="#1B1F2A"/>
+
+  <!-- Body fill (back is dark; belly is white) -->
+  <rect x="10" y="14" width="12" height="9" fill="#1B1F2A"/>
+  <!-- White belly -->
+  <rect x="12" y="14" width="8"  height="9" fill="#ECF6FF"/>
+  <rect x="13" y="14" width="6"  height="1" fill="#ECF6FF"/>
+
+  <!-- Wings -->
+  <rect x="9"  y="15" width="2"  height="6" fill="#1B1F2A"/>
+  <rect x="21" y="15" width="2"  height="6" fill="#1B1F2A"/>
+
+  <!-- Feet -->
+  <rect x="11" y="24" width="3"  height="2" fill="#E67D3A"/>
+  <rect x="18" y="24" width="3"  height="2" fill="#E67D3A"/>
+</svg>

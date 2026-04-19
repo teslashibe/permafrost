@@ -1,0 +1,53 @@
+<!--
+  Narwhal  LLM advisor floating beside its penguin. Horn glows
+  (.glow class) when the LLM is being consulted; brighter on a veto.
+
+  Hand-authored pixel art, 32×32 logical grid.
+  Palette: lavender body #B5A6E0, navy back #4D3B7C, white belly #E9E4F8,
+           horn iridescent #E0D3FF + highlight #FFFFFF, eye #1B1F2A.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="256" height="256" shape-rendering="crispEdges" role="img" aria-label="Narwhal advisor">
+  <title>Narwhal advisor</title>
+  <desc>Floats beside its penguin trader; horn glows when the LLM is consulted.</desc>
+
+  <!-- Horn -->
+  <rect x="2"  y="13" width="1"  height="1" fill="#FFFFFF" class="glow"/>
+  <rect x="3"  y="13" width="3"  height="1" fill="#E0D3FF" class="glow"/>
+  <rect x="6"  y="13" width="2"  height="1" fill="#B5A6E0"/>
+
+  <!-- Head + body outline -->
+  <rect x="7"  y="11" width="20" height="1" fill="#4D3B7C"/>
+  <rect x="6"  y="12" width="1"  height="1" fill="#4D3B7C"/>
+  <rect x="6"  y="14" width="1"  height="2" fill="#4D3B7C"/>
+  <rect x="7"  y="16" width="1"  height="1" fill="#4D3B7C"/>
+  <rect x="8"  y="17" width="20" height="1" fill="#4D3B7C"/>
+
+  <!-- Body fill (lavender top, white belly) -->
+  <rect x="7"  y="12" width="20" height="2" fill="#4D3B7C"/>
+  <rect x="7"  y="14" width="20" height="2" fill="#B5A6E0"/>
+  <rect x="8"  y="16" width="20" height="1" fill="#E9E4F8"/>
+
+  <!-- Eye -->
+  <rect x="10" y="13" width="1"  height="1" fill="#1B1F2A"/>
+
+  <!-- Smile -->
+  <rect x="11" y="15" width="2"  height="1" fill="#4D3B7C"/>
+
+  <!-- Tail -->
+  <rect x="27" y="11" width="1"  height="1" fill="#4D3B7C"/>
+  <rect x="28" y="10" width="2"  height="2" fill="#4D3B7C"/>
+  <rect x="27" y="17" width="1"  height="1" fill="#4D3B7C"/>
+  <rect x="28" y="17" width="2"  height="2" fill="#4D3B7C"/>
+  <rect x="29" y="13" width="1"  height="3" fill="#B5A6E0"/>
+
+  <!-- Spots (lavender) -->
+  <rect x="14" y="14" width="1"  height="1" fill="#4D3B7C"/>
+  <rect x="18" y="13" width="1"  height="1" fill="#4D3B7C"/>
+  <rect x="22" y="14" width="1"  height="1" fill="#4D3B7C"/>
+
+  <!-- Optional glow halo around horn (visible only when .glow CSS class
+       opacity is bumped from 0 ’ 1 in the stylesheet) -->
+  <rect x="1"  y="13" width="1"  height="1" fill="#E0D3FF" class="glow-halo" opacity="0"/>
+  <rect x="2"  y="12" width="4"  height="1" fill="#E0D3FF" class="glow-halo" opacity="0"/>
+  <rect x="2"  y="14" width="4"  height="1" fill="#E0D3FF" class="glow-halo" opacity="0"/>
+</svg>
