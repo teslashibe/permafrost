@@ -1,0 +1,38 @@
+<!--
+  Coin (PnL accumulation). Shimmers via .shimmer animation when
+  visible in the vault chrome.
+
+  Hand-authored pixel art, 16×16 grid, scaled.
+  Palette: gold body #F0C24A, deep gold edge #B8860B, highlight #FFF6C2.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64" shape-rendering="crispEdges" role="img" aria-label="Coin (PnL)">
+  <title>Coin</title>
+  <desc>One coin per accumulated PnL unit; shimmers when added to the vault.</desc>
+
+  <!-- Outer ring -->
+  <rect x="5"  y="2"  width="6"  height="1" fill="#B8860B"/>
+  <rect x="3"  y="3"  width="2"  height="1" fill="#B8860B"/>
+  <rect x="11" y="3"  width="2"  height="1" fill="#B8860B"/>
+  <rect x="2"  y="4"  width="1"  height="2" fill="#B8860B"/>
+  <rect x="13" y="4"  width="1"  height="2" fill="#B8860B"/>
+  <rect x="2"  y="10" width="1"  height="2" fill="#B8860B"/>
+  <rect x="13" y="10" width="1"  height="2" fill="#B8860B"/>
+  <rect x="3"  y="12" width="2"  height="1" fill="#B8860B"/>
+  <rect x="11" y="12" width="2"  height="1" fill="#B8860B"/>
+  <rect x="5"  y="13" width="6"  height="1" fill="#B8860B"/>
+
+  <!-- Inner gold body -->
+  <rect x="5"  y="3"  width="6"  height="10" fill="#F0C24A"/>
+  <rect x="3"  y="4"  width="10" height="8"  fill="#F0C24A"/>
+
+  <!-- Highlight (top-left arc) -->
+  <rect x="4"  y="4"  width="3"  height="1" fill="#FFF6C2" class="shimmer"/>
+  <rect x="3"  y="5"  width="2"  height="2" fill="#FFF6C2" class="shimmer"/>
+
+  <!-- "$" glyph (or generic coin marking  pixel S) -->
+  <rect x="7"  y="6"  width="2"  height="1" fill="#B8860B"/>
+  <rect x="7"  y="7"  width="1"  height="1" fill="#B8860B"/>
+  <rect x="7"  y="8"  width="2"  height="1" fill="#B8860B"/>
+  <rect x="8"  y="9"  width="1"  height="1" fill="#B8860B"/>
+  <rect x="7"  y="10" width="2"  height="1" fill="#B8860B"/>
+</svg>

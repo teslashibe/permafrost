@@ -61,6 +61,14 @@ const sidebars: SidebarsConfig = {
         'reference/cli',
       ],
     },
+    {
+      type: 'category',
+      label: 'Brand & Narrative',
+      items: [
+        'brand/llm-as-agent',
+        'brand/cast',
+      ],
+    },
   ],
 };
 
