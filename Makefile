@@ -1,4 +1,4 @@
-.PHONY: help build test lint fmt vet tidy clean up down logs migrate sqlc tools
+.PHONY: help build test lint fmt vet tidy clean up down logs migrate sqlc tools demo demo-clean
 
 GO ?= go
 BIN_DIR := bin
@@ -53,3 +53,13 @@ sqlc: ## Regenerate sqlc bindings
 tools: ## Install dev tools
 	$(GO) install github.com/pressly/goose/v3/cmd/goose@latest
 	$(GO) install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+
+demo: ## One-command demo: build + stack + init + recruit Pip + tail decisions
+	@./scripts/demo.sh
+
+demo-clean: ## Tear down the demo: stop stack + remove the demo config dir
+	@echo "==> stopping stack"
+	@docker compose -f deploy/compose/docker-compose.yml down -v 2>/dev/null || true
+	@echo "==> removing .permafrost-demo/"
+	@rm -rf .permafrost-demo
+	@echo "demo cleaned. Run \`make demo\` to start fresh."

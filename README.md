@@ -101,6 +101,10 @@ For the full architectural specification, the agent runtime, the strategy SAPI, 
 
 > Requires Docker and Go 1.25+.
 
+**TL;DR:** `git clone … && cd permafrost && make demo` — one command from clone to seeing decisions land. Tears down via `make demo-clean`.
+
+What `make demo` does, step by step, if you'd rather drive each one yourself:
+
 ```bash
 git clone https://github.com/teslashibe/permafrost.git
 cd permafrost
