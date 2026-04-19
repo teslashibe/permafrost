@@ -4,7 +4,7 @@
   Override at use-site by overlaying a <rect> with class="scarf" or
   by passing a CSS variable.
 
-  Hand-authored pixel art, 32×32 logical grid.
+  Hand-authored pixel art, 32x32 logical grid.
   Palette: black #1B1F2A, white belly #ECF6FF, beak orange #F0A24A,
            feet orange-red #E67D3A, scarf cyan #50D2C2.
 -->

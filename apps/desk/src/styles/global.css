@@ -1,12 +1,14 @@
-/* Permafrost Trading Desk — arctic palette.
+/* Permafrost Trading Desk -- arctic palette + animation library.
  *
  * Colour ramp:
- *   --ice-deep   #0A1B36   night-sky base
+ *   --ice-deep   #0A1B36   night-sky base (top of viewport)
  *   --ice-mid    #122A52   panel base
  *   --ice-edge   #1F4380   panel edge / hover
- *   --ice-bright #ECF6FF   chrome highlight
+ *   --ice-bright #ECF6FF   chrome highlight + ice surface
+ *   --ice-pale   #C8DCF7   distant ice
  *   --aurora-c   #50D2C2   accent (calls to action, healthy)
  *   --aurora-p   #B5A6E0   accent (LLM signal)
+ *   --aurora-g   #66E5A8   accent (PnL up, decision confidence)
  *   --warning    #F0C24A   degraded
  *   --danger     #C73E36   killswitch / breaker tripped
  */
@@ -16,8 +18,10 @@
   --ice-mid:    #122A52;
   --ice-edge:   #1F4380;
   --ice-bright: #ECF6FF;
+  --ice-pale:   #C8DCF7;
   --aurora-c:   #50D2C2;
   --aurora-p:   #B5A6E0;
+  --aurora-g:   #66E5A8;
   --warning:    #F0C24A;
   --danger:     #C73E36;
 
@@ -35,6 +39,7 @@ html, body, #root {
   background: var(--ice-deep);
   color: var(--ice-bright);
   font-family: var(--font-pixel);
+  overflow: hidden;             /* world view fills viewport; panels scroll independently */
 }
 
 a { color: var(--aurora-c); text-decoration: none; }
@@ -42,34 +47,547 @@ a:hover { text-decoration: underline; }
 
 h1, h2, h3 { letter-spacing: 0.02em; font-weight: 600; }
 
-/* Aurora-band background — a subtle gradient at the top of the viewport
- * that hints at the namesake without actually animating. The Trading
- * Desk is a tool, not a screensaver. */
-body {
+img { -webkit-user-drag: none; user-select: none; }
+
+/* ===================================================================
+ * THE WORLD
+ * The full-viewport arctic scene that everything else floats over.
+ * =================================================================== */
+
+.world {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  /* Layered background:
+   *   bottom: deep ice (the polar night sky)
+   *   middle: aurora bands -- two slow-drifting gradients in
+   *           green and purple
+   *   top:    starfield -- 50 dots painted via radial-gradient
+   *           positions, one tile, repeated subtly
+   */
   background:
-    radial-gradient(ellipse 1200px 240px at 50% -120px, rgba(80,210,194,0.18) 0%, transparent 60%),
-    radial-gradient(ellipse 800px 200px at 30% -160px, rgba(181,166,224,0.15) 0%, transparent 60%),
-    var(--ice-deep);
+    /* Stars (top, sparse) */
+    radial-gradient(1px 1px at 20% 12%,  rgba(255,255,255,0.7) 50%, transparent),
+    radial-gradient(1px 1px at 65% 8%,   rgba(255,255,255,0.6) 50%, transparent),
+    radial-gradient(1px 1px at 80% 20%,  rgba(255,255,255,0.7) 50%, transparent),
+    radial-gradient(1px 1px at 35% 18%,  rgba(255,255,255,0.5) 50%, transparent),
+    radial-gradient(1px 1px at 50% 28%,  rgba(255,255,255,0.4) 50%, transparent),
+    radial-gradient(1px 1px at 90% 35%,  rgba(255,255,255,0.5) 50%, transparent),
+    radial-gradient(1px 1px at 12% 30%,  rgba(255,255,255,0.6) 50%, transparent),
+    radial-gradient(1px 1px at 5% 22%,   rgba(255,255,255,0.4) 50%, transparent),
+    radial-gradient(2px 2px at 45% 14%,  rgba(255,255,255,0.85) 50%, transparent),
+    radial-gradient(2px 2px at 75% 30%,  rgba(255,255,255,0.7)  50%, transparent),
+    /* Aurora -- broad ellipses, two colour bands */
+    radial-gradient(ellipse 1400px 280px at 50% -120px,
+      rgba(80,210,194,0.32) 0%, transparent 65%),
+    radial-gradient(ellipse 1000px 220px at 30% -100px,
+      rgba(181,166,224,0.28) 0%, transparent 70%),
+    radial-gradient(ellipse 800px 200px at 70% -80px,
+      rgba(102,229,168,0.20) 0%, transparent 70%),
+    /* Sky base */
+    linear-gradient(180deg, #050E22 0%, var(--ice-deep) 50%, #0F2A4D 100%);
   background-attachment: fixed;
 }
 
-/* Sprite shimmer animation for the coin highlight */
-@keyframes shimmer {
-  0%,100% { opacity: 0.6; }
-  50%     { opacity: 1.0; }
+/* Aurora drift -- slow horizontal sweep on a second layer of bands.
+ * Implemented as a separate absolutely-positioned div that animates
+ * its background-position, so it composites over the static sky
+ * without forcing the whole layer to repaint. */
+.world::before {
+  content: '';
+  position: absolute;
+  inset: 0 -200px;             /* extra width so the sweep wraps */
+  background:
+    radial-gradient(ellipse 700px 120px at 20% 18%, rgba(102,229,168,0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 700px 120px at 60% 12%, rgba(181,166,224,0.16) 0%, transparent 60%),
+    radial-gradient(ellipse 700px 140px at 90% 22%, rgba(80,210,194,0.18)  0%, transparent 60%);
+  animation: aurora-drift 60s linear infinite;
+  pointer-events: none;
 }
+@keyframes aurora-drift {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-200px); }
+}
+
+/* ===================================================================
+ * SCENERY -- floes, snow, icebergs, aurora band
+ * Layered over the world background, under the actors.
+ * =================================================================== */
+
+.aurora-band {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 32%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+.aurora-band .aur-1 { transform-origin: 0 100%; animation: aur-roll 18s ease-in-out infinite; }
+.aurora-band .aur-2 { transform-origin: 0 100%; animation: aur-roll 24s ease-in-out infinite reverse; }
+.aurora-band .aur-3 { transform-origin: 0 100%; animation: aur-roll 30s ease-in-out infinite; }
+@keyframes aur-roll {
+  0%, 100% { transform: translateY(0)    scaleY(1); opacity: 0.7; }
+  50%      { transform: translateY(-12px) scaleY(1.15); opacity: 1.0; }
+}
+
+.iceberg {
+  position: absolute;
+  top: 38%;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+  z-index: 4;
+  filter: drop-shadow(0 6px 8px rgba(0,0,0,0.25));
+}
+
+.floe {
+  position: absolute;
+  width: 320px;
+  pointer-events: none;
+  z-index: 3;
+}
+.floe svg { width: 100%; height: auto; display: block; }
+.floe-far {
+  top: 49%;
+  width: 280px;
+  animation: floe-drift 90s linear infinite;
+}
+.floe-near {
+  top: 53%;
+  width: 360px;
+  animation: floe-drift 60s linear infinite -20s;
+}
+@keyframes floe-drift {
+  0%   { transform: translateX(-360px); }
+  100% { transform: translateX(110vw); }
+}
+
+/* Falling snow -- small white dots translating downward continuously. */
+.snow-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+  overflow: hidden;
+}
+.flake {
+  position: absolute;
+  top: -8px;
+  display: block;
+  background: #FFFFFF;
+  border-radius: 50%;
+  animation: snowfall linear infinite;
+}
+@keyframes snowfall {
+  0%   { transform: translateY(-20px) translateX(0); }
+  100% { transform: translateY(110vh) translateX(20px); }
+}
+
+/* The ice line -- pseudo-element at ~50% of viewport height. The
+ * bottom HALF of the screen is ice surface, giving the characters
+ * proper room to breathe and Skipper a visible run path. */
+.world::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 50%;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05) 0%, transparent 6%),
+    radial-gradient(ellipse 100% 100% at 50% 0%,
+      var(--ice-pale) 0%, var(--ice-bright) 30%, #9EBADD 80%, #6A8AB8 100%);
+  border-top: 1px solid rgba(255,255,255,0.15);
+  pointer-events: none;
+}
+
+/* ===================================================================
+ * CHROME (top bar) -- floats over the world
+ * =================================================================== */
+
+.chrome {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  padding: 12px 24px;
+  gap: 16px;
+  background: linear-gradient(180deg, rgba(10,27,54,0.92) 0%, rgba(10,27,54,0.55) 80%, transparent 100%);
+  backdrop-filter: blur(2px);
+}
+
+.chrome .title { text-align: center; }
+.chrome .title h1 { margin: 0; font-size: 18px; }
+.chrome .title .subtitle { font-size: 11px; opacity: 0.7; }
+.chrome .right { display: flex; align-items: center; gap: 12px; }
+
+.conn-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--warning);
+}
+.conn-dot.live {
+  background: var(--aurora-c);
+  box-shadow: 0 0 12px var(--aurora-c);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 4px var(--aurora-c); }
+  50%      { box-shadow: 0 0 14px var(--aurora-c); }
+}
+
+/* ===================================================================
+ * CHARACTERS -- absolutely positioned over the world.
+ * .actor is the wrapper; the SVG is the child.
+ * Each character has its own movement keyframe.
+ * =================================================================== */
+
+.actor {
+  position: absolute;
+  pointer-events: auto;
+  cursor: default;
+  /* Subtle drop shadow so characters lift off the ice */
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.35));
+}
+.actor img {
+  display: block;
+  image-rendering: pixelated;
+}
+
+/* Workstation -- small ice block under each penguin agent so they
+ * look like they're standing at a trading desk rather than floating. */
+.workstation {
+  position: absolute;
+  width: 90px; height: 28px;
+  pointer-events: none;
+  transform: translate(-50%, -10%);
+  z-index: 18;
+}
+.workstation .top {
+  position: absolute; inset: 0 4px auto 4px; top: 6px;
+  height: 8px;
+  background: linear-gradient(180deg, #ECF6FF 0%, #C8DCF7 100%);
+  border-radius: 2px;
+  box-shadow: 0 2px 0 #7B9FCB;
+}
+.workstation .glow {
+  position: absolute; left: 50%; top: 0;
+  transform: translate(-50%, -120%);
+  width: 12px; height: 4px;
+  background: var(--aurora-c);
+  border-radius: 2px;
+  filter: blur(2px);
+  opacity: 0.7;
+  animation: workstation-glow 1.8s ease-in-out infinite;
+}
+@keyframes workstation-glow {
+  0%, 100% { opacity: 0.4; transform: translate(-50%, -120%) scale(1); }
+  50%      { opacity: 0.9; transform: translate(-50%, -130%) scale(1.4); }
+}
+
+.actor .nameplate {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: -22px;
+  background: rgba(10,27,54,0.85);
+  border: 1px solid var(--ice-edge);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
+  pointer-events: none;
+}
+.actor:hover .nameplate { opacity: 1; }
+
+.actor .speech {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(100% + 8px);
+  background: var(--ice-bright);
+  color: var(--ice-deep);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: speech-pop 3s ease-out forwards;
+}
+.actor .speech::after {
+  content: '';
+  position: absolute;
+  bottom: -4px; left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 8px; height: 8px;
+  background: var(--ice-bright);
+}
+@keyframes speech-pop {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.9); }
+  10%  { opacity: 1; transform: translateX(-50%) translateY(0)   scale(1); }
+  90%  { opacity: 1; transform: translateX(-50%) translateY(0)   scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-4px) scale(0.95); }
+}
+
+/* Idle bob -- penguins / Pole / Aurora gently sway on the ice. */
+@keyframes idle-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+.actor.idle img { animation: idle-bob 3s ease-in-out infinite; }
+/* Stagger the bob so several penguins don't move in sync */
+.actor.idle:nth-child(2n) img { animation-delay: -1s; }
+.actor.idle:nth-child(3n) img { animation-delay: -2s; }
+
+/* Halted -- agent slumps, drops by 4px and stays */
+.actor.halted img { animation: idle-bob 6s ease-in-out infinite; opacity: 0.7; transform: translateY(2px); }
+
+/* Walking penguin -- waddles back and forth across a small range.
+ * Used when an agent has just made a decision (the penguin took an
+ * action, so it briefly wanders before sitting back down). */
+@keyframes walk {
+  0%   { transform: translateX(0)    scaleX(1); }
+  20%  { transform: translateX(20px) scaleX(1); }
+  21%  { transform: translateX(20px) scaleX(-1); }
+  60%  { transform: translateX(-15px) scaleX(-1); }
+  61%  { transform: translateX(-15px) scaleX(1); }
+  100% { transform: translateX(0)    scaleX(1); }
+}
+.actor.walking img { animation: walk 4s ease-in-out infinite, idle-bob 0.4s ease-in-out infinite; }
+
+/* Husky run -- Skipper sprints across the lower part of the world
+ * during reconcile passes. The keyframe MUST preserve the actor's
+ * base centering offset (translate(-50%, -50%)) which otherwise
+ * gets overridden by the animation's transform. */
+@keyframes husky-run {
+  0%   { transform: translate(calc(-50% - 240px), -50%); }
+  100% { transform: translate(calc(100vw - 50% + 240px), -50%); }
+}
+.actor.running-across img { animation: idle-bob 0.25s linear infinite; }
+.actor.running-across { animation: husky-run 6s linear forwards; }
+
+/* Narwhal swim -- comes up from under the ice (off-screen) when an
+ * LLM consult fires, swims across to its assigned penguin, then
+ * drifts back down. Same centering-preservation rule applies. */
+@keyframes narwhal-swim {
+  0%   { transform: translate(calc(-50% - 150px), calc(-50% + 60px)) rotate(-8deg); opacity: 0; }
+  20%  { opacity: 1; }
+  50%  { transform: translate(-50%, -50%) rotate(0); opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translate(calc(-50% + 150px), calc(-50% + 60px)) rotate(8deg); opacity: 0; }
+}
+.actor.swim img { animation: idle-bob 1.2s ease-in-out infinite; }
+.actor.swim     { animation: narwhal-swim 5s ease-in-out forwards; }
+
+/* Owl head bob -- subtle, much smaller than penguin idle */
+@keyframes owl-bob {
+  0%, 100% { transform: rotate(-2deg); }
+  50%      { transform: rotate(2deg); }
+}
+.actor.perched img { animation: owl-bob 5s ease-in-out infinite; }
+
+/* Coin floating up to the vault. Preserves the centering offset. */
+@keyframes coin-float {
+  0%   { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+  10%  { transform: translate(-50%, -50%) scale(1);   opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--cx, 0px)), calc(-50% + var(--cy, -200px))) scale(1.1); opacity: 0; }
+}
+.actor.coin-fly { animation: coin-float 2.5s ease-out forwards; pointer-events: none; }
+
+/* Crack appears and fades when a trade fails */
+@keyframes crack-appear {
+  0%   { opacity: 0; transform: scale(0.4); }
+  20%  { opacity: 0.9; transform: scale(1.0); }
+  100% { opacity: 0; transform: scale(1.05); }
+}
+.crack {
+  position: absolute;
+  width: 60px; height: 60px;
+  pointer-events: none;
+  animation: crack-appear 4s ease-out forwards;
+}
+.crack svg { width: 100%; height: 100%; }
+
+/* ===================================================================
+ * SVG element-level animations (driven by classes on parent)
+ * =================================================================== */
+
+@keyframes shimmer { 0%,100% { opacity: 0.6; } 50% { opacity: 1.0; } }
 .shimmer { animation: shimmer 1.6s ease-in-out infinite; }
 
-/* Narwhal horn glow — pops when an LLM round-trip is in flight.
- * Toggle by adding .glow-active to an ancestor; default is dim. */
 .glow,
 .glow-halo { transition: opacity 200ms ease-out; }
-.glow-active .glow-halo { opacity: 0.85; }
-.glow-active .glow      { fill: #FFFFFF; }
+.actor.glowing .glow-halo { opacity: 0.85; }
+.actor.glowing .glow      { fill: #FFFFFF; }
 
-/* Owl eye blink (used when a circuit breaker trips) */
 @keyframes blink {
   0%, 90%, 100% { fill: #F0C24A; }
   92%, 96%      { fill: #C73E36; }
 }
-.alert .eye { animation: blink 0.8s linear infinite; }
+.actor.alert .eye { animation: blink 0.8s linear infinite; }
+
+/* ===================================================================
+ * HUDs -- corner panels for vault, decision log, agent legend
+ * =================================================================== */
+
+.hud {
+  position: fixed;
+  z-index: 30;
+  background: rgba(10,27,54,0.78);
+  border: 1px solid var(--ice-edge);
+  border-radius: 10px;
+  padding: 12px;
+  backdrop-filter: blur(4px);
+}
+
+.hud h3 {
+  margin: 0 0 8px 0;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.hud.vault {
+  top: 80px; left: 24px;
+  width: 220px;
+}
+.hud.vault .nav {
+  font-size: 22px; font-weight: 700;
+  margin-bottom: 6px;
+}
+.hud.vault .coin-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: flex-end;
+  min-height: 40px;
+}
+.hud.vault .coin-stack img { image-rendering: pixelated; }
+.hud.vault .footnote {
+  font-size: 9px; opacity: 0.5; margin-top: 6px;
+}
+
+.hud.legend {
+  top: 80px; right: 24px;
+  width: 240px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.hud.legend .row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px dashed rgba(255,255,255,0.08);
+  font-size: 10px;
+}
+.hud.legend .row:last-child { border-bottom: 0; }
+.hud.legend .row .name { font-weight: 600; }
+.hud.legend .row .meta { opacity: 0.6; font-size: 9px; }
+.hud.legend .row .badge {
+  padding: 1px 6px; border-radius: 3px; font-size: 8px;
+  background: var(--aurora-c); color: var(--ice-deep); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.hud.legend .row .badge.halted { background: var(--warning); }
+.hud.legend .row .badge.error  { background: var(--danger); color: var(--ice-bright); }
+
+.hud.log {
+  bottom: 24px; left: 24px;
+  width: 380px;
+  max-height: 28vh;
+  overflow-y: auto;
+}
+.hud.log .row {
+  display: grid;
+  grid-template-columns: 36px 1fr 32px;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.hud.log .row:last-child { border-bottom: 0; }
+.hud.log .row.llm { background: rgba(181,166,224,0.06); }
+.hud.log .age   { opacity: 0.6; }
+.hud.log .conf  {
+  height: 4px; border-radius: 2px; align-self: center;
+  background: rgba(0,0,0,0.4); position: relative;
+}
+.hud.log .conf > span {
+  position: absolute; top: 0; left: 0; bottom: 0;
+  background: var(--aurora-c); border-radius: 2px;
+}
+.hud.log .pill {
+  display: inline-block; padding: 0 4px; margin-left: 4px;
+  font-size: 8px; opacity: 0.7;
+  border: 1px solid currentColor; border-radius: 2px;
+}
+.hud.log .pill.llm-pill { color: var(--aurora-p); }
+
+/* The expedition strip across the bottom-right */
+.hud.cast {
+  bottom: 24px; right: 24px;
+  width: 300px;
+}
+.hud.cast .grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.hud.cast .cell {
+  display: flex; flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  font-size: 8px; opacity: 0.7; text-align: center;
+}
+.hud.cast .cell img { width: 40px; height: 40px; image-rendering: pixelated; }
+
+/* Action overlay -- big "WHITEOUT" banner when killswitch fires */
+.whiteout {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(255,255,255,0.85);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 16px;
+  color: var(--ice-deep);
+  animation: whiteout-pop 0.4s ease-out;
+}
+.whiteout h1 {
+  font-size: 64px; margin: 0;
+  letter-spacing: 0.1em;
+}
+@keyframes whiteout-pop {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* Disconnected banner -- pinned to TOP-CENTER under the chrome bar so
+ * it never collides with the rotating sprite-hint pinned at the
+ * bottom. Subtle warning colour. */
+.disconnect-footer {
+  position: fixed;
+  top: 56px; left: 50%; transform: translateX(-50%);
+  z-index: 40;
+  font-size: 10px;
+  background: rgba(240,194,74,0.15);
+  border: 1px solid var(--warning);
+  padding: 4px 12px;
+  border-radius: 4px;
+  color: var(--warning);
+  max-width: 70vw;
+  text-align: center;
+}
+
+/* Tooltip-style hover info pinned to a corner */
+.hint {
+  position: fixed;
+  bottom: 4px; right: 24px;
+  z-index: 30;
+  font-size: 9px;
+  opacity: 0.5;
+}

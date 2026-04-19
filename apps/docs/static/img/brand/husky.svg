@@ -1,8 +1,8 @@
 <!--
-  Skipper the husky. Reconciliation runner  appears during reconcile
+  Skipper the husky. Reconciliation runner  appears during reconcile
   passes, optionally with a slight motion-blur via CSS animation.
 
-  Hand-authored pixel art, 32×32 logical grid.
+  Hand-authored pixel art, 32x32 logical grid.
   Palette: gray fur #8DA0BC, white belly #ECF6FF, blue eyes #50D2C2,
            dark mask #2A3958, navy outline #1B2A4E, pink tongue #F4B6C0.
 -->

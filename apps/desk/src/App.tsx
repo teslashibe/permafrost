@@ -1,32 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { APIClient, Agent, DecisionLite, demoData } from './api/client';
-import { DashboardChrome } from './components/DashboardChrome';
-import { AgentCard } from './components/AgentCard';
-import { DecisionRow } from './components/DecisionRow';
-import { Vault } from './components/Vault';
-import { CastShowcase } from './components/CastShowcase';
+import { APIClient, Agent, DecisionLite, demoData, nextDemoBatch } from './api/client';
+import { World } from './components/World';
+import { VaultHud, AgentLegendHud, DecisionLogHud, CastHud } from './components/Hud';
+import { Sprite } from './components/Sprite';
 
-// App is the root view. v1 layout:
-//
-//   ┌──────────────────────────────────────────────────────────────┐
-//   │  [Pole]   ❄ Permafrost — Trading Desk          [conn] [Owl] │  chrome
-//   ├──────────────────┬──────────────────────────────────────────┤
-//   │                  │                                          │
-//   │  Vault           │  Decision Log                            │
-//   │  (coins)         │  (last 20)                               │
-//   │                  │                                          │
-//   │  Agents          │                                          │
-//   │  ─ Pip 🐧+🦄     │                                          │
-//   │  ─ Boulder 🐧    │                                          │
-//   │  ─ ...           │                                          │
-//   │                  │                                          │
-//   ├──────────────────┴──────────────────────────────────────────┤
-//   │  The Expedition (cast showcase)                             │
-//   └──────────────────────────────────────────────────────────────┘
-//
-// Polls /v1/agents and /v1/agents/<id>/decisions every 3s. v2 will
-// switch to a single WebSocket multiplex for sub-second latency
-// (#41 follow-up; the polling baseline is fine for the v1 ship).
+// App is the root view. The world fills the viewport; HUDs (Vault,
+// Agent legend, Decision log, Cast) overlay the corners. Title +
+// connection state pin to the top.
 
 const POLL_MS = 3000;
 const client = new APIClient();
@@ -48,18 +28,24 @@ export const App: React.FC = () => {
         setAgents(list);
         setConnected(true);
         setLastError(null);
-        // For v1 just pull decisions for the first agent. v2 will
-        // multiplex over WebSocket and merge per-agent streams.
         if (list.length > 0) {
-          const decs = await client.recentDecisions(list[0].id, 20);
-          if (!cancelled) setDecisions(decs);
+          // Pull recent decisions from EVERY agent so the World can
+          // animate each penguin independently. Limit per-agent so a
+          // chatty strategy doesn't overwhelm the view.
+          const all = await Promise.all(
+            list.map(a => client.recentDecisions(a.id, 5).catch(() => [] as DecisionLite[]))
+          );
+          if (!cancelled) {
+            const merged = all.flat().sort((x, y) =>
+              new Date(y.ts).getTime() - new Date(x.ts).getTime()
+            );
+            setDecisions(merged.slice(0, 30));
+          }
         } else {
           setDecisions([]);
         }
       } catch (err) {
         if (cancelled) return;
-        // Disconnected: show the demo data so the UI still feels
-        // alive, but flag it clearly.
         setConnected(false);
         setAgents(demoData.agents);
         setDecisions(demoData.recent_decisions);
@@ -76,88 +62,61 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  // V1 doesn't yet pipe NAV through the API — synthesise from
-  // alloc_usd as a stand-in. Real NAV stream lands when /v1/vault/nav
-  // is added (separate small PR).
-  const navUSD = agents.reduce((acc, a) => acc + parseFloat(a.alloc_usd || '0'), 0);
+  // While disconnected, advance the demo scene every 4s so the world
+  // keeps animating instead of freezing on the canned snapshot.
+  useEffect(() => {
+    if (connected) return;
+    const t = setInterval(() => {
+      setDecisions(prev => nextDemoBatch(prev));
+    }, 4_000);
+    return () => clearInterval(t);
+  }, [connected]);
 
-  // Aurora alerts when any agent is halted or errored. Cheap heuristic
-  // until per-breaker telemetry is plumbed.
+  // Synthesised NAV (sum of allocations) until /v1/vault/nav lands.
+  const navUSD = agents.reduce((acc, a) => acc + parseFloat(a.alloc_usd || '0'), 0);
   const alertActive = agents.some(a => a.status === 'halted' || a.status === 'error');
 
   return (
     <>
-      <DashboardChrome
-        title="Permafrost — Trading Desk"
-        subtitle={connected ? 'live data from permafrostd' : 'demo mode (daemon unreachable)'}
-        alertActive={alertActive}
-        connected={connected}
-      />
-
-      <main style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(320px, 1fr) 2fr',
-        gap: 16,
-        padding: 24,
-        maxWidth: 1400,
-        margin: '0 auto',
-      }}>
-        <aside style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <Vault navUSD={navUSD} />
-          <section>
-            <h2 style={{ fontSize: 14, opacity: 0.8, letterSpacing: 0.5, marginBottom: 8, textTransform: 'uppercase' }}>
-              Agents
-            </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {agents.length === 0
-                ? <EmptyAgents />
-                : agents.map(a => <AgentCard key={a.id} agent={a} />)}
-            </div>
-          </section>
-        </aside>
-
-        <section>
-          <h2 style={{ fontSize: 14, opacity: 0.8, letterSpacing: 0.5, marginBottom: 8, textTransform: 'uppercase' }}>
-            Decision Log
-          </h2>
-          <div style={{
-            background: 'var(--ice-mid)',
-            border: '1px solid var(--ice-edge)',
-            borderRadius: 8,
-            overflow: 'hidden',
-          }}>
-            {decisions.length === 0
-              ? <EmptyDecisions connected={connected} />
-              : decisions.map(d => <DecisionRow key={d.id} d={d} />)}
+      {/* Top chrome -- title + connection dot */}
+      <header className="chrome">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Sprite name="pole" size={36} />
+          <div style={{ fontSize: 11, opacity: 0.7, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+            Camp Director
           </div>
-        </section>
-      </main>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Captain Pole</div>
+        </div>
+        <div className="title">
+          <h1>Permafrost - Trading Desk</h1>
+          <div className="subtitle">
+            {connected ? 'live data from permafrostd' : 'demo mode (daemon unreachable)'}
+          </div>
+        </div>
+        <div className="right">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, opacity: 0.85 }}>
+            <span className={`conn-dot ${connected ? 'live' : ''}`} />
+            {connected ? 'connected' : 'demo'}
+          </div>
+        </div>
+      </header>
 
-      <CastShowcase />
+      {/* The animated arctic world */}
+      <World agents={agents} decisions={decisions} alertActive={alertActive} />
 
+      {/* HUD overlays */}
+      <VaultHud navUSD={navUSD} />
+      <AgentLegendHud agents={agents} />
+      <DecisionLogHud decisions={decisions} />
+      <CastHud />
+
+      {/* Footer error banner -- only when offline AND we have an error */}
       {lastError && !connected && (
-        <footer style={{ padding: 12, fontSize: 10, opacity: 0.5, textAlign: 'center' }}>
-          {lastError} — start the daemon with <code>make up</code> to see live data.
-        </footer>
+        <div className="disconnect-footer">
+          {lastError.length > 90 ? lastError.slice(0, 87) + '...' : lastError}
+          {' - run '}<code>make up</code>{' for live data'}
+        </div>
       )}
     </>
   );
 };
-
-const EmptyAgents: React.FC = () => (
-  <div style={{
-    padding: 16, background: 'var(--ice-mid)',
-    border: '1px dashed var(--ice-edge)', borderRadius: 8,
-    fontSize: 12, opacity: 0.7,
-  }}>
-    No agents yet. Try <code>permafrost agent create --strategy noop --perp hyperliquid --alloc 1000</code>.
-  </div>
-);
-
-const EmptyDecisions: React.FC<{ connected: boolean }> = ({ connected }) => (
-  <div style={{ padding: 24, fontSize: 12, opacity: 0.7, textAlign: 'center' }}>
-    {connected
-      ? 'Waiting for the first decision tick…'
-      : 'No decisions to show. Start the daemon to see live activity.'}
-  </div>
-);

@@ -2,7 +2,7 @@
   Aurora the snowy owl. Risk monitor. Perches in dashboard chrome,
   blinks on a breaker trip (.alert class swaps eye colour).
 
-  Hand-authored pixel art, 32×32 logical grid.
+  Hand-authored pixel art, 32x32 logical grid.
   Palette: white plumage #ECF6FF, brown speckle #5A4220, golden eye
            #F0C24A, beak orange #E67D3A, navy outline #1B2A4E,
            alarm red #C73E36 (for .alert state).
