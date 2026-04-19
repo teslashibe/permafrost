@@ -1,0 +1,61 @@
+<!--
+  Aurora the snowy owl. Risk monitor. Perches in dashboard chrome,
+  blinks on a breaker trip (.alert class swaps eye colour).
+
+  Hand-authored pixel art, 32×32 logical grid.
+  Palette: white plumage #ECF6FF, brown speckle #5A4220, golden eye
+           #F0C24A, beak orange #E67D3A, navy outline #1B2A4E,
+           alarm red #C73E36 (for .alert state).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="256" height="256" shape-rendering="crispEdges" role="img" aria-label="Aurora the snowy owl, risk monitor">
+  <title>Aurora the snowy owl</title>
+  <desc>Risk monitor; perches in the dashboard chrome and blinks on a breaker trip.</desc>
+
+  <!-- Ear tufts -->
+  <rect x="9"  y="3"  width="2"  height="2" fill="#ECF6FF"/>
+  <rect x="21" y="3"  width="2"  height="2" fill="#ECF6FF"/>
+
+  <!-- Head -->
+  <rect x="8"  y="5"  width="16" height="1" fill="#1B2A4E"/>
+  <rect x="7"  y="6"  width="1"  height="9" fill="#1B2A4E"/>
+  <rect x="24" y="6"  width="1"  height="9" fill="#1B2A4E"/>
+  <rect x="8"  y="6"  width="16" height="9" fill="#ECF6FF"/>
+
+  <!-- Eyes (golden) -->
+  <rect x="10" y="9"  width="4"  height="4" fill="#F0C24A" class="eye"/>
+  <rect x="18" y="9"  width="4"  height="4" fill="#F0C24A" class="eye"/>
+  <rect x="11" y="10" width="2"  height="2" fill="#1B2A4E"/>
+  <rect x="19" y="10" width="2"  height="2" fill="#1B2A4E"/>
+  <!-- Eye highlights -->
+  <rect x="11" y="10" width="1"  height="1" fill="#ECF6FF"/>
+  <rect x="19" y="10" width="1"  height="1" fill="#ECF6FF"/>
+
+  <!-- Beak -->
+  <rect x="15" y="13" width="2"  height="2" fill="#E67D3A"/>
+  <rect x="15" y="15" width="2"  height="1" fill="#1B2A4E"/>
+
+  <!-- Body -->
+  <rect x="9"  y="15" width="14" height="1" fill="#1B2A4E"/>
+  <rect x="8"  y="16" width="16" height="8" fill="#ECF6FF"/>
+  <rect x="7"  y="16" width="1"  height="8" fill="#1B2A4E"/>
+  <rect x="24" y="16" width="1"  height="8" fill="#1B2A4E"/>
+  <rect x="9"  y="24" width="14" height="1" fill="#1B2A4E"/>
+
+  <!-- Brown speckles (snowy owl pattern) -->
+  <rect x="10" y="17" width="1"  height="1" fill="#5A4220"/>
+  <rect x="14" y="18" width="1"  height="1" fill="#5A4220"/>
+  <rect x="17" y="17" width="1"  height="1" fill="#5A4220"/>
+  <rect x="20" y="19" width="1"  height="1" fill="#5A4220"/>
+  <rect x="11" y="20" width="1"  height="1" fill="#5A4220"/>
+  <rect x="15" y="21" width="1"  height="1" fill="#5A4220"/>
+  <rect x="18" y="21" width="1"  height="1" fill="#5A4220"/>
+  <rect x="13" y="22" width="1"  height="1" fill="#5A4220"/>
+
+  <!-- Wings (subtle outline) -->
+  <rect x="9"  y="17" width="1"  height="6" fill="#5A4220"/>
+  <rect x="22" y="17" width="1"  height="6" fill="#5A4220"/>
+
+  <!-- Talons -->
+  <rect x="11" y="25" width="2"  height="1" fill="#5A4220"/>
+  <rect x="19" y="25" width="2"  height="1" fill="#5A4220"/>
+</svg>
