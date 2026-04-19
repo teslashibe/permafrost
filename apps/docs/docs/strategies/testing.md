@@ -11,7 +11,7 @@ Strategies are pure Go packages — `go test ./strategies/<your_strategy>/...` w
 Strategy logic should be testable without touching the network. Two helpers make that easy:
 
 - **`pkg/inference/mock`** — a `Provider` implementation that returns scripted responses. Use it for any LLM-veto path so unit tests don't make real network calls.
-- **`NewFromTypedConfig`** — many strategies (including `funding_arb_basic`) ship a test-only constructor that takes a typed `Config` directly, bypassing the `map[string]any` parser. This keeps tests focused on logic rather than config plumbing.
+- **A typed-config test constructor** — strategies that need to assert on edge cases of their own typed `Config` commonly ship a `NewFromTypedConfig(cfg, …)` helper alongside the registry-facing `New(map[string]any)`. The helper accepts the typed struct directly and bypasses the JSONB-style parser, so tests can stay focused on strategy logic rather than config plumbing.
 
 Example:
 
