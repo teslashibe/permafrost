@@ -1,0 +1,34 @@
+package {{.PackageName}}
+
+import (
+	"context"
+	"testing"
+
+	"github.com/teslashibe/permafrost/pkg/strategy"
+)
+
+// TestNew_ReturnsStrategy: the constructor never errors and produces
+// a strategy.Strategy whose Name matches.
+func TestNew_ReturnsStrategy(t *testing.T) {
+	s, err := New(nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if s.Name() != Name {
+		t.Errorf("Name: got %q want %q", s.Name(), Name)
+	}
+}
+
+// TestDecide_NoOp: until Decide is implemented, it produces a no-op
+// Decision with the TODO note. Replace this test once you fill in the
+// logic.
+func TestDecide_NoOp(t *testing.T) {
+	s, _ := New(nil)
+	dec, err := s.Decide(context.Background(), strategy.DecisionInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dec.Orders) != 0 || len(dec.Swaps) != 0 {
+		t.Errorf("stub strategy should emit no intents; got %+v", dec)
+	}
+}
