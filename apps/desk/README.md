@@ -40,7 +40,7 @@ daemon and serve under `/ui`.
 | 🦉 Aurora the snowy owl   | Risk monitor; eye blinks red on a trip.   |
 | 🐕 Skipper the husky      | Reconciliation runner.                    |
 | 🦦 Kelp the walrus        | Swap router.                              |
-| 🐙 Frostbite the kraken   | Killswitch.                               |
+| 🐳 Frostbite the Whale   | Killswitch.                               |
 | 🦣 Tusk the mammoth       | Operator's gitignored private strategies. |
 | 🪙 Coin                   | One per ~$100 of accumulated NAV.         |
 

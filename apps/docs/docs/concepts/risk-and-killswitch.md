@@ -36,13 +36,24 @@ Beyond pre-trade limits, the framework runs a small set of circuit breakers cont
 
 ## Killswitch
 
-The killswitch is the global stop-everything. It cancels every open order across every agent, optionally market-closes perp shorts, and (configurably) liquidates spot legs back to USDC. Triggers:
+The killswitch is the per-agent stop-and-unwind. When `Runtime.Trip` fires it:
 
-- Operator command: `permafrost agent stop --all --reason "<reason>"`.
-- Repeated breaker trips on multiple agents (configurable threshold).
-- Daemon-level kill conditions (RPC error storm, DB unreachable, inference rate-limit storm).
+1. Stops the runtime's tick loop and sets `status='halted'` on the agent.
+2. Calls `v.OpenOrders(ctx)` on the perp venue and cancels every one. Per-order failures are logged but don't abort the rest.
+3. (If `CloseShorts: true`) Reads `v.Positions(ctx)` and submits a reduce-only market order for every non-flat position. Shorts → buy, longs → sell.
+4. (If `LiquidateSpot: true`) Walks every open `BasisPosition`'s spot legs and submits a Quote → Swap pair against the configured `SwapVenue` for that chain, swapping back to USDC. Slippage cap precedence: explicit `opts.SpotSlippageBps` → agent's `MaxSpotSlippageBps` risk limit → 100bps ceiling.
 
-The killswitch flow lives in `internal/agent/killswitch.go`. See [killswitch tuning](/operations/killswitch-tuning) for the configurable knobs.
+Triggers today (v1):
+
+- Operator command: `permafrost agent stop --all --reason "<reason>"` flips agent status; the daemon supervisor invokes `Trip` when it observes the change.
+- Per-agent breakers (`MaxDrawdownBreaker`, `DailyLossBreaker`) trigger `Trip` when limits are hit.
+
+Not yet auto-wired (planned follow-ups):
+
+- Daemon-wide killswitch trigger (RPC error storms, multi-agent breaker cascades). Manual `agent stop --all` is the v1 path.
+- Per-chain liquidation policy (today `LiquidateSpot` is global).
+
+The full implementation lives in `internal/agent/killswitch.go`; tests in `internal/agent/killswitch_test.go` exercise the cancel path, the flatten path, the failure-continues invariant, and the conservative-defaults regression guard. See [killswitch tuning](/operations/killswitch-tuning) for the configurable knobs.
 
 ## Mainnet gating
 

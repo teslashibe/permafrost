@@ -14,10 +14,10 @@ import (
 
 // KillSwitchOptions controls the aggressiveness of an emergency stop.
 //
-// The metaphor (per epic #30): Frostbite the kraken stirring from his
-// sleep beneath the ice. CloseShorts is "wake quietly and recall the
-// expedition"; LiquidateSpot is "full Whiteout — leave nothing on the
-// field."
+// The metaphor (per epic #30): Frostbite the Whale surfacing -- a
+// killer whale literally is the kill-switch. CloseShorts is "surface
+// quietly and recall the expedition"; LiquidateSpot is "full Whiteout
+// -- leave nothing on the field."
 type KillSwitchOptions struct {
 	// CloseShorts: send reduce-only market orders to flatten any open
 	// perp positions. Always recommended.

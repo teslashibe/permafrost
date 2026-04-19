@@ -23,18 +23,38 @@ MVP. Single-operator, local-first. v2 will introduce hosted vaults with on-chain
 
 ## What you get out of the box
 
+**Framework**
+
 - A deterministic agent loop with paired-execution invariants (swap-before-order for delta-neutral trades).
-- Exchange adapter for Hyperliquid (perp).
+- Exchange adapter for Hyperliquid (perp), with `OpenOrders` + idempotent place/cancel.
 - Swap adapters for Solana (Jupiter) and EVM chains (1inch v6 — Ethereum, Base, Avalanche, BSC).
 - A self-custodied keystore. Private key bytes never leave the `internal/wallet` boundary.
 - Position reconciliation, PnL accounting, NAV tracking.
-- A killswitch with circuit breakers (drawdown, daily loss, funding flip, RPC errors, …).
-- Optional LLM-veto path via an OpenAI-compatible inference client (works with OpenAI, OpenRouter, Groq, vLLM, Ollama, etc.).
+- A real killswitch — cancels every open order, flattens shorts via reduce-only market orders, and (opt-in) liquidates spot legs back to USDC via the configured swap router.
+- Pre-trade risk + circuit breakers (drawdown, daily loss, funding flip, …).
+- Optional LLM-veto path via an OpenAI-compatible inference client (OpenAI, OpenRouter, Groq, vLLM, Ollama, etc.).
 - Decision provenance: every order links back to the exact prompt and model response.
 - A CSV-driven backtester.
 
+**Reference strategies**
+
+- `noop` — minimal smoke-test strategy.
+- `dca_buy` — deterministic dollar-cost-averaging into a configured spot asset.
+- `market_maker_basic` — paired bid/ask quoting on Hyperliquid with optional LLM veto.
+
+**Operator tooling**
+
+- `make demo` — one command from `git clone` to a paper-mode agent posting decisions in your terminal.
+- `permafrost init` — interactive setup wizard (config + keystore passphrase + first-agent template).
+- `permafrost doctor` — preflight check for Go, Docker, DB, keystore, inference providers, RPCs, registered strategies.
+- `permafrost strategy-new <name>` — scaffolds a new strategy package and registers it in the build.
+- A multi-arch Docker image (`linux/amd64` + `linux/arm64`) published to GHCR, with a `cli` compose service for one-off commands.
+- A read-only **Trading Desk web UI** — arctic-themed React + Vite dashboard with hand-authored pixel-art SVG sprites of the cast.
+
 ## Next steps
 
-- [Local install](/getting-started/local-install)
+- [Run the demo in 60 seconds](/getting-started/make-demo)
+- [The init wizard + doctor](/getting-started/init-and-doctor)
 - [Architecture overview](/introduction/architecture)
 - [Writing a strategy](/strategies/sapi)
+- [The cast and the LLM-as-agent thesis](/brand/llm-as-agent)

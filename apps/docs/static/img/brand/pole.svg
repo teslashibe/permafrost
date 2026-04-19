@@ -1,12 +1,12 @@
 <!--
   Pole the polar bear (Captain). The operator's avatar.
-  Hand-authored pixel art, 32×32 logical grid, scaled to 256×256.
+  Hand-authored pixel art, 32x32 logical grid, scaled to 256x256.
   Palette: ice white #ECF6FF, navy outline #1B2A4E, snout pink #F4B6C0,
            captain hat navy #1B2A4E + gold #F0C24A.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="256" height="256" shape-rendering="crispEdges" role="img" aria-label="Pole the polar bear, Captain">
   <title>Pole the polar bear (Captain)</title>
-  <desc>The operator's avatar  a stylized polar bear with a navy captain's cap, presiding over the trading-desk pyramid.</desc>
+  <desc>The operator's avatar  a stylized polar bear with a navy captain's cap, presiding over the trading-desk pyramid.</desc>
 
   <!-- Captain's hat brim (black) -->
   <rect x="9"  y="5"  width="14" height="1" fill="#1B2A4E"/>

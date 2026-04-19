@@ -1,8 +1,8 @@
 <!--
-  Narwhal  LLM advisor floating beside its penguin. Horn glows
+  Narwhal  LLM advisor floating beside its penguin. Horn glows
   (.glow class) when the LLM is being consulted; brighter on a veto.
 
-  Hand-authored pixel art, 32×32 logical grid.
+  Hand-authored pixel art, 32x32 logical grid.
   Palette: lavender body #B5A6E0, navy back #4D3B7C, white belly #E9E4F8,
            horn iridescent #E0D3FF + highlight #FFFFFF, eye #1B1F2A.
 -->
@@ -46,7 +46,7 @@
   <rect x="22" y="14" width="1"  height="1" fill="#4D3B7C"/>
 
   <!-- Optional glow halo around horn (visible only when .glow CSS class
-       opacity is bumped from 0 ’ 1 in the stylesheet) -->
+       opacity is bumped from 0 ? 1 in the stylesheet) -->
   <rect x="1"  y="13" width="1"  height="1" fill="#E0D3FF" class="glow-halo" opacity="0"/>
   <rect x="2"  y="12" width="4"  height="1" fill="#E0D3FF" class="glow-halo" opacity="0"/>
   <rect x="2"  y="14" width="4"  height="1" fill="#E0D3FF" class="glow-halo" opacity="0"/>

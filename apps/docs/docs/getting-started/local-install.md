@@ -1,29 +1,36 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
 ---
 
-# Local install
+# Local install (manual)
+
+The fast path is [`make demo`](/getting-started/make-demo) — one command, ~60 seconds. This page is the manual walk-through if you want to drive each step yourself, or to understand what `make demo` does under the hood.
+
+## The four commands
 
 ```bash
 git clone https://github.com/teslashibe/permafrost.git
 cd permafrost
-cp config.example.yaml config.yaml      # edit with your keys & RPC URLs
-make up                                  # bring up Timescale + permafrostd
-```
 
-That gives you a running daemon with `noop` registered. To do anything useful, register a wallet, initialize the vault, and create an agent:
+make build                                 # builds bin/permafrost + bin/permafrostd
+export PATH=$PWD/bin:$PATH
 
-```bash
-permafrost wallet import --chain solana --from <keypair.json>
+permafrost init                            # generates config.yaml + keystore passphrase
+set -a; source ~/.permafrost/env; set +a   # load the passphrase into your shell
+
+make up                                    # bring up Timescale + permafrostd in Docker
+permafrost doctor                          # confirm everything is wired
+
+permafrost wallet generate --chain solana  # only if you'll trade Solana spot
 permafrost vault init
 permafrost agent create \
     --strategy noop \
     --perp hyperliquid \
-    --alloc 5000
-permafrost agent start <id>
+    --alloc 1000
+permafrost agent start <id>                # supervisor picks it up
 ```
 
-Default mode is `paper` — no real orders are placed until the agent is explicitly promoted to `live` (and you pass `--confirm-live`). See [running noop](/getting-started/running-noop) for the full smoke-test flow.
+Default mode is `paper` — no real orders are placed until the agent is explicitly promoted to `live` (and you pass `--confirm-live` to `agent run`). See [running noop](/getting-started/running-noop) for the full smoke-test flow and [the init wizard + doctor](/getting-started/init-and-doctor) for what `init` and `doctor` do.
 
 ## What `make up` does
 
@@ -32,32 +39,30 @@ Default mode is `paper` — no real orders are placed until the agent is explici
 - Builds the daemon (`go build -o bin/permafrostd ./cmd/permafrostd`).
 - Starts `permafrostd` against your `config.yaml`.
 
-The CLI (`permafrost`) talks to the daemon over REST for most commands. A handful (`db migrate`, `backtest`, `wallet`) work without the daemon running.
+The CLI (`permafrost`) talks to the daemon over REST for most commands. A handful (`db migrate`, `backtest`, `wallet`, `init`, `doctor`) work without the daemon running.
 
 ## Adding a strategy
 
-The OSS build only registers `noop`. Every other strategy is added by the operator — see [writing a strategy](/strategies/sapi). The short version: a strategy needs to be linked into *both* binaries (the daemon `permafrostd` and the CLI `permafrost`) to be both runnable and backtest-able. Each binary has a committed `strategies.go` and a gitignored `strategies_local.go` (the latter for private adds).
+The OSS build registers `noop`, `dca_buy`, and `market_maker_basic` out of the box (see [reference strategies](/strategies/reference-strategies)). To add your own, the easy path is the scaffolder:
 
 ```bash
-mkdir -p strategies/my_strategy
-# write strategies/my_strategy/strategy.go that registers in init()
-
-# Add ONE import line to each of the four files (or just the two
-# strategies.go ones for community/upstream contributions, or just the
-# two strategies_local.go ones for private adds):
-#   cmd/permafrost/strategies.go        (committed, CLI)
-#   cmd/permafrost/strategies_local.go  (gitignored, CLI)
-#   cmd/permafrostd/strategies.go       (committed, daemon)
-#   cmd/permafrostd/strategies_local.go (gitignored, daemon)
-
-go build -o bin/permafrostd ./cmd/permafrostd
-go build -o bin/permafrost  ./cmd/permafrost
+permafrost strategy-new my_strategy
+go build ./...
 ```
 
-For a strategy you do not want pushed publicly, put it under `strategies/private/<name>/` (gitignored) and add the import lines to the two `strategies_local.go` files. See [private strategies](/strategies/private-strategies) for the full pattern, including backups.
+That generates `strategies/my_strategy/`, registers it in both binaries' `strategies.go` files, and prints the next 3 commands to type. See [`strategy-new` scaffolding](/strategies/scaffolding) for the full reference.
+
+For a private strategy that should not be pushed publicly:
+
+```bash
+permafrost strategy-new my_secret --private
+```
+
+Routes everything to `strategies/private/my_secret/` and the gitignored `*_local.go` files (created if missing). See [private strategies](/strategies/private-strategies) for the full pattern, including backups.
 
 ## Next steps
 
+- [The init wizard + doctor](/getting-started/init-and-doctor)
 - [Configuration reference](/getting-started/configuration)
 - [Running noop](/getting-started/running-noop)
 - [Writing a strategy](/strategies/sapi)

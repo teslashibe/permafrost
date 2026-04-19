@@ -1,8 +1,8 @@
 <!--
-  Kelp the walrus. Swap router  appears on swap routes between
+  Kelp the walrus. Swap router  appears on swap routes between
   chains, hauling tokens across.
 
-  Hand-authored pixel art, 32×32 logical grid.
+  Hand-authored pixel art, 32x32 logical grid.
   Palette: warm brown body #8B5C3A, paler belly #C19169, cream tusks
            #F1E5C3, dark eye #1B1F2A, navy outline #1B2A4E,
            pink whisker #F4B6C0.
@@ -39,7 +39,7 @@
   <rect x="9"  y="18" width="2"  height="1" fill="#1B2A4E"/>
   <rect x="13" y="18" width="2"  height="1" fill="#1B2A4E"/>
 
-  <!-- Body (round, pinniped  wider than head) -->
+  <!-- Body (round, pinniped  wider than head) -->
   <rect x="4"  y="17" width="22" height="1" fill="#1B2A4E"/>
   <rect x="3"  y="18" width="1"  height="7" fill="#1B2A4E"/>
   <rect x="26" y="18" width="1"  height="7" fill="#1B2A4E"/>
