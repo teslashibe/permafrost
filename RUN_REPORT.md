@@ -26,7 +26,7 @@ Approach: chained PRs targeting main, audited per .cursor/rules/issue-audit-user
 
 Mario theme replaced with **Arctic / Permafrost** theme per maintainer decision (better for the brand, zero IP risk, native to "frozen capital" tagline). Cast:
 
-- 🐻 **Polar Bear (Captain)** — operator avatar, top of pyramid
+- 🐻 **Pole the polar bear (Captain)** — operator avatar, top of pyramid
 - 🐧 **Penguin** (color-variant scarves) — strategy agents
 - 🦄 **Narwhals** — LLM advisors whispering decisions
 - 🦉 **Aurora (snowy owl)** — risk monitor
