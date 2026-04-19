@@ -1,0 +1,75 @@
+/* Permafrost Trading Desk — arctic palette.
+ *
+ * Colour ramp:
+ *   --ice-deep   #0A1B36   night-sky base
+ *   --ice-mid    #122A52   panel base
+ *   --ice-edge   #1F4380   panel edge / hover
+ *   --ice-bright #ECF6FF   chrome highlight
+ *   --aurora-c   #50D2C2   accent (calls to action, healthy)
+ *   --aurora-p   #B5A6E0   accent (LLM signal)
+ *   --warning    #F0C24A   degraded
+ *   --danger     #C73E36   killswitch / breaker tripped
+ */
+
+:root {
+  --ice-deep:   #0A1B36;
+  --ice-mid:    #122A52;
+  --ice-edge:   #1F4380;
+  --ice-bright: #ECF6FF;
+  --aurora-c:   #50D2C2;
+  --aurora-p:   #B5A6E0;
+  --warning:    #F0C24A;
+  --danger:     #C73E36;
+
+  --font-pixel: 'IBM Plex Mono', 'JetBrains Mono', 'Menlo', monospace;
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--ice-deep);
+  color: var(--ice-bright);
+  font-family: var(--font-pixel);
+}
+
+a { color: var(--aurora-c); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1, h2, h3 { letter-spacing: 0.02em; font-weight: 600; }
+
+/* Aurora-band background — a subtle gradient at the top of the viewport
+ * that hints at the namesake without actually animating. The Trading
+ * Desk is a tool, not a screensaver. */
+body {
+  background:
+    radial-gradient(ellipse 1200px 240px at 50% -120px, rgba(80,210,194,0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 800px 200px at 30% -160px, rgba(181,166,224,0.15) 0%, transparent 60%),
+    var(--ice-deep);
+  background-attachment: fixed;
+}
+
+/* Sprite shimmer animation for the coin highlight */
+@keyframes shimmer {
+  0%,100% { opacity: 0.6; }
+  50%     { opacity: 1.0; }
+}
+.shimmer { animation: shimmer 1.6s ease-in-out infinite; }
+
+/* Narwhal horn glow — pops when an LLM round-trip is in flight.
+ * Toggle by adding .glow-active to an ancestor; default is dim. */
+.glow,
+.glow-halo { transition: opacity 200ms ease-out; }
+.glow-active .glow-halo { opacity: 0.85; }
+.glow-active .glow      { fill: #FFFFFF; }
+
+/* Owl eye blink (used when a circuit breaker trips) */
+@keyframes blink {
+  0%, 90%, 100% { fill: #F0C24A; }
+  92%, 96%      { fill: #C73E36; }
+}
+.alert .eye { animation: blink 0.8s linear infinite; }

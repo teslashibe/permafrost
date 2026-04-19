@@ -40,6 +40,26 @@ jobs:
       - name: test
         run: go test ./... -race -count=1
 
+  desk-ui:
+    name: trading desk — typecheck + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/desk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/desk/package-lock.json
+      - name: install
+        run: npm ci --no-audit --no-fund
+      - name: typecheck
+        run: npm run typecheck
+      - name: build
+        run: npm run build
+
   no-tracked-private-strategies:
     # Guards the gitignored-private-strategies contract: the public
     # repo must never have strategies/private/ or any strategies_local.go

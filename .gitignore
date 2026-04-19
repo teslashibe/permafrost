@@ -27,6 +27,10 @@ go.work.sum
 .DS_Store
 Thumbs.db
 
+## Vite / Trading Desk build outputs
+apps/desk/node_modules/
+apps/desk/dist/
+
 ## Local config & secrets
 config.yaml
 config.local.yaml
