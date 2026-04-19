@@ -12,7 +12,7 @@ import narwhalUrl from '../characters/narwhal.svg';
 import owlUrl     from '../characters/owl.svg';
 import huskyUrl   from '../characters/husky.svg';
 import walrusUrl  from '../characters/walrus.svg';
-import krakenUrl  from '../characters/kraken.svg';
+import whaleUrl   from '../characters/whale.svg';
 import mammothUrl from '../characters/mammoth.svg';
 import coinUrl    from '../characters/coin.svg';
 
@@ -23,7 +23,7 @@ export type CharacterName =
   | 'owl'
   | 'husky'
   | 'walrus'
-  | 'kraken'
+  | 'whale'
   | 'mammoth'
   | 'coin';
 
@@ -34,7 +34,7 @@ const SOURCES: Record<CharacterName, string> = {
   owl:     owlUrl,
   husky:   huskyUrl,
   walrus:  walrusUrl,
-  kraken:  krakenUrl,
+  whale:   whaleUrl,
   mammoth: mammothUrl,
   coin:    coinUrl,
 };
@@ -46,7 +46,7 @@ const LABELS: Record<CharacterName, string> = {
   owl:     'Aurora the snowy owl (risk monitor)',
   husky:   'Skipper (reconciliation runner)',
   walrus:  'Kelp the walrus (swap router)',
-  kraken:  'Frostbite the kraken (killswitch)',
+  whale:   'Frostbite the Whale (killswitch)',
   mammoth: 'Tusk the mammoth (private strategy)',
   coin:    'Coin (PnL)',
 };

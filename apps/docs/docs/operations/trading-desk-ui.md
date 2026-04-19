@@ -73,7 +73,7 @@ The UI never blank-screens. If the daemon is offline you still see a working das
 - Per-agent action buttons (start / stop / set-mode / kill)
 - NAV history chart (currently only the current value)
 - Trade-history view
-- Whiteout overlay when killswitch fires (Frostbite the kraken emerging)
+- Whiteout overlay when killswitch fires (Frostbite the Whale breaching)
 - Mobile breakpoints (desktop-first by design — this is an operator tool)
 - Light theme
 

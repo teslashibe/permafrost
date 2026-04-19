@@ -94,7 +94,7 @@ Defaults are intentionally conservative; tune up only as you build confidence.
 ## Known limits
 
 - **No daemon-wide killswitch trigger.** Multi-agent breaker escalation, RPC error storms, and inference rate-limit storms are not auto-triggered by the framework. An operator hitting `permafrost agent stop --all` is the manual equivalent today.
-- **Liquidation is fire-and-forget.** `Trip` does not `WaitConfirm` on liquidation swaps. Operator can inspect tx hashes from the decision log if they need to follow up — that trade-off is deliberate (a kraken doesn't wait politely).
+- **Liquidation is fire-and-forget.** `Trip` does not `WaitConfirm` on liquidation swaps. Operator can inspect tx hashes from the decision log if they need to follow up — that trade-off is deliberate (a breaching whale doesn't wait politely).
 - **Per-chain policy is global.** `LiquidateSpot` either applies to every chain or none. Per-chain selectivity (e.g. "liquidate Solana legs but not EVM") needs a tiny wrapper around `Trip` for now.
 
 These are documented in `internal/agent/killswitch.go` itself; the source is the authoritative reference.

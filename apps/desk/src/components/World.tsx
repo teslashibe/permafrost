@@ -298,15 +298,16 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
         />
       )}
 
-      {/* Frostbite peeks from the bottom edge -- a low-poll easter
-          egg, only ever visible if alertActive */}
+      {/* Frostbite the Whale surfaces from the bottom-front of the
+          ice when an agent halts. Big, ominous, hard to miss. */}
       {alertActive && (
         <Actor
-          name="kraken"
+          name="whale"
           x={50}
-          y={108}
-          size={140}
+          y={102}
+          size={160}
           state=""
+          nameplate="Frostbite has surfaced"
           zIndex={40}
         />
       )}

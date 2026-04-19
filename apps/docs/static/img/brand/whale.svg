@@ -1,0 +1,125 @@
+<!--
+  Frostbite the Whale. Killswitch. Side-profile orca facing right -
+  iconic black-and-white pattern, large dorsal fin on top, vertical
+  tail fluke at the back-left. Friendly enough to be cute when idle,
+  intimidating enough that "Frostbite has surfaced" reads as bad
+  news.
+
+  Also literal: a "killer whale" is the killswitch.
+
+  Hand-authored pixel art on a 32x32 grid scaled to 256x256.
+  Palette: deep navy body #1B2A4E, midnight outline #110A28,
+           white belly #ECF6FF, eye-patch white above eye,
+           tooth white #FFFFFF, mouth pink #F4B6C0,
+           menacing aqua eye #50D2C2.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="256" height="256" shape-rendering="crispEdges" role="img" aria-label="Frostbite the Whale, killswitch">
+  <title>Frostbite the Whale</title>
+  <desc>Killswitch. Killer whale that surfaces only when the expedition has to be recalled.</desc>
+
+  <!-- ============================================================
+       Dorsal fin (tall, slightly hooked back, top of body)
+       ============================================================ -->
+  <rect x="14" y="3"  width="2" height="1" fill="#110A28"/>
+  <rect x="13" y="4"  width="3" height="1" fill="#110A28"/>
+  <rect x="12" y="5"  width="4" height="1" fill="#110A28"/>
+  <rect x="12" y="6"  width="5" height="1" fill="#110A28"/>
+  <rect x="13" y="4"  width="2" height="2" fill="#1B2A4E"/>
+  <rect x="13" y="6"  width="3" height="1" fill="#1B2A4E"/>
+
+  <!-- ============================================================
+       Body silhouette (single continuous shape, side profile,
+       facing right). Outline first, then fill.
+       ============================================================ -->
+
+  <!-- Top edge of body (curving from the back of the dorsal fin
+       down to the front of the head) -->
+  <rect x="6"  y="7"  width="6"  height="1" fill="#110A28"/>
+  <rect x="17" y="7"  width="8"  height="1" fill="#110A28"/>
+  <rect x="5"  y="8"  width="1"  height="1" fill="#110A28"/>
+  <rect x="25" y="8"  width="1"  height="2" fill="#110A28"/>
+  <rect x="4"  y="9"  width="1"  height="1" fill="#110A28"/>
+  <rect x="26" y="10" width="1"  height="3" fill="#110A28"/>
+
+  <!-- Bottom edge of body (head curve down to belly to tail) -->
+  <rect x="25" y="13" width="1"  height="2" fill="#110A28"/>
+  <rect x="24" y="15" width="1"  height="1" fill="#110A28"/>
+  <rect x="23" y="16" width="1"  height="1" fill="#110A28"/>
+  <rect x="6"  y="17" width="17" height="1" fill="#110A28"/>
+  <rect x="5"  y="16" width="1"  height="1" fill="#110A28"/>
+
+  <!-- Tail spine on the far left -->
+  <rect x="3"  y="10" width="1"  height="1" fill="#110A28"/>
+  <rect x="2"  y="11" width="1"  height="1" fill="#110A28"/>
+  <rect x="1"  y="12" width="1"  height="1" fill="#110A28"/>
+  <rect x="1"  y="13" width="1"  height="2" fill="#110A28"/>
+  <rect x="2"  y="15" width="1"  height="1" fill="#110A28"/>
+  <rect x="3"  y="16" width="1"  height="1" fill="#110A28"/>
+
+  <!-- ============================================================
+       Body fill - main dark navy
+       ============================================================ -->
+  <rect x="6"  y="8"  width="19" height="1" fill="#1B2A4E"/>
+  <rect x="5"  y="9"  width="21" height="1" fill="#1B2A4E"/>
+  <rect x="4"  y="10" width="22" height="1" fill="#1B2A4E"/>
+  <rect x="4"  y="11" width="22" height="2" fill="#1B2A4E"/>
+
+  <!-- ============================================================
+       White belly (the iconic orca pattern). Stretches from just
+       under the head, along the underside, to the tail base.
+       ============================================================ -->
+  <rect x="6"  y="13" width="17" height="4" fill="#ECF6FF"/>
+  <rect x="5"  y="14" width="1"  height="2" fill="#ECF6FF"/>
+  <rect x="23" y="13" width="1"  height="2" fill="#ECF6FF"/>
+  <rect x="22" y="15" width="2"  height="1" fill="#ECF6FF"/>
+
+  <!-- Soft transition strip between dark back and white belly -->
+  <rect x="5"  y="13" width="1"  height="1" fill="#1B2A4E"/>
+
+  <!-- ============================================================
+       Eye-patch (the famous white smudge above an orca's eye)
+       ============================================================ -->
+  <rect x="19" y="9"  width="3" height="2" fill="#ECF6FF"/>
+
+  <!-- Eye (aqua glow inside the patch - "menacing-but-cute") -->
+  <rect x="20" y="10" width="2" height="1" fill="#50D2C2"/>
+  <rect x="20" y="10" width="1" height="1" fill="#FFFFFF"/>
+
+  <!-- ============================================================
+       Mouth (long line at the bottom-front of the head with a
+       hint of teeth and a gentle upward curve)
+       ============================================================ -->
+  <rect x="22" y="14" width="3" height="1" fill="#110A28"/>
+  <rect x="24" y="13" width="1" height="1" fill="#110A28"/>
+  <!-- One tiny tooth -->
+  <rect x="23" y="13" width="1" height="1" fill="#FFFFFF"/>
+  <!-- Pink mouth dab (cute) -->
+  <rect x="22" y="13" width="1" height="1" fill="#F4B6C0"/>
+
+  <!-- ============================================================
+       Tail flukes (left side, vertical spread)
+       ============================================================ -->
+  <rect x="2"  y="10" width="1" height="2" fill="#1B2A4E"/>
+  <rect x="2"  y="13" width="1" height="2" fill="#1B2A4E"/>
+  <rect x="3"  y="11" width="1" height="5" fill="#1B2A4E"/>
+  <rect x="0"  y="12" width="1" height="1" fill="#110A28"/>
+  <rect x="0"  y="14" width="1" height="1" fill="#110A28"/>
+
+  <!-- ============================================================
+       Pectoral fin (just under the body, side fin)
+       ============================================================ -->
+  <rect x="9"  y="17" width="5" height="1" fill="#110A28"/>
+  <rect x="10" y="18" width="4" height="1" fill="#110A28"/>
+  <rect x="11" y="19" width="2" height="1" fill="#110A28"/>
+  <rect x="9"  y="17" width="5" height="1" fill="#1B2A4E"/>
+  <rect x="10" y="18" width="3" height="1" fill="#1B2A4E"/>
+
+  <!-- ============================================================
+       Spout / blow (small puff above the dorsal fin - only barely
+       visible; suggests a freshly-surfaced whale)
+       ============================================================ -->
+  <rect x="20" y="2"  width="1" height="1" fill="#ECF6FF" opacity="0.7"/>
+  <rect x="19" y="3"  width="1" height="1" fill="#ECF6FF" opacity="0.7"/>
+  <rect x="21" y="3"  width="2" height="1" fill="#ECF6FF" opacity="0.7"/>
+  <rect x="20" y="4"  width="3" height="1" fill="#ECF6FF" opacity="0.7"/>
+</svg>

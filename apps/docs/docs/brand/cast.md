@@ -71,17 +71,20 @@ Hauls tokens between chains via the configured DEX aggregators
 
 ## The hazards
 
-### <img src="/img/brand/kraken.svg" alt="Frostbite the kraken" width="64" height="64" style={{verticalAlign: 'middle'}} /> Frostbite the kraken (Killswitch)
+### <img src="/img/brand/whale.svg" alt="Frostbite the Whale" width="64" height="64" style={{verticalAlign: 'middle'}} /> Frostbite the Whale (Killswitch)
 
-Sleeps deep beneath the ice. When he wakes, the expedition is over —
-he cancels every open order, flattens every short, and (if
-configured) liquidates every spot leg back to USDC.
+A killer whale. Literal: a "killer whale" is the killswitch.
 
-You hope to never see Frostbite. When you do see him, the right
+Frostbite spends most of his life out of sight, somewhere under the
+ice. When he surfaces, the expedition is over — he cancels every open
+order, flattens every short, and (if configured) liquidates every
+spot leg back to USDC.
+
+You hope to never see Frostbite surface. When you do, the right
 response is to read the killswitch reason and figure out what
 you missed.
 
-The full-screen "Whiteout" overlay (UI v2) is Frostbite emerging.
+The full-screen "Whiteout" overlay (UI v2) is Frostbite breaching.
 
 ### <img src="/img/brand/mammoth.svg" alt="Tusk the mammoth" width="64" height="64" style={{verticalAlign: 'middle'}} /> Tusk the mammoth (Private Strategies)
 

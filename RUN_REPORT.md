@@ -39,7 +39,7 @@ Mario theme replaced with **Arctic / Permafrost** theme per maintainer decision.
 | 🦉 | Aurora the snowy owl | Risk monitor; eye blinks red on breaker trip |
 | 🐕 | Skipper the husky | Reconciliation runner |
 | 🦦 | Kelp the walrus | Swap router |
-| 🐙 | Frostbite the kraken | Killswitch (sleeps deep, emerges on Whiteout) |
+| 🐳 | Frostbite the Whale | Killswitch (killer whale -> killswitch; surfaces on Whiteout) |
 | 🦣 | Tusk the mammoth | Operator's gitignored private strategies (extinct from public view) |
 | 🪙 | Coin | ~$100 of accumulated NAV |
 

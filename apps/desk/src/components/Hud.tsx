@@ -147,7 +147,7 @@ const CAST_ENTRIES: Array<{ name: import('./Sprite').CharacterName; label: strin
   { name: 'owl',     label: 'Aurora',  blurb: 'Risk monitor' },
   { name: 'husky',   label: 'Skipper', blurb: 'Reconciler' },
   { name: 'walrus',  label: 'Kelp',    blurb: 'Swap router' },
-  { name: 'kraken',  label: 'Frostbite', blurb: 'Killswitch' },
+  { name: 'whale',   label: 'Frostbite', blurb: 'Killswitch' },
   { name: 'mammoth', label: 'Tusk',    blurb: 'Private strats' },
 ];
 
