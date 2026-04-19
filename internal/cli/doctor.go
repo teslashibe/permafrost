@@ -69,6 +69,11 @@ type CheckResult struct {
 	Err    error // populated on StatusFail; surfaced under --verbose
 }
 
+// httpClient is the doctor's HTTP client. Hard 5s ceiling so a hung TLS
+// handshake (which a bare context.WithTimeout doesn't always preempt)
+// cannot make the doctor wedge.
+var httpClient = &http.Client{Timeout: 5 * time.Second}
+
 // runDoctor executes every check. Order is deliberate (cheapest first so the
 // operator sees fast feedback even on a slow connection).
 func runDoctor(ctx context.Context, c *cobra.Command, _ bool) []CheckResult {
@@ -276,7 +281,10 @@ func checkSolanaRPC(ctx context.Context, g *Globals) CheckResult {
 		r.Detail = "not configured"
 		return r
 	}
-	body := strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"getHealth"}`)
+	// Use getSlot rather than getHealth: getHealth is restricted on most
+	// commercial providers (Helius, Triton); getSlot is part of the
+	// universally-exposed RPC surface and returns a uint64 we can show.
+	body := strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"getSlot"}`)
 	rpcCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(rpcCtx, http.MethodPost, g.Config.Solana.RPCURL, body)
@@ -287,7 +295,7 @@ func checkSolanaRPC(ctx context.Context, g *Globals) CheckResult {
 		return r
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		r.Status = StatusFail
 		r.Detail = redactURL(g.Config.Solana.RPCURL) + " (network error)"
@@ -296,20 +304,43 @@ func checkSolanaRPC(ctx context.Context, g *Globals) CheckResult {
 	}
 	defer resp.Body.Close()
 	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if resp.StatusCode == http.StatusTooManyRequests {
+		r.Status = StatusWarn
+		r.Detail = redactURL(g.Config.Solana.RPCURL) + " (rate-limited; try a paid provider like Helius/Triton)"
+		return r
+	}
 	if resp.StatusCode != http.StatusOK {
 		r.Status = StatusFail
 		r.Detail = fmt.Sprintf("%s (HTTP %d)", redactURL(g.Config.Solana.RPCURL), resp.StatusCode)
-		r.Err = fmt.Errorf("http %d: %s", resp.StatusCode, string(respBody))
+		r.Err = fmt.Errorf("http %d: %s", resp.StatusCode, truncate(string(respBody), 200))
 		return r
 	}
-	// getHealth returns "ok" in the result field on a healthy node.
-	if !strings.Contains(string(respBody), `"ok"`) {
+	// getSlot returns a number in result; presence indicates a working RPC.
+	var rpcResp struct {
+		Result *uint64 `json:"result"`
+		Error  *struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(respBody, &rpcResp); err != nil {
+		r.Status = StatusFail
+		r.Detail = redactURL(g.Config.Solana.RPCURL) + " (unparseable response)"
+		r.Err = err
+		return r
+	}
+	if rpcResp.Error != nil {
+		r.Status = StatusFail
+		r.Detail = redactURL(g.Config.Solana.RPCURL) + " (rpc error: " + rpcResp.Error.Message + ")"
+		r.Err = errors.New(rpcResp.Error.Message)
+		return r
+	}
+	if rpcResp.Result == nil {
 		r.Status = StatusWarn
-		r.Detail = redactURL(g.Config.Solana.RPCURL) + " (unhealthy: " + truncate(string(respBody), 80) + ")"
+		r.Detail = redactURL(g.Config.Solana.RPCURL) + " (no result; method may be restricted)"
 		return r
 	}
 	r.Status = StatusOK
-	r.Detail = redactURL(g.Config.Solana.RPCURL)
+	r.Detail = fmt.Sprintf("%s (slot %d)", redactURL(g.Config.Solana.RPCURL), *rpcResp.Result)
 	return r
 }
 
@@ -351,7 +382,7 @@ func checkEVMRPCs(ctx context.Context, g *Globals) []CheckResult {
 			continue
 		}
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := httpClient.Do(req)
 		cancel()
 		if err != nil {
 			r.Status = StatusFail
