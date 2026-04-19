@@ -110,3 +110,15 @@ type bookLevel struct {
 	Sz string `json:"sz"`
 	N  int    `json:"n"` // number of orders at this level
 }
+
+// ─── openOrders response ────────────────────────────────────────────────────
+
+// openOrderResp mirrors one entry in the JSON array returned by
+// /info?type=openOrders. The HL response is keyed `coin`/`oid`/`side`
+// (B = buy, A = ask/sell). Fields not used by the kill switch (origSz,
+// limitPx, timestamp, …) are omitted.
+type openOrderResp struct {
+	Coin string `json:"coin"`
+	Oid  int64  `json:"oid"`
+	Side string `json:"side"` // "B" (buy) | "A" (sell)
+}

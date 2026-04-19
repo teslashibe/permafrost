@@ -29,6 +29,10 @@ func (p *Policy) WithBreaker(b CircuitBreaker) *Policy {
 	return p
 }
 
+// Limits returns the hard limits this Policy enforces. Returns by value
+// so callers cannot mutate the Policy's internal copy.
+func (p *Policy) Limits() types.RiskLimits { return p.limits }
+
 // Compile-time check.
 var _ Engine = (*Policy)(nil)
 

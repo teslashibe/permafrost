@@ -32,6 +32,15 @@ type Venue interface {
 	// order MUST NOT return an error.
 	Cancel(ctx context.Context, id types.OrderID) error
 
+	// OpenOrders returns every order currently open for the configured
+	// account. Used by the kill switch to enumerate-and-cancel without
+	// the framework having to track every order id it ever placed.
+	// Implementations that do not yet expose the venue's open-orders
+	// endpoint MAY return an empty slice — callers must tolerate that
+	// (the kill switch will still attempt cancels for orders it knows
+	// about via its own session memory).
+	OpenOrders(ctx context.Context) ([]OpenOrder, error)
+
 	// Positions returns currently-open positions across all symbols.
 	Positions(ctx context.Context) ([]types.Position, error)
 
@@ -41,4 +50,15 @@ type Venue interface {
 	// FundingRates returns the latest funding observation per symbol. If
 	// symbols is empty, all subscribed symbols are returned.
 	FundingRates(ctx context.Context, symbols []string) ([]types.FundingRate, error)
+}
+
+// OpenOrder is the projection of a venue-side resting order returned by
+// OpenOrders. Deliberately small — just what the kill switch needs to
+// issue a cancel. Callers that want richer data (post-time, partial
+// fill state, …) can extend this struct as needs surface; current code
+// only reads ID + Symbol.
+type OpenOrder struct {
+	ID     types.OrderID
+	Symbol string
+	Side   types.Side
 }
