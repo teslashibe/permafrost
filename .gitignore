@@ -41,6 +41,9 @@ env.*.local
 keystore.json
 ~/.permafrost/
 
+## `make demo` artifacts (config, keystore, env file under .permafrost-demo/)
+.permafrost-demo/
+
 ## Private strategies (Hummingbot-style local extension)
 ## Docs: https://teslashibe.github.io/permafrost/strategies/private-strategies
 /strategies/private/
