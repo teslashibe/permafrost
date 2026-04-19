@@ -25,3 +25,8 @@ func (Engine) PreTrade(_ context.Context, _ string, _ any, _ types.PortfolioSnap
 func (Engine) Portfolio(_ context.Context, _ types.PortfolioSnapshot) types.Verdict {
 	return types.Verdict{Kind: types.VerdictAllow}
 }
+
+// Limits returns the zero RiskLimits — i.e. no limits enforced.
+// Killswitch callers asking the noop engine for its slippage cap will
+// fall back to whatever default they hold (100bps in the killswitch).
+func (Engine) Limits() types.RiskLimits { return types.RiskLimits{} }

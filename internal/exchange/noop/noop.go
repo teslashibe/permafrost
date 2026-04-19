@@ -20,6 +20,7 @@ type Venue struct {
 	mu       sync.Mutex
 	placed   []types.OrderIntent
 	cancels  []types.OrderID
+	openOrds []exchange.OpenOrder // tests can pre-seed via SetOpenOrders
 }
 
 // New constructs a fresh no-op venue.
@@ -63,6 +64,24 @@ func (v *Venue) Positions(_ context.Context) ([]types.Position, error)         {
 func (v *Venue) Balances(_ context.Context) ([]types.Balance, error)           { return nil, nil }
 func (v *Venue) FundingRates(_ context.Context, _ []string) ([]types.FundingRate, error) {
 	return nil, nil
+}
+
+// OpenOrders returns whatever the test seeded via SetOpenOrders.
+// Empty by default, which is the right answer for a noop venue.
+func (v *Venue) OpenOrders(_ context.Context) ([]exchange.OpenOrder, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	out := make([]exchange.OpenOrder, len(v.openOrds))
+	copy(out, v.openOrds)
+	return out, nil
+}
+
+// SetOpenOrders pre-seeds the venue with open orders, for tests of the
+// kill-switch cancel path.
+func (v *Venue) SetOpenOrders(orders []exchange.OpenOrder) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.openOrds = append(v.openOrds[:0], orders...)
 }
 
 // Placed returns the intents recorded by Place, in submission order.

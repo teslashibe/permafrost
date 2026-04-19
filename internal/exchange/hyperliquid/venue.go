@@ -228,6 +228,41 @@ func (v *Venue) Cancel(ctx context.Context, id types.OrderID) error {
 	return nil
 }
 
+// OpenOrders returns every order currently open on the configured user's
+// account. Reads are unauthenticated — only Address is required, no
+// signer. Used by the kill switch to enumerate-and-cancel without
+// relying on session memory of previously-placed orders.
+//
+// Hyperliquid's /info?type=openOrders returns a flat array; we project
+// each entry to exchange.OpenOrder. Each cancel still needs (oid, coin)
+// which is exactly what this returns.
+func (v *Venue) OpenOrders(ctx context.Context) ([]exchange.OpenOrder, error) {
+	if v.cfg.Address == "" {
+		return nil, ErrAddressRequired
+	}
+	var out []openOrderResp
+	if err := v.client.info(ctx, infoRequest{Type: "openOrders", User: v.cfg.Address}, &out); err != nil {
+		return nil, fmt.Errorf("hyperliquid: openOrders: %w", err)
+	}
+	orders := make([]exchange.OpenOrder, 0, len(out))
+	for _, r := range out {
+		side := types.SideBuy
+		if r.Side == "A" {
+			side = types.SideSell
+		}
+		id := types.OrderID(fmt.Sprintf("%d", r.Oid))
+		orders = append(orders, exchange.OpenOrder{
+			ID:     id,
+			Symbol: r.Coin,
+			Side:   side,
+		})
+		// Refresh our session map so a subsequent Cancel(id) works
+		// even for orders placed by a previous process.
+		v.rememberOrder(id, r.Coin)
+	}
+	return orders, nil
+}
+
 // CancelWithSymbol cancels an order placed by another process / restart
 // where this Venue doesn't know the symbol mapping.
 func (v *Venue) CancelWithSymbol(ctx context.Context, id types.OrderID, symbol string) error {
