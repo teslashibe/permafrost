@@ -358,16 +358,30 @@ img { -webkit-user-drag: none; user-select: none; }
 }
 .actor.walking img { animation: walk 4s ease-in-out infinite, idle-bob 0.4s ease-in-out infinite; }
 
-/* Husky run -- Skipper sprints across the lower part of the world
- * during reconcile passes. The keyframe MUST preserve the actor's
- * base centering offset (translate(-50%, -50%)) which otherwise
- * gets overridden by the animation's transform. */
-@keyframes husky-run {
-  0%   { transform: translate(calc(-50% - 240px), -50%); }
-  100% { transform: translate(calc(100vw - 50% + 240px), -50%); }
+/* Husky trot -- Skipper trots rightward across the world FOREVER.
+ *
+ * The keyframe MUST preserve the actor's base centering offset
+ * (translate(-50%, -50%)) which otherwise gets overridden by the
+ * animation's transform.
+ *
+ * Always-forward semantics: the animation runs `infinite`, and the
+ * keyframe sets him to off-screen-RIGHT for the second half of each
+ * cycle. When CSS loops back to 0% (off-screen-left) the transition
+ * is instantaneous and happens entirely off-screen, so the operator
+ * never sees Skipper backtrack. From the user's perspective: he
+ * trots rightward, exits stage right, brief pause, re-enters from
+ * stage left, trots rightward again.
+ *
+ * Cycle: 16s total. 0%-50% = visible trot (8s). 50%-100% = parked
+ * off-screen-right (8s). At 100% -> 0% the wrap is invisible.
+ */
+@keyframes husky-trot {
+  0%    { transform: translate(calc(-50% - 240px), -50%); }
+  50%   { transform: translate(calc(100vw - 50% + 240px), -50%); }
+  100%  { transform: translate(calc(100vw - 50% + 240px), -50%); }
 }
-.actor.running-across img { animation: idle-bob 0.25s linear infinite; }
-.actor.running-across { animation: husky-run 6s linear forwards; }
+.actor.running-across img { animation: idle-bob 0.4s linear infinite; }
+.actor.running-across     { animation: husky-trot 16s linear infinite; }
 
 /* Narwhal swim -- comes up from under the ice (off-screen) when an
  * LLM consult fires, swims across to its assigned penguin, then

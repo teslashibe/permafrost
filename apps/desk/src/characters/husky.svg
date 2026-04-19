@@ -1,110 +1,121 @@
 <!--
-  Skipper the husky. Reconciliation runner. Mid-gallop pose with all
-  four legs visible, tongue lolling, fluffy tail curled.
-  Hand-authored pixel art, 32x32 grid, scaled to 256x256.
-  Palette: gray fur #8DA0BC, dark mask #2A3958, white belly #ECF6FF,
-           ice-blue eye #50D2C2, navy outline #1B2A4E,
-           pink tongue #F4B6C0, paw black #1B2A4E.
+  Skipper. Reconciliation runner. Brown dog with a forward-facing
+  cartoon head (ears up, prominent nose, big eyes - emoji 1F436
+  vibe) and straight side-profile legs underneath the body. Always
+  trots rightward.
+  Hand-authored pixel art on a 32x32 grid scaled to 256x256.
+  Palette: warm brown #8B5C3A, light brown belly #C19169,
+           dark brown #5A3A20, navy outline #1B2A4E,
+           muzzle cream #F5E6D0, nose black #1B1F2A,
+           tongue pink #F4B6C0, tooth white #FFFFFF.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="256" height="256" shape-rendering="crispEdges" role="img" aria-label="Skipper the husky, reconciliation runner">
-  <title>Skipper the husky</title>
-  <desc>Reconciliation runner; gallops between camps delivering reconcile passes.</desc>
+  <title>Skipper</title>
+  <desc>Reconciliation runner. Brown dog trotting forward.</desc>
 
   <!-- ============================================================
-       Head (left side of body, ears upright, mid-stride)
+       Front-facing head, top-left corner of the sprite.
+       Big ears, big eyes, prominent muzzle/nose pointing at the
+       viewer.
        ============================================================ -->
-  <!-- Ears (pointed, perked forward) -->
-  <rect x="4"  y="8"  width="2"  height="3" fill="#1B2A4E"/>
-  <rect x="5"  y="7"  width="1"  height="1" fill="#1B2A4E"/>
-  <rect x="9"  y="8"  width="2"  height="3" fill="#1B2A4E"/>
-  <rect x="10" y="7"  width="1"  height="1" fill="#1B2A4E"/>
-  <!-- Ear inner -->
-  <rect x="5"  y="9"  width="1"  height="1" fill="#F4B6C0"/>
-  <rect x="9"  y="9"  width="1"  height="1" fill="#F4B6C0"/>
 
-  <!-- Head outline -->
-  <rect x="4"  y="11" width="9"  height="1" fill="#1B2A4E"/>
-  <rect x="3"  y="12" width="1"  height="5" fill="#1B2A4E"/>
-  <rect x="13" y="12" width="1"  height="5" fill="#1B2A4E"/>
-  <rect x="4"  y="17" width="9"  height="1" fill="#1B2A4E"/>
+  <!-- Ears (two upright triangles, sticking up either side) -->
+  <rect x="2"  y="3"  width="2" height="1" fill="#1B2A4E"/>
+  <rect x="2"  y="4"  width="3" height="2" fill="#5A3A20"/>
+  <rect x="3"  y="6"  width="3" height="1" fill="#5A3A20"/>
+  <rect x="3"  y="5"  width="1" height="1" fill="#F4B6C0"/>
 
-  <!-- Head fill (gray) -->
-  <rect x="4"  y="12" width="9"  height="5" fill="#8DA0BC"/>
+  <rect x="11" y="3"  width="2" height="1" fill="#1B2A4E"/>
+  <rect x="10" y="4"  width="3" height="2" fill="#5A3A20"/>
+  <rect x="9"  y="6"  width="3" height="1" fill="#5A3A20"/>
+  <rect x="11" y="5"  width="1" height="1" fill="#F4B6C0"/>
 
-  <!-- Dark husky mask across the eyes -->
-  <rect x="4"  y="13" width="9"  height="2" fill="#2A3958"/>
+  <!-- Head outline (rounded square) -->
+  <rect x="3"  y="6"  width="9" height="1" fill="#1B2A4E"/>
+  <rect x="2"  y="7"  width="1" height="6" fill="#1B2A4E"/>
+  <rect x="12" y="7"  width="1" height="6" fill="#1B2A4E"/>
+  <rect x="3"  y="13" width="9" height="1" fill="#1B2A4E"/>
 
-  <!-- Ice-blue eyes -->
-  <rect x="6"  y="13" width="2"  height="1" fill="#50D2C2"/>
-  <rect x="10" y="13" width="2"  height="1" fill="#50D2C2"/>
+  <!-- Head fill (brown) -->
+  <rect x="3"  y="7"  width="9" height="6" fill="#8B5C3A"/>
+
+  <!-- Forehead darker patch -->
+  <rect x="4"  y="7"  width="7" height="1" fill="#5A3A20"/>
+
+  <!-- Big round eyes (forward-facing) -->
+  <rect x="4"  y="8"  width="2" height="2" fill="#1B1F2A"/>
+  <rect x="9"  y="8"  width="2" height="2" fill="#1B1F2A"/>
   <!-- Eye highlights -->
-  <rect x="6"  y="13" width="1"  height="1" fill="#ECF6FF"/>
-  <rect x="10" y="13" width="1"  height="1" fill="#ECF6FF"/>
+  <rect x="4"  y="8"  width="1" height="1" fill="#FFFFFF"/>
+  <rect x="9"  y="8"  width="1" height="1" fill="#FFFFFF"/>
 
-  <!-- White muzzle stripe -->
-  <rect x="6"  y="15" width="5"  height="2" fill="#ECF6FF"/>
-  <!-- Nose -->
-  <rect x="7"  y="15" width="2"  height="1" fill="#1B2A4E"/>
-  <!-- Tongue lolling out the mouth -->
-  <rect x="9"  y="16" width="3"  height="1" fill="#F4B6C0"/>
-  <rect x="11" y="17" width="2"  height="1" fill="#F4B6C0"/>
+  <!-- Cream muzzle (large, fills lower half of face) -->
+  <rect x="4"  y="10" width="7" height="3" fill="#F5E6D0"/>
+
+  <!-- Black nose (centered, prominent - the dog-emoji signature) -->
+  <rect x="6"  y="10" width="3" height="2" fill="#1B1F2A"/>
+  <rect x="6"  y="10" width="1" height="1" fill="#FFFFFF"/>
+
+  <!-- Mouth + tongue -->
+  <rect x="5"  y="12" width="1" height="1" fill="#1B1F2A"/>
+  <rect x="9"  y="12" width="1" height="1" fill="#1B1F2A"/>
+  <rect x="6"  y="12" width="3" height="1" fill="#F4B6C0"/>
 
   <!-- ============================================================
-       Body - horizontal, slight downward slope (running)
+       Body (side profile, extending right from the head)
+       Horizontal trunk; head joins at the left.
        ============================================================ -->
+
   <!-- Body outline -->
   <rect x="11" y="13" width="14" height="1" fill="#1B2A4E"/>
   <rect x="25" y="14" width="1"  height="6" fill="#1B2A4E"/>
-  <rect x="11" y="20" width="15" height="1" fill="#1B2A4E"/>
+  <rect x="11" y="20" width="14" height="1" fill="#1B2A4E"/>
 
-  <!-- Body fill (gray top, white belly) -->
-  <rect x="11" y="14" width="14" height="3" fill="#8DA0BC"/>
-  <rect x="11" y="17" width="14" height="3" fill="#ECF6FF"/>
+  <!-- Body fill -->
+  <rect x="11" y="14" width="14" height="3" fill="#8B5C3A"/>
+  <!-- Lighter belly -->
+  <rect x="11" y="17" width="14" height="3" fill="#C19169"/>
 
   <!-- Spine shading -->
-  <rect x="13" y="14" width="11" height="1" fill="#7388A8"/>
+  <rect x="13" y="14" width="11" height="1" fill="#5A3A20"/>
 
   <!-- ============================================================
-       Tail (curled up over back, fluffy)
+       Tail (curled up over the back, brown with cream tip)
        ============================================================ -->
-  <rect x="26" y="11" width="3"  height="1" fill="#1B2A4E"/>
-  <rect x="25" y="12" width="1"  height="1" fill="#1B2A4E"/>
-  <rect x="29" y="12" width="1"  height="2" fill="#1B2A4E"/>
-  <rect x="26" y="14" width="3"  height="1" fill="#1B2A4E"/>
-  <rect x="26" y="12" width="3"  height="2" fill="#8DA0BC"/>
-  <!-- White tail tip -->
-  <rect x="28" y="11" width="1"  height="1" fill="#ECF6FF"/>
-  <rect x="28" y="13" width="1"  height="1" fill="#ECF6FF"/>
+  <rect x="26" y="11" width="3" height="1" fill="#1B2A4E"/>
+  <rect x="25" y="12" width="1" height="1" fill="#1B2A4E"/>
+  <rect x="29" y="12" width="1" height="2" fill="#1B2A4E"/>
+  <rect x="26" y="14" width="3" height="1" fill="#1B2A4E"/>
+  <rect x="26" y="12" width="3" height="2" fill="#8B5C3A"/>
+  <!-- Cream tail tip -->
+  <rect x="28" y="11" width="1" height="1" fill="#F5E6D0"/>
+  <rect x="28" y="13" width="1" height="1" fill="#F5E6D0"/>
 
   <!-- ============================================================
-       Legs - mid-gallop: front pair extended forward (one bent
-       under, one stretched), back pair extended back (mirrored).
-       Pink-pad paws.
+       Legs (4 STRAIGHT vertical legs, no bend, planted firmly)
        ============================================================ -->
-  <!-- Front-left leg (forward, planted) -->
-  <rect x="11" y="21" width="2"  height="4" fill="#8DA0BC"/>
-  <rect x="11" y="25" width="3"  height="2" fill="#1B2A4E"/>
 
-  <!-- Front-right leg (lifted, bent) -->
-  <rect x="14" y="21" width="2"  height="2" fill="#8DA0BC"/>
-  <rect x="13" y="23" width="3"  height="1" fill="#8DA0BC"/>
-  <rect x="13" y="24" width="2"  height="1" fill="#1B2A4E"/>
+  <!-- Front-left leg -->
+  <rect x="12" y="21" width="1" height="6" fill="#1B2A4E"/>
+  <rect x="13" y="21" width="2" height="6" fill="#8B5C3A"/>
+  <rect x="15" y="21" width="1" height="6" fill="#1B2A4E"/>
+  <rect x="13" y="27" width="2" height="1" fill="#1B2A4E"/>
 
-  <!-- Back-left leg (extended back, planted) -->
-  <rect x="20" y="21" width="2"  height="4" fill="#8DA0BC"/>
-  <rect x="19" y="25" width="3"  height="2" fill="#1B2A4E"/>
+  <!-- Front-right leg -->
+  <rect x="17" y="21" width="1" height="6" fill="#1B2A4E"/>
+  <rect x="18" y="21" width="2" height="6" fill="#8B5C3A"/>
+  <rect x="20" y="21" width="1" height="6" fill="#1B2A4E"/>
+  <rect x="18" y="27" width="2" height="1" fill="#1B2A4E"/>
 
-  <!-- Back-right leg (extended back, lifted) -->
-  <rect x="23" y="21" width="2"  height="2" fill="#8DA0BC"/>
-  <rect x="24" y="23" width="3"  height="1" fill="#8DA0BC"/>
-  <rect x="25" y="24" width="2"  height="1" fill="#1B2A4E"/>
+  <!-- Hind-left leg -->
+  <rect x="20" y="21" width="1" height="6" fill="#1B2A4E"/>
+  <rect x="21" y="21" width="2" height="6" fill="#8B5C3A"/>
+  <rect x="23" y="21" width="1" height="6" fill="#1B2A4E"/>
+  <rect x="21" y="27" width="2" height="1" fill="#1B2A4E"/>
 
-  <!-- Pink paw-pad highlights -->
-  <rect x="12" y="26" width="1"  height="1" fill="#F4B6C0"/>
-  <rect x="20" y="26" width="1"  height="1" fill="#F4B6C0"/>
-
-  <!-- Motion lines behind the husky (suggests speed) -->
-  <rect x="29" y="16" width="2"  height="1" fill="#ECF6FF" opacity="0.6"/>
-  <rect x="28" y="18" width="3"  height="1" fill="#ECF6FF" opacity="0.6"/>
-  <rect x="29" y="20" width="2"  height="1" fill="#ECF6FF" opacity="0.6"/>
+  <!-- Hind-right leg -->
+  <rect x="22" y="21" width="1" height="6" fill="#1B2A4E"/>
+  <rect x="23" y="21" width="2" height="6" fill="#8B5C3A"/>
+  <rect x="25" y="21" width="1" height="6" fill="#1B2A4E"/>
+  <rect x="23" y="27" width="2" height="1" fill="#1B2A4E"/>
 </svg>

@@ -1,113 +1,121 @@
 <!--
-  Pole the polar bear (Captain). Sat-down 3/4-view polar bear with
-  visible paws and a captain's hat. Snoopy-friendly proportions: round
-  body, big head, soft silhouette.
-  Hand-authored pixel art, 32x32 grid, scaled to 256x256.
-  Palette: ice white #ECF6FF, navy outline #1B2A4E, snout pink #F4B6C0,
-           soft snout cream #F8FBFF, hat navy + gold #F0C24A,
-           shadow grey #B7C9E0.
+  Pole the Polar Bear. Sat side-profile bear, facing right, with a
+  cyan scarf around his neck. No hat. Hand-authored pixel art on a
+  32x32 grid scaled to 256x256.
+  Palette: ice white #ECF6FF, navy outline #1B2A4E, snout cream #F8FBFF,
+           scarf cyan #50D2C2 + dark cyan #2BA694, nose pink #F4B6C0,
+           soft shadow #D8E5F5.
 -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="256" height="256" shape-rendering="crispEdges" role="img" aria-label="Pole the polar bear, Captain">
-  <title>Pole the polar bear (Captain)</title>
-  <desc>The operator's avatar -- a sat-down polar bear with a navy captain's cap.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="256" height="256" shape-rendering="crispEdges" role="img" aria-label="Pole the Polar Bear">
+  <title>Pole the Polar Bear</title>
+  <desc>The operator's avatar -- a side-profile sat polar bear with a cyan scarf, watching the camp.</desc>
 
-  <!-- Captain's hat -->
-  <rect x="10" y="1"  width="11" height="1" fill="#1B2A4E"/>
-  <rect x="9"  y="2"  width="13" height="2" fill="#1B2A4E"/>
-  <rect x="8"  y="4"  width="15" height="1" fill="#1B2A4E"/>
-  <!-- Hat gold band + tiny anchor pip -->
-  <rect x="8"  y="5"  width="15" height="1" fill="#F0C24A"/>
-  <rect x="15" y="3"  width="1"  height="1" fill="#F0C24A"/>
-  <rect x="16" y="3"  width="1"  height="1" fill="#F0C24A"/>
+  <!-- ============================================================
+       Ear (single, on top of head; side profile)
+       ============================================================ -->
+  <rect x="19" y="4"  width="3" height="1" fill="#1B2A4E"/>
+  <rect x="18" y="5"  width="1" height="2" fill="#1B2A4E"/>
+  <rect x="22" y="5"  width="1" height="2" fill="#1B2A4E"/>
+  <rect x="19" y="5"  width="3" height="2" fill="#ECF6FF"/>
+  <rect x="20" y="6"  width="1" height="1" fill="#F4B6C0"/>
 
-  <!-- Ear tips peeking from behind the hat -->
-  <rect x="9"  y="5"  width="1"  height="1" fill="#1B2A4E"/>
-  <rect x="22" y="5"  width="1"  height="1" fill="#1B2A4E"/>
+  <!-- ============================================================
+       Head outline (rounded, slightly elongated)
+       ============================================================ -->
+  <rect x="18" y="7"  width="6"  height="1" fill="#1B2A4E"/>
+  <rect x="17" y="8"  width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="24" y="8"  width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="16" y="9"  width="1"  height="3" fill="#1B2A4E"/>
+  <rect x="25" y="9"  width="1"  height="2" fill="#1B2A4E"/>
+  <!-- Snout extends right, lower section -->
+  <rect x="26" y="11" width="1"  height="3" fill="#1B2A4E"/>
+  <rect x="27" y="13" width="1"  height="2" fill="#1B2A4E"/>
+  <rect x="22" y="15" width="5"  height="1" fill="#1B2A4E"/>
+  <rect x="17" y="14" width="5"  height="1" fill="#1B2A4E"/>
 
-  <!-- Head - rounded, wider in the middle -->
-  <rect x="10" y="6"  width="11" height="1" fill="#1B2A4E"/>
-  <rect x="9"  y="7"  width="1"  height="1" fill="#1B2A4E"/>
-  <rect x="22" y="7"  width="1"  height="1" fill="#1B2A4E"/>
-  <rect x="8"  y="8"  width="1"  height="6" fill="#1B2A4E"/>
-  <rect x="23" y="8"  width="1"  height="6" fill="#1B2A4E"/>
-  <rect x="9"  y="14" width="1"  height="1" fill="#1B2A4E"/>
-  <rect x="22" y="14" width="1"  height="1" fill="#1B2A4E"/>
-  <rect x="10" y="15" width="11" height="1" fill="#1B2A4E"/>
-  <!-- Head fill -->
-  <rect x="10" y="7"  width="11" height="1" fill="#ECF6FF"/>
-  <rect x="9"  y="8"  width="14" height="6" fill="#ECF6FF"/>
-  <rect x="10" y="14" width="12" height="1" fill="#ECF6FF"/>
+  <!-- Head fill (white) -->
+  <rect x="18" y="8"  width="6"  height="1" fill="#ECF6FF"/>
+  <rect x="17" y="9"  width="8"  height="2" fill="#ECF6FF"/>
+  <rect x="17" y="11" width="9"  height="3" fill="#ECF6FF"/>
+  <rect x="22" y="14" width="5"  height="1" fill="#F8FBFF"/>
 
-  <!-- Eyes - closer together for a friendlier face -->
-  <rect x="12" y="10" width="2"  height="2" fill="#1B2A4E"/>
-  <rect x="17" y="10" width="2"  height="2" fill="#1B2A4E"/>
-  <!-- Eye highlights -->
-  <rect x="12" y="10" width="1"  height="1" fill="#ECF6FF"/>
-  <rect x="17" y="10" width="1"  height="1" fill="#ECF6FF"/>
+  <!-- Eye (single, side profile) -->
+  <rect x="20" y="10" width="1" height="2" fill="#1B2A4E"/>
+  <rect x="20" y="10" width="1" height="1" fill="#FFFFFF"/>
 
-  <!-- Snout patch - lighter cream rectangle, lower-center -->
-  <rect x="12" y="12" width="7"  height="3" fill="#F8FBFF"/>
-  <!-- Nose -->
-  <rect x="14" y="12" width="3"  height="1" fill="#1B2A4E"/>
-  <rect x="15" y="13" width="1"  height="1" fill="#1B2A4E"/>
-  <!-- Mouth (gentle smile) -->
-  <rect x="13" y="14" width="1"  height="1" fill="#1B2A4E"/>
-  <rect x="14" y="14" width="3"  height="1" fill="#F4B6C0"/>
-  <rect x="17" y="14" width="1"  height="1" fill="#1B2A4E"/>
+  <!-- Snout/nose tip -->
+  <rect x="27" y="12" width="1" height="1" fill="#1B2A4E"/>
+  <rect x="26" y="13" width="2" height="1" fill="#F8FBFF"/>
+  <rect x="25" y="14" width="2" height="1" fill="#F8FBFF"/>
 
-  <!-- Body outline - tapered oval (narrower at the top where it
-       meets the neck, widest at the haunches). Soft rounded corners
-       give a clear "sitting bear" silhouette instead of a snowman
-       rectangle. -->
-  <!-- Top of body (narrower) -->
-  <rect x="8"  y="16" width="16" height="1" fill="#1B2A4E"/>
-  <rect x="7"  y="17" width="1"  height="1" fill="#1B2A4E"/>
-  <rect x="24" y="17" width="1"  height="1" fill="#1B2A4E"/>
-  <!-- Mid body sides -->
-  <rect x="6"  y="18" width="1"  height="2" fill="#1B2A4E"/>
-  <rect x="25" y="18" width="1"  height="2" fill="#1B2A4E"/>
-  <!-- Widest part (haunches) -->
-  <rect x="5"  y="20" width="1"  height="3" fill="#1B2A4E"/>
-  <rect x="26" y="20" width="1"  height="3" fill="#1B2A4E"/>
-  <!-- Body bottom curving in -->
-  <rect x="6"  y="23" width="1"  height="1" fill="#1B2A4E"/>
-  <rect x="25" y="23" width="1"  height="1" fill="#1B2A4E"/>
-  <rect x="7"  y="24" width="1"  height="1" fill="#1B2A4E"/>
-  <rect x="24" y="24" width="1"  height="1" fill="#1B2A4E"/>
+  <!-- Mouth -->
+  <rect x="24" y="14" width="1" height="1" fill="#1B2A4E"/>
+  <rect x="22" y="13" width="2" height="1" fill="#F4B6C0"/>
 
-  <!-- Body fill (matches the tapered outline) -->
-  <rect x="8"  y="17" width="16" height="1" fill="#ECF6FF"/>
-  <rect x="7"  y="18" width="18" height="2" fill="#ECF6FF"/>
-  <rect x="6"  y="20" width="20" height="3" fill="#ECF6FF"/>
-  <rect x="7"  y="23" width="18" height="1" fill="#ECF6FF"/>
-  <rect x="8"  y="24" width="16" height="1" fill="#ECF6FF"/>
+  <!-- ============================================================
+       Scarf (cyan, wraps around neck and a tail trails left)
+       ============================================================ -->
+  <!-- Main scarf body -->
+  <rect x="14" y="15" width="11" height="1" fill="#2BA694"/>
+  <rect x="13" y="16" width="13" height="2" fill="#50D2C2"/>
+  <rect x="13" y="18" width="13" height="1" fill="#2BA694"/>
+  <!-- Scarf knot on the left side -->
+  <rect x="11" y="17" width="3"  height="3" fill="#50D2C2"/>
+  <rect x="11" y="17" width="3"  height="1" fill="#2BA694"/>
+  <rect x="11" y="20" width="3"  height="1" fill="#2BA694"/>
+  <!-- Scarf tail trailing down-left (a few pixels of fringe) -->
+  <rect x="9"  y="20" width="2"  height="2" fill="#50D2C2"/>
+  <rect x="9"  y="22" width="2"  height="1" fill="#2BA694"/>
+  <rect x="10" y="23" width="1"  height="2" fill="#50D2C2"/>
 
-  <!-- Subtle belly shading (slightly darker arc to suggest roundness) -->
-  <rect x="20" y="20" width="6"  height="3" fill="#D8E5F5"/>
-  <rect x="21" y="19" width="5"  height="1" fill="#D8E5F5"/>
+  <!-- ============================================================
+       Body (sat side profile, big round haunches on the left,
+       chest curving down on the right)
+       ============================================================ -->
+  <!-- Body outline -->
+  <rect x="6"  y="17" width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="5"  y="18" width="1"  height="2" fill="#1B2A4E"/>
+  <rect x="4"  y="20" width="1"  height="4" fill="#1B2A4E"/>
+  <rect x="3"  y="24" width="1"  height="2" fill="#1B2A4E"/>
+  <rect x="4"  y="26" width="2"  height="1" fill="#1B2A4E"/>
+  <rect x="6"  y="27" width="11" height="1" fill="#1B2A4E"/>
+  <rect x="17" y="26" width="2"  height="1" fill="#1B2A4E"/>
+  <rect x="19" y="25" width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="20" y="24" width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="21" y="20" width="1"  height="4" fill="#1B2A4E"/>
+  <rect x="20" y="19" width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="14" y="19" width="6"  height="1" fill="#1B2A4E"/>
+  <rect x="7"  y="19" width="6"  height="1" fill="#1B2A4E"/>
 
-  <!-- Captain's gold collar across the chest -->
-  <rect x="10" y="17" width="11" height="1" fill="#F0C24A"/>
-  <rect x="14" y="18" width="3"  height="1" fill="#1B2A4E"/>
+  <!-- Body fill (white, with subtle belly shading) -->
+  <rect x="6"  y="18" width="15" height="1" fill="#ECF6FF"/>
+  <rect x="5"  y="20" width="16" height="4" fill="#ECF6FF"/>
+  <rect x="4"  y="24" width="17" height="2" fill="#ECF6FF"/>
+  <rect x="6"  y="26" width="13" height="1" fill="#ECF6FF"/>
+  <!-- Belly shading -->
+  <rect x="14" y="22" width="6"  height="3" fill="#D8E5F5"/>
 
-  <!-- Front paws - two distinct paws planted in front -->
-  <rect x="8"  y="25" width="1"  height="3" fill="#1B2A4E"/>
-  <rect x="9"  y="25" width="4"  height="3" fill="#ECF6FF"/>
-  <rect x="13" y="25" width="1"  height="3" fill="#1B2A4E"/>
-  <rect x="9"  y="28" width="4"  height="1" fill="#1B2A4E"/>
+  <!-- ============================================================
+       Front paw (one visible at the bottom-right of body)
+       ============================================================ -->
+  <rect x="15" y="25" width="3"  height="2" fill="#ECF6FF"/>
+  <rect x="14" y="26" width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="18" y="25" width="1"  height="2" fill="#1B2A4E"/>
+  <rect x="15" y="27" width="3"  height="1" fill="#1B2A4E"/>
+  <rect x="16" y="26" width="1"  height="1" fill="#F4B6C0"/>
 
-  <rect x="18" y="25" width="1"  height="3" fill="#1B2A4E"/>
-  <rect x="19" y="25" width="4"  height="3" fill="#ECF6FF"/>
-  <rect x="23" y="25" width="1"  height="3" fill="#1B2A4E"/>
-  <rect x="19" y="28" width="4"  height="1" fill="#1B2A4E"/>
+  <!-- Hind leg / haunch (visible at the bottom-left of body) -->
+  <rect x="6"  y="25" width="3"  height="2" fill="#ECF6FF"/>
+  <rect x="5"  y="26" width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="9"  y="25" width="1"  height="2" fill="#1B2A4E"/>
+  <rect x="6"  y="27" width="3"  height="1" fill="#1B2A4E"/>
+  <rect x="7"  y="26" width="1"  height="1" fill="#F4B6C0"/>
 
-  <!-- Paw pad shading (cute pink toe-bean hint) -->
-  <rect x="10" y="27" width="2"  height="1" fill="#F4B6C0"/>
-  <rect x="20" y="27" width="2"  height="1" fill="#F4B6C0"/>
-
-  <!-- Hind paws / haunches peeking at the very base sides -->
-  <rect x="3"  y="22" width="1"  height="3" fill="#1B2A4E"/>
-  <rect x="4"  y="24" width="1"  height="2" fill="#ECF6FF"/>
-  <rect x="28" y="22" width="1"  height="3" fill="#1B2A4E"/>
-  <rect x="27" y="24" width="1"  height="2" fill="#ECF6FF"/>
+  <!-- ============================================================
+       Tail (small white nub at the back-left)
+       ============================================================ -->
+  <rect x="2"  y="22" width="2"  height="2" fill="#ECF6FF"/>
+  <rect x="2"  y="22" width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="3"  y="22" width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="2"  y="24" width="2"  height="1" fill="#1B2A4E"/>
 </svg>

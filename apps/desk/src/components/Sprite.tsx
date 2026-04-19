@@ -40,11 +40,11 @@ const SOURCES: Record<CharacterName, string> = {
 };
 
 const LABELS: Record<CharacterName, string> = {
-  pole:    'Pole the polar bear (Captain)',
+  pole:    'Pole the Polar Bear',
   penguin: 'Penguin trader',
   narwhal: 'Narwhal LLM advisor',
   owl:     'Aurora the snowy owl (risk monitor)',
-  husky:   'Skipper the husky (reconciliation runner)',
+  husky:   'Skipper (reconciliation runner)',
   walrus:  'Kelp the walrus (swap router)',
   kraken:  'Frostbite the kraken (killswitch)',
   mammoth: 'Tusk the mammoth (private strategy)',

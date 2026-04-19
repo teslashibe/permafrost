@@ -81,11 +81,11 @@ export const App: React.FC = () => {
       {/* Top chrome -- title + connection dot */}
       <header className="chrome">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Sprite name="pole" size={36} />
+          <Sprite name="pole" size={48} />
           <div style={{ fontSize: 11, opacity: 0.7, letterSpacing: 0.5, textTransform: 'uppercase' }}>
             Camp Director
           </div>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>Captain Pole</div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Pole the Polar Bear</div>
         </div>
         <div className="title">
           <h1>Permafrost - Trading Desk</h1>

@@ -98,7 +98,7 @@ export const DecisionLogHud: React.FC<{ decisions: DecisionLite[] }> = ({ decisi
 // blurb on hover (via title). Compact reference for what each sprite
 // represents in the world.
 const CAST_ENTRIES: Array<{ name: import('./Sprite').CharacterName; label: string; blurb: string }> = [
-  { name: 'pole',    label: 'Pole',    blurb: 'Camp Director (you)' },
+  { name: 'pole',    label: 'Pole the Polar Bear', blurb: 'Camp Director (you)' },
   { name: 'penguin', label: 'Penguin', blurb: 'Strategy agent' },
   { name: 'narwhal', label: 'Narwhal', blurb: 'LLM advisor' },
   { name: 'owl',     label: 'Aurora',  blurb: 'Risk monitor' },

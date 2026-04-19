@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Agent, DecisionLite } from '../api/client';
 import { Actor } from './Actor';
 import { Sprite } from './Sprite';
-import { AuroraBand, Iceberg, IceFloes, SnowFlurry } from './Scenery';
+import { AuroraBand, IceFloes, SnowFlurry } from './Scenery';
 
 // World is the animated scene. Each agent gets a workstation slot on
 // the ice. Decisions arriving from the API drive transient animations:
@@ -60,22 +60,15 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
   // expire after a short timeout.
   const [walkers, setWalkers] = useState<Record<string, number>>({});
   const [speeches, setSpeeches] = useState<Record<string, string | undefined>>({});
-  // Skipper-run trigger (reset by re-mounting the actor with a new key).
-  const [skipperRun, setSkipperRun] = useState(0);
-
   // Keep a ref of the most-recent decision id we've processed so we
   // don't re-trigger animations on every poll.
   const seenIds = useRef<Set<string>>(new Set());
 
-  // Drive Skipper's run loop independently of decisions. Every 12s
-  // he sprints across the ice from left to right (reconcile pass).
-  useEffect(() => {
-    // Fire once shortly after mount so the operator sees Skipper run
-    // within 2s rather than waiting a full cycle.
-    const initial = setTimeout(() => setSkipperRun(1), 1_500);
-    const t = setInterval(() => setSkipperRun(n => n + 1), 12_000);
-    return () => { clearTimeout(initial); clearInterval(t); };
-  }, []);
+  // Skipper used to be triggered via React-key remount which caused
+  // a brief "teleport" to the start of his run path. He now uses a
+  // single infinite CSS animation so he always glides rightward,
+  // pauses off-screen, and re-emerges from the left -- never moves
+  // backwards. No state needed here.
 
   // React to new decisions. Each new decision triggers a small set of
   // animations on the corresponding agent's actor.
@@ -201,64 +194,54 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
       {/* === scenery (sky + horizon + drifters) === */}
       <AuroraBand />
       <IceFloes />
-      <Iceberg x={88}  scale={0.85} />
-      <Iceberg x={20}  scale={0.55} />
       <SnowFlurry />
 
       {/* === permanent characters === */}
 
-      {/* Pole sits stage-left-mid, watches the camp. Positioned at the
-          left edge of the ice, in the safe zone between top vault and
-          bottom decision-log HUDs. */}
+      {/* Pole the Polar Bear sits stage-left, watches the camp. */}
       <Actor
         name="pole"
-        x={11}
-        y={56}
-        size={140}
+        x={12}
+        y={58}
+        size={150}
         state="idle"
-        nameplate="Captain Pole"
+        nameplate="Pole the Polar Bear"
         zIndex={25}
       />
 
-      {/* Aurora the owl perches on top of the iceberg on the right.
-          Y=44 puts her on the iceberg peak (iceberg top is at 38% +
-          a ~5% triangular peak). x=84 keeps her clear of the legend
-          HUD which spans x=79-98 above y=34. */}
+      {/* Aurora the snowy owl floats high above the right side of
+          the ice (no iceberg perch any more -- she just hovers). */}
       <Actor
         name="owl"
-        x={84}
-        y={44}
-        size={96}
+        x={87}
+        y={42}
+        size={88}
         state={`perched ${alertActive ? 'alert' : ''}`}
         nameplate={alertActive ? 'Aurora is ALERT' : 'Aurora is watching'}
         zIndex={26}
       />
 
-      {/* Kelp the walrus on a small ice patch in front of Pole. y=64
-          puts him safely above the decision log (top edge ~69% on a
-          768 viewport at 28vh max-height). */}
+      {/* Kelp the walrus on a small ice patch in front of Pole. */}
       <Actor
         name="walrus"
-        x={22}
-        y={64}
+        x={23}
+        y={66}
         size={104}
         state="idle"
         nameplate="Kelp - swap router"
         zIndex={22}
       />
 
-      {/* Skipper periodically runs across the OPEN ICE (between
-          decision log and cast hud), high enough to be visible.
-          The key change forces React to remount the actor so the
-          animation re-fires from the start. */}
+      {/* Skipper trots rightward forever via a single infinite CSS
+          animation -- runs across the ice, exits right, pauses,
+          re-enters from the left. Never moves backwards. */}
       <Actor
-        key={`skipper-${skipperRun}`}
         name="husky"
         x={-5}
-        y={68}
-        size={96}
+        y={70}
+        size={108}
         state="running-across"
-        nameplate="Skipper - reconcile"
+        nameplate="Skipper"
         zIndex={28}
       />
 
@@ -339,12 +322,12 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
 // up real estate.
 const SpriteHint: React.FC = () => {
   const HINTS = [
-    { name: 'pole'    as const, text: 'Captain Pole watches the camp.' },
+    { name: 'pole'    as const, text: 'Pole the Polar Bear watches the camp.' },
     { name: 'owl'     as const, text: 'Aurora the owl monitors risk.' },
     { name: 'penguin' as const, text: 'Penguin traders execute strategy decisions.' },
     { name: 'narwhal' as const, text: 'Narwhals swim up when an LLM consult fires.' },
     { name: 'walrus'  as const, text: 'Kelp the walrus routes swaps between chains.' },
-    { name: 'husky'   as const, text: 'Skipper runs reconcile passes.' },
+    { name: 'husky'   as const, text: 'Skipper trots between camps reconciling state.' },
   ];
   const [i, setI] = useState(0);
   useEffect(() => {
