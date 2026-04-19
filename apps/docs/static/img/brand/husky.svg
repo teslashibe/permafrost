@@ -1,60 +1,171 @@
 <!--
-  Skipper the husky. Reconciliation runner  appears during reconcile
-  passes, optionally with a slight motion-blur via CSS animation.
+  Skipper. Reconciliation runner. Front-facing sat-up husky matching
+  the user's pixel-art reference: pointed brown ears with pink inners,
+  brown head with a white face and muzzle, slit eyes, black nose,
+  brown shoulders and back with a white belly stripe down the centre,
+  two white front paws planted at the bottom, gray hind paws visible
+  between them, curled gray tail to the right.
 
-  Hand-authored pixel art, 32x32 logical grid.
-  Palette: gray fur #8DA0BC, white belly #ECF6FF, blue eyes #50D2C2,
-           dark mask #2A3958, navy outline #1B2A4E, pink tongue #F4B6C0.
+  Drawing order matters: body drawn FIRST, then face + ears + tail
+  layered on top so they are never covered.
+
+  Hand-authored pixel art on a 32x32 grid scaled to 256x256.
+  Palette: warm brown #8B5C3A, lighter brown #A06D43, dark brown
+           #5A3A20, pink ear-inner / mouth #F4B6C0, white #ECF6FF,
+           gray #B7C9E0, gray shadow #8A9DBC, navy outline #1B2A4E,
+           eye black #1B1F2A.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="256" height="256" shape-rendering="crispEdges" role="img" aria-label="Skipper the husky, reconciliation runner">
-  <title>Skipper the husky</title>
-  <desc>Runs between camps delivering reconcile passes.</desc>
+  <title>Skipper</title>
+  <desc>Reconciliation runner. Front-facing sat-up husky.</desc>
 
-  <!-- Ears (pointed) -->
-  <rect x="6"  y="3"  width="2"  height="3" fill="#2A3958"/>
-  <rect x="6"  y="6"  width="3"  height="1" fill="#2A3958"/>
-  <rect x="14" y="3"  width="2"  height="3" fill="#2A3958"/>
-  <rect x="13" y="6"  width="3"  height="1" fill="#2A3958"/>
+  <!-- ============================================================
+       EARS (two pointed triangles at the top corners, with pink
+       inner detail). Drawn first so the head outline tucks them in.
+       ============================================================ -->
+  <!-- Left ear -->
+  <rect x="6"  y="2"  width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="5"  y="3"  width="3"  height="1" fill="#1B2A4E"/>
+  <rect x="5"  y="4"  width="4"  height="1" fill="#1B2A4E"/>
+  <rect x="4"  y="5"  width="6"  height="1" fill="#1B2A4E"/>
+  <rect x="6"  y="3"  width="1"  height="1" fill="#8B5C3A"/>
+  <rect x="6"  y="4"  width="2"  height="1" fill="#8B5C3A"/>
+  <rect x="5"  y="5"  width="4"  height="1" fill="#8B5C3A"/>
+  <!-- Pink inner of left ear -->
+  <rect x="7"  y="4"  width="1"  height="1" fill="#F4B6C0"/>
+  <rect x="6"  y="5"  width="2"  height="1" fill="#F4B6C0"/>
 
-  <!-- Head -->
-  <rect x="6"  y="7"  width="11" height="1" fill="#1B2A4E"/>
-  <rect x="5"  y="8"  width="1"  height="6" fill="#1B2A4E"/>
-  <rect x="17" y="8"  width="1"  height="6" fill="#1B2A4E"/>
-  <rect x="6"  y="8"  width="11" height="6" fill="#8DA0BC"/>
+  <!-- Right ear -->
+  <rect x="25" y="2"  width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="24" y="3"  width="3"  height="1" fill="#1B2A4E"/>
+  <rect x="23" y="4"  width="4"  height="1" fill="#1B2A4E"/>
+  <rect x="22" y="5"  width="6"  height="1" fill="#1B2A4E"/>
+  <rect x="25" y="3"  width="1"  height="1" fill="#8B5C3A"/>
+  <rect x="24" y="4"  width="2"  height="1" fill="#8B5C3A"/>
+  <rect x="23" y="5"  width="4"  height="1" fill="#8B5C3A"/>
+  <!-- Pink inner of right ear -->
+  <rect x="24" y="4"  width="1"  height="1" fill="#F4B6C0"/>
+  <rect x="24" y="5"  width="2"  height="1" fill="#F4B6C0"/>
 
-  <!-- Mask (darker around eyes) -->
-  <rect x="7"  y="9"  width="9"  height="2" fill="#2A3958"/>
-  <rect x="7"  y="11" width="3"  height="1" fill="#2A3958"/>
-  <rect x="13" y="11" width="3"  height="1" fill="#2A3958"/>
+  <!-- ============================================================
+       HEAD outline + brown forehead band. The face area is covered
+       by white below; the brown wraps around the sides as the
+       husky's coat.
+       ============================================================ -->
+  <!-- Head outline -->
+  <rect x="4"  y="6"  width="24" height="1" fill="#1B2A4E"/>
+  <rect x="3"  y="7"  width="1"  height="9" fill="#1B2A4E"/>
+  <rect x="28" y="7"  width="1"  height="9" fill="#1B2A4E"/>
+  <rect x="4"  y="16" width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="27" y="16" width="1"  height="1" fill="#1B2A4E"/>
+  <!-- Brown head fill -->
+  <rect x="4"  y="7"  width="24" height="9" fill="#8B5C3A"/>
+  <!-- Top-of-head highlight stripe -->
+  <rect x="6"  y="7"  width="20" height="1" fill="#A06D43"/>
 
-  <!-- Eyes (icy blue) -->
-  <rect x="8"  y="10" width="2"  height="1" fill="#50D2C2"/>
-  <rect x="13" y="10" width="2"  height="1" fill="#50D2C2"/>
+  <!-- ============================================================
+       White face mask (covers most of the inner head). Brown stays
+       as ear/temple borders down the sides.
+       ============================================================ -->
+  <rect x="7"  y="8"  width="18" height="8" fill="#ECF6FF"/>
+  <!-- Centre brow stripe (subtle darker brown line down the
+       forehead, between the eyes) -->
+  <rect x="15" y="8"  width="2"  height="2" fill="#8B5C3A"/>
 
-  <!-- Snout (white) -->
-  <rect x="9"  y="12" width="5"  height="2" fill="#ECF6FF"/>
-  <rect x="11" y="12" width="1"  height="1" fill="#1B2A4E"/>
-  <!-- Tongue -->
-  <rect x="11" y="13" width="2"  height="1" fill="#F4B6C0"/>
+  <!-- ============================================================
+       EYES (two small slits, classic husky look)
+       ============================================================ -->
+  <rect x="10" y="10" width="2" height="2" fill="#1B1F2A"/>
+  <rect x="20" y="10" width="2" height="2" fill="#1B1F2A"/>
+  <rect x="10" y="10" width="1" height="1" fill="#FFFFFF"/>
+  <rect x="20" y="10" width="1" height="1" fill="#FFFFFF"/>
 
-  <!-- Body (running pose, leaning forward) -->
-  <rect x="6"  y="14" width="18" height="1" fill="#1B2A4E"/>
-  <rect x="6"  y="15" width="18" height="6" fill="#8DA0BC"/>
-  <rect x="6"  y="21" width="18" height="1" fill="#1B2A4E"/>
+  <!-- ============================================================
+       NOSE (black triangle/diamond at the centre of the muzzle)
+       ============================================================ -->
+  <rect x="14" y="12" width="4" height="2" fill="#1B1F2A"/>
+  <rect x="13" y="13" width="1" height="1" fill="#1B1F2A"/>
+  <rect x="18" y="13" width="1" height="1" fill="#1B1F2A"/>
+  <rect x="14" y="12" width="1" height="1" fill="#FFFFFF"/>
 
-  <!-- White belly -->
-  <rect x="8"  y="17" width="14" height="3" fill="#ECF6FF"/>
+  <!-- ============================================================
+       MOUTH (small pink upturn under the nose)
+       ============================================================ -->
+  <rect x="15" y="14" width="2" height="1" fill="#1B2A4E"/>
+  <rect x="14" y="14" width="1" height="1" fill="#F4B6C0"/>
+  <rect x="17" y="14" width="1" height="1" fill="#F4B6C0"/>
 
-  <!-- Front leg (lifted, mid-stride) -->
-  <rect x="9"  y="22" width="2"  height="3" fill="#8DA0BC"/>
-  <rect x="9"  y="25" width="2"  height="1" fill="#1B2A4E"/>
+  <!-- ============================================================
+       BODY - brown sides with a white belly stripe down the
+       centre. Curls inward at the bottom where the husky is sat.
+       ============================================================ -->
+  <!-- Body outline -->
+  <rect x="5"  y="17" width="22" height="1" fill="#1B2A4E"/>
+  <rect x="4"  y="18" width="1"  height="6" fill="#1B2A4E"/>
+  <rect x="27" y="18" width="1"  height="6" fill="#1B2A4E"/>
+  <rect x="5"  y="24" width="1"  height="2" fill="#1B2A4E"/>
+  <rect x="26" y="24" width="1"  height="2" fill="#1B2A4E"/>
 
-  <!-- Back leg (planted) -->
-  <rect x="18" y="22" width="2"  height="4" fill="#8DA0BC"/>
-  <rect x="18" y="26" width="2"  height="1" fill="#1B2A4E"/>
+  <!-- Body fill (brown) -->
+  <rect x="5"  y="17" width="22" height="1" fill="#8B5C3A"/>
+  <rect x="5"  y="18" width="22" height="6" fill="#8B5C3A"/>
+  <rect x="6"  y="24" width="20" height="2" fill="#8B5C3A"/>
 
-  <!-- Tail (curled up) -->
-  <rect x="24" y="14" width="3"  height="1" fill="#8DA0BC"/>
-  <rect x="26" y="13" width="2"  height="2" fill="#8DA0BC"/>
-  <rect x="27" y="14" width="1"  height="3" fill="#ECF6FF"/>
+  <!-- White belly stripe down the centre (key husky marking) -->
+  <rect x="13" y="17" width="6"  height="9" fill="#ECF6FF"/>
+  <rect x="14" y="17" width="4"  height="9" fill="#ECF6FF"/>
+  <!-- Belly soft shadow at the edges -->
+  <rect x="12" y="20" width="1"  height="4" fill="#D8E5F5"/>
+  <rect x="19" y="20" width="1"  height="4" fill="#D8E5F5"/>
+
+  <!-- Brown shoulder rounding (slight darker patch hinting at
+       front-facing roundness) -->
+  <rect x="6"  y="18" width="1"  height="2" fill="#5A3A20"/>
+  <rect x="25" y="18" width="1"  height="2" fill="#5A3A20"/>
+
+  <!-- ============================================================
+       CURLED TAIL on the right side - gray, peeks out around
+       the husky's right hip
+       ============================================================ -->
+  <rect x="28" y="18" width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="29" y="19" width="1"  height="3" fill="#1B2A4E"/>
+  <rect x="28" y="22" width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="27" y="20" width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="28" y="19" width="1"  height="3" fill="#B7C9E0"/>
+  <!-- Tail tip (lighter) -->
+  <rect x="29" y="19" width="1"  height="1" fill="#ECF6FF"/>
+
+  <!-- ============================================================
+       PAWS / FEET
+       Two white front paws planted at the bottom-centre, with the
+       gray hind legs visible between them (the "sat-husky" look
+       from the reference).
+       ============================================================ -->
+
+  <!-- Gray hind paws (centre) -->
+  <rect x="12" y="26" width="8"  height="3" fill="#B7C9E0"/>
+  <rect x="11" y="26" width="1"  height="3" fill="#1B2A4E"/>
+  <rect x="20" y="26" width="1"  height="3" fill="#1B2A4E"/>
+  <rect x="12" y="29" width="8"  height="1" fill="#1B2A4E"/>
+  <!-- Hind paw shading -->
+  <rect x="13" y="27" width="6"  height="2" fill="#8A9DBC"/>
+  <!-- Centre divider between hind paws -->
+  <rect x="15" y="26" width="2"  height="3" fill="#B7C9E0"/>
+
+  <!-- Front-left white paw -->
+  <rect x="6"  y="26" width="5" height="3" fill="#ECF6FF"/>
+  <rect x="5"  y="26" width="1" height="4" fill="#1B2A4E"/>
+  <rect x="11" y="26" width="0" height="0" fill="#1B2A4E"/>
+  <rect x="6"  y="29" width="5" height="1" fill="#1B2A4E"/>
+  <!-- Toe lines (3 toe pads) -->
+  <rect x="7"  y="28" width="1" height="1" fill="#D8E5F5"/>
+  <rect x="9"  y="28" width="1" height="1" fill="#D8E5F5"/>
+
+  <!-- Front-right white paw -->
+  <rect x="21" y="26" width="5" height="3" fill="#ECF6FF"/>
+  <rect x="26" y="26" width="1" height="4" fill="#1B2A4E"/>
+  <rect x="21" y="29" width="5" height="1" fill="#1B2A4E"/>
+  <!-- Toe lines -->
+  <rect x="22" y="28" width="1" height="1" fill="#D8E5F5"/>
+  <rect x="24" y="28" width="1" height="1" fill="#D8E5F5"/>
 </svg>
