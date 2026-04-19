@@ -1,158 +1,157 @@
 <!--
-  Pole the Polar Bear (v4). Clean simple silhouette matching the
-  user's pixel-art reference: round white body that flows from head
-  to torso, two tiny ear nubs, two small black dot eyes, a small
-  black bean nose, PINK CHEEK BLUSHES on each side of the nose
-  (the signature feature from the reference), two small front paws
-  planted at the base. Wears a red wooly hat with a white pom-pom
-  on top, plus the cyan scarf around the neck.
+  Pole the Polar Bear (v5). Direct pixel-mapping of the user's
+  reference grid: two pointy ears with cyan highlights, two square
+  black eyes, an inverted-triangle black nose, ORANGE/PEACH cheek
+  blushes (not pink), white body with a cyan asymmetric scarf
+  draping across the chest from the right shoulder, gray paw
+  shading. No red hat - the reference doesn't have one.
   Hand-authored pixel art on a 32x32 grid scaled to 256x256.
-  Palette: ice white #ECF6FF, soft shadow #D8E5F5, navy outline
-           #1B2A4E, pink cheek/mouth #F4B6C0, ear-inner pink
-           #F4B6C0, hat red #DC2626, hat highlight #EF4444, hat
-           dark #991B1B, hat shadow #7F1D1D, pom-pom white #FFFFFF,
-           scarf cyan #50D2C2 + dark #2BA694.
+  Palette: black outline #1B2A4E (reads as black at sprite scale),
+           white #ECF6FF, cyan accent #B8E5F0, gray shadow #B7C9E0,
+           peach cheek #F4B5A0, pure black #000000 for eyes/nose,
+           pink mouth #F4B6C0.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="256" height="256" shape-rendering="crispEdges" role="img" aria-label="Pole the Polar Bear">
   <title>Pole the Polar Bear</title>
-  <desc>Clean cute polar bear with pink cheek blushes, a red wooly hat, and a cyan scarf.</desc>
+  <desc>Pixel polar bear with peach cheek blushes and a draped cyan scarf, watching the camp.</desc>
 
   <!-- ============================================================
-       Pom-pom on top of the hat
+       EARS (two pointy triangles on top of the head)
        ============================================================ -->
-  <rect x="15" y="0" width="2" height="1" fill="#ECF6FF"/>
-  <rect x="14" y="1" width="4" height="1" fill="#FFFFFF"/>
-  <rect x="15" y="2" width="2" height="1" fill="#FFFFFF"/>
+  <!-- Left ear outline -->
+  <rect x="9"  y="6"  width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="8"  y="7"  width="3"  height="1" fill="#1B2A4E"/>
+  <rect x="7"  y="8"  width="1"  height="2" fill="#1B2A4E"/>
+  <rect x="11" y="8"  width="1"  height="1" fill="#1B2A4E"/>
+  <!-- Left ear inside (cyan highlight) -->
+  <rect x="9"  y="7"  width="2"  height="1" fill="#B8E5F0"/>
+  <rect x="8"  y="8"  width="3"  height="1" fill="#B8E5F0"/>
+
+  <!-- Right ear outline -->
+  <rect x="22" y="6"  width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="21" y="7"  width="3"  height="1" fill="#1B2A4E"/>
+  <rect x="20" y="8"  width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="24" y="8"  width="1"  height="2" fill="#1B2A4E"/>
+  <!-- Right ear inside (cyan highlight) -->
+  <rect x="21" y="7"  width="2"  height="1" fill="#B8E5F0"/>
+  <rect x="21" y="8"  width="3"  height="1" fill="#B8E5F0"/>
 
   <!-- ============================================================
-       Red wooly hat dome (kept compact so the face has room for
-       the cheek blushes)
+       HEAD outline (top + sides)
        ============================================================ -->
-  <rect x="13" y="3"  width="6"  height="1" fill="#DC2626"/>
-  <rect x="11" y="4"  width="10" height="1" fill="#DC2626"/>
-  <rect x="10" y="5"  width="12" height="1" fill="#DC2626"/>
-  <!-- Knit highlight -->
-  <rect x="13" y="4"  width="3"  height="1" fill="#EF4444"/>
-  <rect x="12" y="5"  width="3"  height="1" fill="#EF4444"/>
-  <!-- Brim cuff (darker rolled wool) -->
-  <rect x="9"  y="6"  width="14" height="1" fill="#991B1B"/>
-  <rect x="9"  y="7"  width="14" height="1" fill="#7F1D1D"/>
-  <!-- Knit pattern dots on the brim -->
-  <rect x="11" y="6"  width="1" height="1" fill="#DC2626"/>
-  <rect x="14" y="6"  width="1" height="1" fill="#DC2626"/>
-  <rect x="17" y="6"  width="1" height="1" fill="#DC2626"/>
-  <rect x="20" y="6"  width="1" height="1" fill="#DC2626"/>
-
-  <!-- ============================================================
-       Ears (tiny nubs peeking out either side under the brim)
-       ============================================================ -->
-  <!-- Left ear -->
-  <rect x="8"  y="8"  width="2"  height="1" fill="#1B2A4E"/>
-  <rect x="7"  y="9"  width="3"  height="1" fill="#1B2A4E"/>
-  <rect x="8"  y="9"  width="2"  height="1" fill="#F4B6C0"/>
-  <!-- Right ear -->
-  <rect x="22" y="8"  width="2"  height="1" fill="#1B2A4E"/>
-  <rect x="22" y="9"  width="3"  height="1" fill="#1B2A4E"/>
-  <rect x="22" y="9"  width="2"  height="1" fill="#F4B6C0"/>
-
-  <!-- ============================================================
-       Head (white, rounded). The cheek blushes are the focal point
-       so the head fill is wider than the hat to give them room.
-       ============================================================ -->
-  <!-- Head outline -->
-  <rect x="10" y="8"  width="12" height="1" fill="#1B2A4E"/>
-  <rect x="9"  y="9"  width="1"  height="2" fill="#1B2A4E"/>
-  <rect x="22" y="9"  width="1"  height="2" fill="#1B2A4E"/>
-  <rect x="9"  y="11" width="1"  height="3" fill="#1B2A4E"/>
-  <rect x="22" y="11" width="1"  height="3" fill="#1B2A4E"/>
-  <rect x="10" y="14" width="1"  height="1" fill="#1B2A4E"/>
-  <rect x="21" y="14" width="1"  height="1" fill="#1B2A4E"/>
-  <rect x="11" y="15" width="10" height="1" fill="#1B2A4E"/>
+  <rect x="11" y="8"  width="10" height="1" fill="#1B2A4E"/>
+  <rect x="9"  y="9"  width="2"  height="1" fill="#1B2A4E"/>
+  <rect x="21" y="9"  width="2"  height="1" fill="#1B2A4E"/>
+  <rect x="8"  y="10" width="1"  height="6" fill="#1B2A4E"/>
+  <rect x="23" y="10" width="1"  height="6" fill="#1B2A4E"/>
+  <rect x="9"  y="16" width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="22" y="16" width="1"  height="1" fill="#1B2A4E"/>
 
   <!-- Head fill (white) -->
-  <rect x="10" y="9"  width="12" height="5" fill="#ECF6FF"/>
-  <rect x="11" y="14" width="10" height="1" fill="#ECF6FF"/>
+  <rect x="11" y="9"  width="10" height="1" fill="#ECF6FF"/>
+  <rect x="9"  y="10" width="14" height="6" fill="#ECF6FF"/>
 
-  <!-- Forehead shading just under the hat brim -->
-  <rect x="10" y="9"  width="12" height="1" fill="#D8E5F5"/>
-
-  <!-- ============================================================
-       FACE - the signature features from the reference:
-       two tiny eyes, a black bean nose, and PINK CHEEK BLUSHES
-       flanking the nose.
-       ============================================================ -->
-
-  <!-- Eyes (small 1x2 navy dots, close together for "cute") -->
-  <rect x="13" y="11" width="1" height="2" fill="#1B2A4E"/>
-  <rect x="18" y="11" width="1" height="2" fill="#1B2A4E"/>
-
-  <!-- Nose (small black bean centred between the eyes) -->
-  <rect x="15" y="12" width="2" height="2" fill="#1B2A4E"/>
-  <rect x="15" y="12" width="1" height="1" fill="#FFFFFF"/>
-
-  <!-- PINK CHEEK BLUSHES (the reference's defining feature) -
-       2x1 patches on each side of the nose -->
-  <rect x="11" y="13" width="2" height="1" fill="#F4B6C0"/>
-  <rect x="19" y="13" width="2" height="1" fill="#F4B6C0"/>
-
-  <!-- Mouth (tiny smile under the nose) -->
-  <rect x="14" y="14" width="1" height="1" fill="#1B2A4E"/>
-  <rect x="15" y="14" width="2" height="1" fill="#F4B6C0"/>
-  <rect x="17" y="14" width="1" height="1" fill="#1B2A4E"/>
+  <!-- Right side of head: cyan accent (the scarf wraps up here) -->
+  <rect x="22" y="10" width="1"  height="6" fill="#B8E5F0"/>
+  <rect x="21" y="11" width="1"  height="3" fill="#B8E5F0"/>
 
   <!-- ============================================================
-       Cyan scarf around the neck. Compact so the body silhouette
-       below stays clean.
+       EYES (two black squares - pure black per the reference)
        ============================================================ -->
-  <rect x="12" y="16" width="8"  height="1" fill="#2BA694"/>
-  <rect x="11" y="17" width="10" height="2" fill="#50D2C2"/>
-  <rect x="12" y="19" width="8"  height="1" fill="#2BA694"/>
-  <!-- Knot on the right -->
-  <rect x="21" y="17" width="2"  height="3" fill="#50D2C2"/>
-  <rect x="21" y="17" width="2"  height="1" fill="#2BA694"/>
-  <rect x="21" y="19" width="2"  height="1" fill="#2BA694"/>
-  <!-- Trailing scarf tail -->
-  <rect x="23" y="20" width="2"  height="2" fill="#50D2C2"/>
-  <rect x="23" y="22" width="2"  height="1" fill="#2BA694"/>
-  <rect x="24" y="23" width="1"  height="2" fill="#50D2C2"/>
+  <rect x="12" y="12" width="2" height="3" fill="#000000"/>
+  <rect x="18" y="12" width="2" height="3" fill="#000000"/>
 
   <!-- ============================================================
-       BODY - mochi-shaped: starts narrow at the chest, widens
-       smoothly at the haunches. Matches the reference's clean
-       continuous silhouette.
+       CHEEK BLUSHES (peach/orange - the reference's signature)
        ============================================================ -->
-  <!-- Body outline -->
-  <rect x="11" y="20" width="10" height="1" fill="#1B2A4E"/>
-  <rect x="10" y="21" width="1"  height="2" fill="#1B2A4E"/>
-  <rect x="21" y="21" width="1"  height="2" fill="#1B2A4E"/>
-  <rect x="9"  y="23" width="1"  height="2" fill="#1B2A4E"/>
-  <rect x="22" y="23" width="1"  height="2" fill="#1B2A4E"/>
-  <rect x="8"  y="25" width="1"  height="3" fill="#1B2A4E"/>
-  <rect x="23" y="25" width="1"  height="3" fill="#1B2A4E"/>
+  <rect x="10" y="14" width="2" height="1" fill="#F4B5A0"/>
+  <rect x="20" y="14" width="2" height="1" fill="#F4B5A0"/>
+
+  <!-- ============================================================
+       NOSE (inverted triangle, pure black)
+       ============================================================ -->
+  <rect x="14" y="14" width="4" height="1" fill="#000000"/>
+  <rect x="15" y="15" width="2" height="1" fill="#000000"/>
+  <rect x="15" y="16" width="2" height="1" fill="#000000"/>
+
+  <!-- ============================================================
+       MOUTH (small triangle/V under the nose)
+       ============================================================ -->
+  <rect x="14" y="17" width="1" height="1" fill="#1B2A4E"/>
+  <rect x="17" y="17" width="1" height="1" fill="#1B2A4E"/>
+
+  <!-- ============================================================
+       NECK / CHIN - bottom of the head curving in to the body
+       ============================================================ -->
+  <rect x="10" y="17" width="12" height="1" fill="#1B2A4E"/>
+  <rect x="10" y="17" width="4"  height="1" fill="#ECF6FF"/>
+  <rect x="18" y="17" width="4"  height="1" fill="#ECF6FF"/>
+  <rect x="14" y="18" width="4"  height="1" fill="#ECF6FF"/>
+  <rect x="13" y="18" width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="18" y="18" width="1"  height="1" fill="#1B2A4E"/>
+
+  <!-- ============================================================
+       BODY outline + fill
+       ============================================================ -->
+  <rect x="9"  y="18" width="1"  height="2" fill="#1B2A4E"/>
+  <rect x="22" y="18" width="1"  height="2" fill="#1B2A4E"/>
+  <rect x="8"  y="20" width="1"  height="5" fill="#1B2A4E"/>
+  <rect x="23" y="20" width="1"  height="5" fill="#1B2A4E"/>
+  <rect x="9"  y="25" width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="22" y="25" width="1"  height="1" fill="#1B2A4E"/>
 
   <!-- Body fill (white) -->
-  <rect x="11" y="21" width="10" height="2" fill="#ECF6FF"/>
-  <rect x="10" y="23" width="12" height="2" fill="#ECF6FF"/>
-  <rect x="9"  y="25" width="14" height="3" fill="#ECF6FF"/>
-
-  <!-- Subtle belly oval (soft shadow for roundness) -->
-  <rect x="13" y="23" width="6"  height="4" fill="#D8E5F5"/>
+  <rect x="10" y="18" width="3"  height="1" fill="#ECF6FF"/>
+  <rect x="19" y="18" width="3"  height="1" fill="#ECF6FF"/>
+  <rect x="9"  y="19" width="13" height="1" fill="#ECF6FF"/>
+  <rect x="9"  y="20" width="13" height="5" fill="#ECF6FF"/>
+  <rect x="10" y="25" width="12" height="1" fill="#ECF6FF"/>
 
   <!-- ============================================================
-       FRONT PAWS (two white nubs planted at the bottom-corners,
-       matching the reference)
+       CYAN SCARF - asymmetric drape: from right shoulder, across
+       the chest, down to the right paw (matching the reference's
+       diagonal cyan stripe pattern)
        ============================================================ -->
+  <!-- Scarf across the chest -->
+  <rect x="11" y="20" width="9"  height="1" fill="#B7C9E0"/>
+  <rect x="10" y="21" width="11" height="1" fill="#B8E5F0"/>
+  <!-- Scarf trailing down the right side -->
+  <rect x="20" y="22" width="2"  height="1" fill="#B8E5F0"/>
+  <rect x="20" y="23" width="2"  height="1" fill="#B8E5F0"/>
+  <rect x="20" y="24" width="2"  height="1" fill="#B8E5F0"/>
+  <rect x="21" y="22" width="1"  height="3" fill="#B7C9E0"/>
+
+  <!-- Belly soft shadow (a diagonal gray stripe on the lower-left) -->
+  <rect x="11" y="23" width="2"  height="1" fill="#B7C9E0"/>
+  <rect x="10" y="24" width="3"  height="1" fill="#B7C9E0"/>
+
+  <!-- ============================================================
+       FRONT PAWS (two, planted at the bottom)
+       Left paw: white with gray shadow. Right paw: white with gray
+       shadow + cyan accent (where the scarf trails down to)
+       ============================================================ -->
+
   <!-- Left paw -->
-  <rect x="9"  y="28" width="4" height="2" fill="#ECF6FF"/>
-  <rect x="8"  y="28" width="1" height="3" fill="#1B2A4E"/>
-  <rect x="13" y="28" width="1" height="3" fill="#1B2A4E"/>
-  <rect x="9"  y="30" width="4" height="1" fill="#1B2A4E"/>
-  <rect x="10" y="29" width="1" height="1" fill="#F4B6C0"/>
+  <rect x="9"  y="26" width="6"  height="2" fill="#ECF6FF"/>
+  <rect x="8"  y="26" width="1"  height="3" fill="#1B2A4E"/>
+  <rect x="15" y="26" width="1"  height="3" fill="#1B2A4E"/>
+  <rect x="9"  y="28" width="6"  height="1" fill="#1B2A4E"/>
+  <!-- Gray shadow under left paw -->
+  <rect x="9"  y="27" width="6"  height="1" fill="#B7C9E0"/>
+  <!-- Toe lines -->
+  <rect x="11" y="27" width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="13" y="27" width="1"  height="1" fill="#1B2A4E"/>
 
   <!-- Right paw -->
-  <rect x="19" y="28" width="4" height="2" fill="#ECF6FF"/>
-  <rect x="18" y="28" width="1" height="3" fill="#1B2A4E"/>
-  <rect x="23" y="28" width="1" height="3" fill="#1B2A4E"/>
-  <rect x="19" y="30" width="4" height="1" fill="#1B2A4E"/>
-  <rect x="20" y="29" width="1" height="1" fill="#F4B6C0"/>
+  <rect x="17" y="26" width="6"  height="2" fill="#ECF6FF"/>
+  <rect x="16" y="26" width="1"  height="3" fill="#1B2A4E"/>
+  <rect x="23" y="26" width="1"  height="3" fill="#1B2A4E"/>
+  <rect x="17" y="28" width="6"  height="1" fill="#1B2A4E"/>
+  <!-- Cyan accent on the right paw (scarf-end touchdown) -->
+  <rect x="20" y="26" width="2"  height="1" fill="#B8E5F0"/>
+  <rect x="20" y="27" width="2"  height="1" fill="#B8E5F0"/>
+  <!-- Gray shadow under right paw -->
+  <rect x="17" y="27" width="3"  height="1" fill="#B7C9E0"/>
+  <!-- Toe lines -->
+  <rect x="18" y="27" width="1"  height="1" fill="#1B2A4E"/>
 </svg>
