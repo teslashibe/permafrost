@@ -54,19 +54,32 @@ Registration is name-keyed (snake_case, must match what gets stored in `agents.s
 
 ## End-to-end: writing your first strategy
 
+The fast path is the scaffolder — see [`strategy-new` scaffolding](/strategies/scaffolding):
+
 ```bash
-mkdir -p strategies/dca_buy
+permafrost strategy-new my_first_strategy
+go build ./...
+permafrost agent create --strategy my_first_strategy --perp hyperliquid --alloc 100
+permafrost agent run <id>
 ```
 
-```go title="strategies/dca_buy/strategy.go"
-package dca_buy
+That generates `strategies/my_first_strategy/`, registers it in both binaries' `strategies.go`, and prints next steps.
+
+The manual equivalent is six commands:
+
+```bash
+mkdir -p strategies/my_first_strategy
+```
+
+```go title="strategies/my_first_strategy/strategy.go"
+package my_first_strategy
 
 import (
     "context"
     "github.com/teslashibe/permafrost/pkg/strategy"
 )
 
-const Name = "dca_buy"
+const Name = "my_first_strategy"
 
 type Strategy struct{}
 
@@ -79,18 +92,18 @@ func (Strategy) Name() string { return Name }
 func (Strategy) Warmup(_ context.Context, _ strategy.WarmupInput) error { return nil }
 
 func (Strategy) Decide(_ context.Context, _ strategy.DecisionInput) (strategy.Decision, error) {
-    return strategy.Decision{Notes: "dca tick"}, nil
+    return strategy.Decision{Notes: "first tick"}, nil
 }
 ```
 
 Enable it in both binaries (one line each — the daemon for runtime, the CLI for `strategy backtest`):
 
 ```go title="cmd/permafrostd/strategies.go"
-import _ "github.com/teslashibe/permafrost/strategies/dca_buy"
+import _ "github.com/teslashibe/permafrost/strategies/my_first_strategy"
 ```
 
 ```go title="cmd/permafrost/strategies.go"
-import _ "github.com/teslashibe/permafrost/strategies/dca_buy"
+import _ "github.com/teslashibe/permafrost/strategies/my_first_strategy"
 ```
 
 Build and run. `agent start` marks the agent runnable so `permafrost serve` (the daemon) picks it up; `agent run` is the foreground equivalent for paper-mode iteration in a single shell:
@@ -98,17 +111,25 @@ Build and run. `agent start` marks the agent runnable so `permafrost serve` (the
 ```bash
 go build -o bin/permafrostd ./cmd/permafrostd
 go build -o bin/permafrost  ./cmd/permafrost
-permafrost agent create --strategy dca_buy --perp hyperliquid --alloc 100
+permafrost agent create --strategy my_first_strategy --perp hyperliquid --alloc 100
 permafrost agent start <id>     # production: daemon picks up
 # OR
 permafrost agent run   <id>     # foreground iteration; SIGINT to stop
 ```
 
-That's the whole loop. See [private strategies](/strategies/private-strategies) for the gitignored variants when you want a strategy that doesn't ship in the public repo.
+See [private strategies](/strategies/private-strategies) for the gitignored variants when you want a strategy that doesn't ship in the public repo.
 
-## Reference: `noop`
+## Reference implementations
 
-The shortest possible strategy lives at `strategies/noop/noop.go` — twenty lines that satisfy the full interface. Use it as a copy-paste starting point. The framework's loops execute identically with `noop` selected, so it's also a valid smoke test for the whole stack.
+Three strategies ship in the OSS build as working examples. Together they exercise every code path in the runtime:
+
+| Strategy | Demonstrates |
+|---|---|
+| [`noop`](https://github.com/teslashibe/permafrost/tree/main/strategies/noop) | Minimum surface (20 lines). Copy-paste starter. Smoke test for the whole stack. |
+| [`dca_buy`](/strategies/reference-strategies#dca_buy) | SwapIntent-only path; periodic spot accumulation with cooldown. |
+| [`market_maker_basic`](/strategies/reference-strategies#market_maker_basic) | OrderIntent + LLM-veto path; paired bid/ask quoting on Hyperliquid. |
+
+Full details on the [reference strategies](/strategies/reference-strategies) page.
 
 ## Next steps
 

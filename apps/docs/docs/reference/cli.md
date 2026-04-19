@@ -11,6 +11,9 @@ Run `permafrost --help` or `permafrost <subcommand> --help` for the authoritativ
 ## Top-level command tree
 
 ```
+permafrost init                                              # interactive setup wizard
+permafrost doctor                                            # preflight check
+permafrost strategy-new <name> [--private] [--template noop] # scaffold a new strategy
 permafrost wallet      show | generate | import | path
 permafrost vault       init | deposit | withdraw | lockup | status | record-nav | nav
 permafrost agent       create | list | status | decisions | set-mode | set-network | start | stop | tick | run
@@ -22,18 +25,64 @@ permafrost pnl         summary | positions | history
 permafrost reconcile   [agent-id]
 permafrost db          migrate
 permafrost serve
+permafrost version
 ```
+
+## init
+
+```bash
+permafrost init
+permafrost init --non-interactive
+permafrost init --theme plain --config-out ./cfg.yaml --env-out ./.env
+```
+
+Walks an operator through config + keystore-passphrase setup in ~60 seconds. Idempotent: re-running keeps existing files. See [the init wizard + doctor](/getting-started/init-and-doctor).
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `--non-interactive` | false | Skip prompts; accept defaults silently. CI / scripts. |
+| `--theme {arctic,plain}` | arctic | Vocabulary theme. |
+| `--config-out <path>` | `./config.yaml` | Override config destination. |
+| `--keystore-out <path>` | `~/.permafrost/keystore.json` | Override keystore destination. |
+| `--env-out <path>` | `~/.permafrost/env` | Override generated-passphrase env file destination. |
+
+## doctor
+
+```bash
+permafrost doctor
+permafrost doctor --verbose
+```
+
+Runs every preflight check in sequence (Go, Docker, DB, keystore, inference providers, RPCs, registered strategies). Exits 0 on no errors, 1 on any failure. Warnings don't fail. See [the init wizard + doctor](/getting-started/init-and-doctor) for the check list.
+
+## strategy-new
+
+```bash
+permafrost strategy-new my_strategy
+permafrost strategy-new my_secret --private
+permafrost strategy-new my_basis --template basis    # planned (only 'noop' available in v1)
+```
+
+Scaffolds a new strategy package and registers it in the build. See [scaffolding](/strategies/scaffolding).
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `--template {noop,basis,maker,dca}` | noop | Template to use (only `noop` shipped in v1). |
+| `--private` | false | Scaffold under `strategies/private/` and register in `*_local.go` (gitignored). |
 
 ## Wallet
 
 ```bash
 permafrost wallet show
 permafrost wallet generate --chain solana
-permafrost wallet import   --chain solana --from <keypair-file>
+permafrost wallet import   --chain solana     --from ~/.config/solana/id.json
+permafrost wallet import   --chain hyperliquid --from /tmp/hl-key   # file with hex priv key
 permafrost wallet path
 ```
 
-`--chain` accepts `solana` or `hyperliquid`. Hyperliquid signers are commonly imported via a hex private key; consult `wallet import --help` for the exact flag your build supports. Keystore unlock uses the env var named in `wallet.passphrase_env` (defaults to `PERMAFROST_KEYSTORE_PASSPHRASE`). See [keystore + backups](/operations/keystore-and-backups).
+`--chain` accepts `solana` or `hyperliquid`. Both use `--from <file>` — the Solana importer accepts Phantom-style JSON arrays, base58 secrets, or hex; the Hyperliquid importer accepts hex (with or without `0x` prefix) in a file. (There is no `--hex` flag — write the key to a tempfile and `shred -u` it after.)
+
+Keystore unlock uses the env var named in `wallet.passphrase_env` (defaults to `PERMAFROST_KEYSTORE_PASSPHRASE`). The [init wizard](/getting-started/init-and-doctor) generates this env file for you. See [keystore + backups](/operations/keystore-and-backups).
 
 ## Vault
 
@@ -92,7 +141,18 @@ permafrost agent stop <id>            # halt one agent (sets status=halted)
 permafrost agent stop --all           # halt every agent
 ```
 
-`agent stop` performs the persistent state change. The full kill switch (cancel orders + close shorts) is wired inside the running daemon; see [risk and the killswitch](/concepts/risk-and-killswitch).
+`agent stop` performs the persistent state change. The full kill switch (cancel orders + close shorts + optional spot liquidation) runs inside the running daemon; see [risk and the killswitch](/concepts/risk-and-killswitch).
+
+### Promoting to live
+
+`set-mode` is positional and just changes the persisted mode:
+
+```bash
+permafrost agent set-mode <id> live      # state change only — does NOT prompt
+permafrost agent run     <id> --confirm-live    # explicit gate fires here
+```
+
+The `--confirm-live` flag is currently only enforced by `agent run` (foreground). The daemon supervisor does not re-prompt — once an agent is `mode=live, status=running`, `permafrost serve` will start it. Tracked for hardening.
 
 ### One-shot integration tick
 
@@ -110,6 +170,14 @@ permafrost strategy backtest <name> --csv funding.csv [--config-json '{...}']
 ```
 
 `backtest` looks the strategy name up in the registry — the same registry the daemon uses — so private strategies registered via `cmd/permafrost/strategies_local.go` are backtest-able too. See [private strategies](/strategies/private-strategies).
+
+Reference strategies shipped in the OSS build:
+
+- `noop` — empty decision every tick; smoke-test only.
+- `dca_buy` — fixed USDC → spot every N hours. See [reference strategies](/strategies/reference-strategies).
+- `market_maker_basic` — paired bid/ask quoting on Hyperliquid with optional LLM veto.
+
+To scaffold a new one: `permafrost strategy-new <name>`.
 
 CSV format: header `time,symbol,rate,interval_seconds`. `time` accepts RFC3339 or epoch milliseconds.
 

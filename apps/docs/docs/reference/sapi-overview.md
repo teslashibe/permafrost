@@ -20,7 +20,7 @@ The Strategy contract.
 | `WarmupInput` | Carries `AgentID`, `Universe`, `Config`, `Now`, `Services`. |
 | `DecisionInput` | Per-tick state: `Now`, `Market`, `PerpPositions`, `SpotBalances`, `BasisPositions`, `Cash`, `Signals`, `Limits`. |
 | `Decision` | Strategy output: `Orders`, `Swaps`, `Cancels`, `Notes`, `Confidence`. |
-| `Services` | Framework deps for the strategy: `Logger`, `Inference`. Extension point for new framework features. |
+| `Services` | Framework deps for the strategy: `Logger`, `Inference`, `InferenceModel`, `Registry`. Extension point for new framework features. |
 
 Source: [`pkg/strategy/`](https://github.com/teslashibe/permafrost/tree/main/pkg/strategy).
 GoDoc: [pkg.go.dev/github.com/teslashibe/permafrost/pkg/strategy](https://pkg.go.dev/github.com/teslashibe/permafrost/pkg/strategy).
@@ -60,7 +60,7 @@ GoDoc: [pkg.go.dev/github.com/teslashibe/permafrost/pkg/inference](https://pkg.g
 
 Strategies in this single-module repo *can* import `internal/*` packages directly (Go's `internal` rule allows it within the same module), but doing so accepts that those internals may change without notice. The packages most commonly reached for:
 
-- `internal/assets` — the curated asset registry. `assets.LoadEmbedded()`. Reasonable to import; the schema is stable.
+- `internal/assets` — the curated asset registry plus USDC helpers (`assets.LoadEmbedded()`, `assets.USDCMintFor(chain)`, `assets.USDCAsset(chain)`). Reasonable to import; the schema is stable.
 - `internal/wallet` — the keystore + signer abstractions. Avoid; strategies should not be touching keys.
 - `internal/agent` — the runtime itself. Avoid; you're a guest of this package, not its user.
 
