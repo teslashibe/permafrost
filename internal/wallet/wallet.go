@@ -9,7 +9,7 @@ package wallet
 import (
 	"context"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // Signer signs payloads for a specific chain. Implementations MUST be safe

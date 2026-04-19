@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/teslashibe/permafrost/internal/assets"
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 	walletnoop "github.com/teslashibe/permafrost/internal/wallet/noop"
 )
 

@@ -9,7 +9,7 @@ package exchange
 import (
 	"context"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // Venue is an orderbook venue capable of placing and cancelling orders and

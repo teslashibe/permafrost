@@ -12,9 +12,9 @@ import (
 	"github.com/teslashibe/permafrost/internal/assets"
 	"github.com/teslashibe/permafrost/internal/backtest"
 	"github.com/teslashibe/permafrost/internal/inference"
-	"github.com/teslashibe/permafrost/internal/strategy"
-	_ "github.com/teslashibe/permafrost/internal/strategy/noop" // register noop
-	fab "github.com/teslashibe/permafrost/internal/strategy/funding_arb_basic"
+	"github.com/teslashibe/permafrost/pkg/strategy"
+	_ "github.com/teslashibe/permafrost/strategies/noop" // register noop
+	fab "github.com/teslashibe/permafrost/strategies/private/funding_arb_basic"
 )
 
 func init() { addCommandFactory(newStrategyCmd) }

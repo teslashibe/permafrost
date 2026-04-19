@@ -21,8 +21,8 @@ import (
 	"github.com/teslashibe/permafrost/internal/exchange"
 	exchangenoop "github.com/teslashibe/permafrost/internal/exchange/noop"
 	"github.com/teslashibe/permafrost/internal/store"
-	fab "github.com/teslashibe/permafrost/internal/strategy/funding_arb_basic"
-	"github.com/teslashibe/permafrost/internal/types"
+	fab "github.com/teslashibe/permafrost/strategies/private/funding_arb_basic"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 func init() { addCommandFactory(newAgentCmd) }

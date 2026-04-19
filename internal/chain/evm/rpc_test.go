@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // stubRPC starts an httptest server that pretends to be an EVM JSON-RPC

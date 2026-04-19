@@ -17,7 +17,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // Asset is one fully-resolved registry entry.

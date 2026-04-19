@@ -29,7 +29,7 @@ import (
 
 	"github.com/teslashibe/permafrost/internal/exchange"
 	"github.com/teslashibe/permafrost/internal/swap"
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // Severity is how loud the operator should hear about a discrepancy.

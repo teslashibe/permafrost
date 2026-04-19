@@ -10,7 +10,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // Strategy is the framework's primary contract. The agent runtime calls

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/teslashibe/permafrost/internal/exchange"
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // Name is the registered venue identifier.

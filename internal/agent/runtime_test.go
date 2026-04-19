@@ -9,10 +9,10 @@ import (
 
 	exchangenoop "github.com/teslashibe/permafrost/internal/exchange/noop"
 	"github.com/teslashibe/permafrost/internal/risk"
-	"github.com/teslashibe/permafrost/internal/strategy"
+	"github.com/teslashibe/permafrost/pkg/strategy"
 	"github.com/teslashibe/permafrost/internal/swap"
 	swapnoop "github.com/teslashibe/permafrost/internal/swap/noop"
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // risknew is a small helper for runtime tests: builds a risk.Policy with

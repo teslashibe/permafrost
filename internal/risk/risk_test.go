@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/teslashibe/permafrost/internal/risk/noop"
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 func TestNoopEngineAllows(t *testing.T) {

@@ -14,7 +14,7 @@ import (
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // stubKey returns a deterministic test private key. Never used outside

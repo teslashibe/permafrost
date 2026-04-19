@@ -22,7 +22,7 @@ import (
 
 	"github.com/teslashibe/permafrost/internal/exchange"
 	"github.com/teslashibe/permafrost/internal/swap"
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // Engine values open basis positions and aggregates per-agent NAV.

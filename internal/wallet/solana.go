@@ -8,7 +8,7 @@ import (
 
 	"github.com/mr-tron/base58"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // SolanaSigner signs payloads with an ed25519 keypair.

@@ -11,8 +11,8 @@ import (
 
 	"github.com/teslashibe/permafrost/internal/assets"
 	"github.com/teslashibe/permafrost/internal/inference"
-	"github.com/teslashibe/permafrost/internal/strategy"
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/strategy"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // Strategy is the deterministic funding-arb strategy.

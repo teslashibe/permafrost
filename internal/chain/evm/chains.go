@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // Chain captures the static metadata for one EVM chain.

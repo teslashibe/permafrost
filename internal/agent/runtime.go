@@ -19,9 +19,9 @@ import (
 	"github.com/teslashibe/permafrost/internal/inference"
 	"github.com/teslashibe/permafrost/internal/pnl"
 	"github.com/teslashibe/permafrost/internal/risk"
-	"github.com/teslashibe/permafrost/internal/strategy"
+	"github.com/teslashibe/permafrost/pkg/strategy"
 	"github.com/teslashibe/permafrost/internal/swap"
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // Deps bundles the dependencies a Runtime needs to execute one Agent.

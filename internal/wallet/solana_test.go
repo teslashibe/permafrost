@@ -5,7 +5,7 @@ import (
 	"crypto/ed25519"
 	"testing"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 func TestSolanaSigner_FromSeedAndFull(t *testing.T) {

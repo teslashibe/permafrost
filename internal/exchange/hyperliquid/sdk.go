@@ -13,7 +13,7 @@ import (
 	"github.com/shopspring/decimal"
 	hl "github.com/sonirico/go-hyperliquid"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 	"github.com/teslashibe/permafrost/internal/wallet"
 )
 

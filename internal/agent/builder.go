@@ -14,12 +14,12 @@ import (
 	"github.com/teslashibe/permafrost/internal/exchange/hyperliquid"
 	"github.com/teslashibe/permafrost/internal/inference"
 	"github.com/teslashibe/permafrost/internal/risk"
-	"github.com/teslashibe/permafrost/internal/strategy"
-	fab "github.com/teslashibe/permafrost/internal/strategy/funding_arb_basic"
+	"github.com/teslashibe/permafrost/pkg/strategy"
+	fab "github.com/teslashibe/permafrost/strategies/private/funding_arb_basic"
 	"github.com/teslashibe/permafrost/internal/swap"
 	"github.com/teslashibe/permafrost/internal/swap/jupiter"
 	"github.com/teslashibe/permafrost/internal/swap/oneinch"
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 	"github.com/teslashibe/permafrost/internal/wallet"
 )
 

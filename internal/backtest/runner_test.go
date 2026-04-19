@@ -9,7 +9,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/teslashibe/permafrost/internal/assets"
-	fab "github.com/teslashibe/permafrost/internal/strategy/funding_arb_basic"
+	fab "github.com/teslashibe/permafrost/strategies/private/funding_arb_basic"
 )
 
 func d(s string) decimal.Decimal { return decimal.RequireFromString(s) }

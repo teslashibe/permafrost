@@ -8,8 +8,8 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"github.com/teslashibe/permafrost/internal/strategy"
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/strategy"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // Runner replays a series of FundingTicks through a Strategy in time order,

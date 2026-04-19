@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 func TestEmbedded_Loads(t *testing.T) {
