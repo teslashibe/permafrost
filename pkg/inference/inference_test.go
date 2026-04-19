@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/teslashibe/permafrost/internal/inference"
-	"github.com/teslashibe/permafrost/internal/inference/mock"
+	"github.com/teslashibe/permafrost/pkg/inference"
+	"github.com/teslashibe/permafrost/pkg/inference/mock"
 )
 
 func TestMock_Static(t *testing.T) {

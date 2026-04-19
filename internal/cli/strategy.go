@@ -1,20 +1,22 @@
 package cli
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/shopspring/decimal"
 	"github.com/spf13/cobra"
 
-	"github.com/teslashibe/permafrost/internal/assets"
 	"github.com/teslashibe/permafrost/internal/backtest"
-	"github.com/teslashibe/permafrost/internal/inference"
 	"github.com/teslashibe/permafrost/pkg/strategy"
-	_ "github.com/teslashibe/permafrost/strategies/noop" // register noop
-	fab "github.com/teslashibe/permafrost/strategies/private/funding_arb_basic"
+
+	// Register strategies that ship with the OSS framework. Local /
+	// private strategies are registered from cmd/permafrostd; the CLI
+	// only needs noop in scope so `strategy list` and `strategy backtest`
+	// work out of the box on a fresh clone.
+	_ "github.com/teslashibe/permafrost/strategies/noop"
 )
 
 func init() { addCommandFactory(newStrategyCmd) }
@@ -33,21 +35,7 @@ func newStrategyListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List registered strategies",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			names := strategy.List()
-			// funding_arb_basic is constructed manually (needs registry +
-			// inference); list it explicitly so operators see what exists.
-			has := false
-			for _, n := range names {
-				if n == fab.Name {
-					has = true
-					break
-				}
-			}
-			if !has {
-				names = append(names, fab.Name)
-				sort.Strings(names)
-			}
-			for _, n := range names {
+			for _, n := range strategy.List() {
 				fmt.Println(n)
 			}
 			return nil
@@ -55,27 +43,27 @@ func newStrategyListCmd() *cobra.Command {
 	}
 }
 
+// newStrategyBacktestCmd runs a CSV of funding ticks through any registered
+// strategy. The strategy is constructed via the registry (same path the
+// daemon uses), so per-strategy config is supplied as a JSON blob — the
+// same shape `agent create --config-json` accepts.
 func newStrategyBacktestCmd() *cobra.Command {
 	var (
-		csvPath        string
-		startingNAV    string
-		entryAnn       string
-		exitAnn        string
-		positionCap    string
-		stepHours      int
-		perpFeeBps     int
-		swapFeeBps     int
-		gasUSD         string
-		slippageBps    int
+		csvPath     string
+		startingNAV string
+		stepHours   int
+		perpFeeBps  int
+		swapFeeBps  int
+		gasUSD      string
+		slippageBps int
+		configJSON  string
 	)
 	cmd := &cobra.Command{
-		Use:   "backtest funding_arb_basic --csv <path>",
-		Short: "Replay a CSV of funding ticks against funding_arb_basic",
+		Use:   "backtest <strategy>",
+		Short: "Replay a CSV of funding ticks against a registered strategy",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			if args[0] != fab.Name {
-				return fmt.Errorf("only strategy %q is backtest-able in v1", fab.Name)
-			}
+			name := args[0]
 			if csvPath == "" {
 				return errors.New("--csv is required")
 			}
@@ -83,17 +71,17 @@ func newStrategyBacktestCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			reg, err := assets.LoadEmbedded()
+			ctor, err := strategy.Get(name)
 			if err != nil {
 				return err
 			}
-			cfg := fab.Config{
-				EntryAnnualisedFunding: mustDec(entryAnn),
-				ExitAnnualisedFunding:  mustDec(exitAnn),
-				PositionCapUSDC:        mustDec(positionCap),
-				SlippageBps:            slippageBps,
+			cfg := map[string]any{}
+			if configJSON != "" {
+				if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
+					return fmt.Errorf("--config-json: %w", err)
+				}
 			}
-			strat, err := fab.New(cfg, reg, inference.Provider(nil))
+			strat, err := ctor(cfg)
 			if err != nil {
 				return err
 			}
@@ -113,14 +101,12 @@ func newStrategyBacktestCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&csvPath, "csv", "", "path to CSV of funding ticks (header: time,symbol,rate,interval_seconds)")
 	cmd.Flags().StringVar(&startingNAV, "starting-nav", "10000", "starting NAV in USDC")
-	cmd.Flags().StringVar(&entryAnn, "entry", "0.50", "entry annualised funding (e.g. 0.50)")
-	cmd.Flags().StringVar(&exitAnn, "exit", "0.10", "exit annualised funding (e.g. 0.10)")
-	cmd.Flags().StringVar(&positionCap, "position-cap", "1000", "USDC notional per basis position")
 	cmd.Flags().IntVar(&stepHours, "step-hours", 1, "simulation step interval (hours)")
-	cmd.Flags().IntVar(&perpFeeBps, "perp-fee-bps", 4, "Hyperliquid taker fee assumption (bps)")
+	cmd.Flags().IntVar(&perpFeeBps, "perp-fee-bps", 4, "perp taker fee assumption (bps)")
 	cmd.Flags().IntVar(&swapFeeBps, "swap-fee-bps", 25, "DEX fee assumption (bps)")
 	cmd.Flags().StringVar(&gasUSD, "gas-usd", "0.05", "USD gas per swap")
 	cmd.Flags().IntVar(&slippageBps, "slippage-bps", 10, "spot slippage assumption (bps)")
+	cmd.Flags().StringVar(&configJSON, "config-json", "", "strategy-specific config as JSON (same shape as agent create)")
 	return cmd
 }
 
@@ -147,5 +133,6 @@ func printBacktestResult(r backtest.Result) {
 	}
 }
 
-// keep decimal in scope so future flag additions don't need re-importing.
+// mustDec parses a decimal flag value. Backtest CLI inputs come from the
+// operator on the command line; an unparseable value is a usage error.
 var _ = decimal.Zero

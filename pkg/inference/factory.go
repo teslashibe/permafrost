@@ -26,7 +26,7 @@ type Registry struct {
 //
 // In practice callers use:
 //
-//	import "github.com/teslashibe/permafrost/internal/inference/openai"
+//	import "github.com/teslashibe/permafrost/pkg/inference/openai"
 //	reg, err := inference.NewRegistry(cfg.Inference, openai.NewProvider)
 func NewRegistry(cfg config.InferenceConfig, factory ProviderFactory) (*Registry, error) {
 	r := &Registry{

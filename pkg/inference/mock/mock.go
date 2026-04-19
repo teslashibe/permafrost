@@ -11,7 +11,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/teslashibe/permafrost/internal/inference"
+	"github.com/teslashibe/permafrost/pkg/inference"
 )
 
 // Name is the registered provider identifier.

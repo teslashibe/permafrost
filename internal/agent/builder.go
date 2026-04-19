@@ -12,15 +12,13 @@ import (
 	"github.com/teslashibe/permafrost/internal/assets"
 	"github.com/teslashibe/permafrost/internal/exchange"
 	"github.com/teslashibe/permafrost/internal/exchange/hyperliquid"
-	"github.com/teslashibe/permafrost/internal/inference"
 	"github.com/teslashibe/permafrost/internal/risk"
-	"github.com/teslashibe/permafrost/pkg/strategy"
-	fab "github.com/teslashibe/permafrost/strategies/private/funding_arb_basic"
 	"github.com/teslashibe/permafrost/internal/swap"
 	"github.com/teslashibe/permafrost/internal/swap/jupiter"
 	"github.com/teslashibe/permafrost/internal/swap/oneinch"
-	"github.com/teslashibe/permafrost/pkg/types"
 	"github.com/teslashibe/permafrost/internal/wallet"
+	"github.com/teslashibe/permafrost/pkg/strategy"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // BuildDeps assembles dependencies for a single Agent's Runtime. It is the
@@ -49,10 +47,15 @@ func BuildDeps(
 	log *slog.Logger,
 	opts BuildOptions,
 ) (Deps, error) {
-	strat, err := BuildStrategy(a, reg)
+	strat, err := BuildStrategy(a)
 	if err != nil {
 		return Deps{}, fmt.Errorf("strategy: %w", err)
 	}
+	// reg is held by the caller and consumed by strategies that load their
+	// own registry copy via assets.LoadEmbedded(); the framework no longer
+	// special-cases who needs it. Kept on the signature so callers don't
+	// have to thread separate parameters.
+	_ = reg
 	// Resolve network: explicit override wins, else fall back to what the
 	// agent itself records, else default to mainnet (paper-safe by design).
 	network := opts.HyperliquidNetwork
@@ -287,23 +290,46 @@ func BuildEVMSwapVenue(chain types.ChainID, cfg EVMSpot, keystore wallet.Keystor
 	}, signer)
 }
 
-// BuildStrategy is the strategy-construction switch shared between the
-// foreground CLI and the supervisor. Currently funding_arb_basic is the
-// only strategy that needs the asset registry; everything else goes through
-// the generic strategy.Constructor registry.
-func BuildStrategy(a Agent, reg assets.Registry) (strategy.Strategy, error) {
-	switch a.Strategy {
-	case fab.Name:
-		cfg := fab.Config{Universe: a.Universe}
-		applyFundingArbConfig(a.Config, &cfg)
-		return fab.New(cfg, reg, inference.Provider(nil))
-	default:
-		ctor, err := strategy.Get(a.Strategy)
-		if err != nil {
-			return nil, err
-		}
-		return ctor(a.Config)
+// BuildStrategy constructs the strategy by name from the registry. It is a
+// pure registry lookup with no special-casing per strategy: each strategy
+// owns its own typed config parsing inside its Constructor and pulls
+// framework services (asset registry, inference, etc.) from WarmupInput
+// later. Adding a new strategy never requires editing this function.
+func BuildStrategy(a Agent) (strategy.Strategy, error) {
+	ctor, err := strategy.Get(a.Strategy)
+	if err != nil {
+		return nil, err
 	}
+	return ctor(a.Config)
+}
+
+// decimalFromAny converts a JSONB-decoded numeric value into a decimal.
+// Used by BuildRiskEngine and any other framework-side config parsing.
+func decimalFromAny(v any) (decimal.Decimal, error) {
+	switch x := v.(type) {
+	case float64:
+		return decimal.NewFromFloat(x), nil
+	case int:
+		return decimal.NewFromInt(int64(x)), nil
+	case int64:
+		return decimal.NewFromInt(x), nil
+	case string:
+		return decimal.NewFromString(x)
+	}
+	return decimal.Zero, fmt.Errorf("agent: unrecognised numeric type %T", v)
+}
+
+// intFromAny converts a JSONB-decoded numeric value into an int.
+func intFromAny(v any) (int, error) {
+	switch x := v.(type) {
+	case float64:
+		return int(x), nil
+	case int:
+		return x, nil
+	case int64:
+		return int(x), nil
+	}
+	return 0, fmt.Errorf("agent: unrecognised int type %T", v)
 }
 
 // BuildHyperliquidVenue assembles a Hyperliquid Venue. Address resolution:
@@ -339,67 +365,6 @@ func BuildHyperliquidVenue(keystore wallet.Keystore, opts BuildOptions) (exchang
 		Network: hyperliquid.Network(network),
 		Address: addr,
 	}, venueOpts...)
-}
-
-// applyFundingArbConfig copies known keys from agents.config (jsonb) into
-// the typed funding_arb_basic Config struct. Unknown keys are ignored.
-func applyFundingArbConfig(cfg map[string]any, out *fab.Config) {
-	if v, ok := cfg["entry_annualised_funding"]; ok {
-		if d, err := decimalFromAny(v); err == nil {
-			out.EntryAnnualisedFunding = d
-		}
-	}
-	if v, ok := cfg["exit_annualised_funding"]; ok {
-		if d, err := decimalFromAny(v); err == nil {
-			out.ExitAnnualisedFunding = d
-		}
-	}
-	if v, ok := cfg["position_cap_usdc"]; ok {
-		if d, err := decimalFromAny(v); err == nil {
-			out.PositionCapUSDC = d
-		}
-	}
-	if v, ok := cfg["slippage_bps"]; ok {
-		if i, err := intFromAny(v); err == nil {
-			out.SlippageBps = i
-		}
-	}
-	if v, ok := cfg["use_llm_veto"]; ok {
-		if b, ok := v.(bool); ok {
-			out.UseLLMVeto = b
-		}
-	}
-	if v, ok := cfg["veto_model"]; ok {
-		if s, ok := v.(string); ok {
-			out.VetoModel = s
-		}
-	}
-}
-
-func decimalFromAny(v any) (decimal.Decimal, error) {
-	switch x := v.(type) {
-	case float64:
-		return decimal.NewFromFloat(x), nil
-	case int:
-		return decimal.NewFromInt(int64(x)), nil
-	case int64:
-		return decimal.NewFromInt(x), nil
-	case string:
-		return decimal.NewFromString(x)
-	}
-	return decimal.Zero, fmt.Errorf("agent: unrecognised numeric type %T", v)
-}
-
-func intFromAny(v any) (int, error) {
-	switch x := v.(type) {
-	case float64:
-		return int(x), nil
-	case int:
-		return x, nil
-	case int64:
-		return int(x), nil
-	}
-	return 0, fmt.Errorf("agent: unrecognised int type %T", v)
 }
 
 // Loader is a small helper used by the supervisor inside `serve` to start

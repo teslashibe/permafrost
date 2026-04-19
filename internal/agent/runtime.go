@@ -16,7 +16,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/teslashibe/permafrost/internal/exchange"
-	"github.com/teslashibe/permafrost/internal/inference"
+	"github.com/teslashibe/permafrost/pkg/inference"
 	"github.com/teslashibe/permafrost/internal/pnl"
 	"github.com/teslashibe/permafrost/internal/risk"
 	"github.com/teslashibe/permafrost/pkg/strategy"
@@ -128,11 +128,31 @@ func (r *Runtime) Start(parent context.Context) error {
 	if r.running {
 		return errors.New("runtime: already running")
 	}
+	if err := r.warmupStrategy(parent); err != nil {
+		return fmt.Errorf("runtime: strategy warmup: %w", err)
+	}
 	ctx, cancel := context.WithCancel(parent)
 	r.cancel = cancel
 	r.running = true
 	go r.loop(ctx)
 	return nil
+}
+
+// warmupStrategy invokes Strategy.Warmup with the per-agent context and
+// the framework Services bag. Called once from Start before the tick loop
+// begins. Failures here surface as a Start error so the operator notices
+// at agent-launch time rather than on the first decision tick.
+func (r *Runtime) warmupStrategy(ctx context.Context) error {
+	return r.deps.Strategy.Warmup(ctx, strategy.WarmupInput{
+		AgentID:  r.agent.ID,
+		Universe: r.agent.Universe,
+		Config:   r.agent.Config,
+		Now:      r.now(),
+		Services: strategy.Services{
+			Logger:    r.deps.Logger,
+			Inference: r.deps.Inference,
+		},
+	})
 }
 
 // Stop gracefully halts the tick loop. It does NOT change the persisted

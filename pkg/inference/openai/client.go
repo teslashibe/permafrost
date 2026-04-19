@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teslashibe/permafrost/internal/inference"
+	"github.com/teslashibe/permafrost/pkg/inference"
 )
 
 // Client implements inference.Provider against any OpenAI-compatible HTTP API.

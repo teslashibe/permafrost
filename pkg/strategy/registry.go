@@ -18,7 +18,7 @@ var (
 
 // Register adds a strategy constructor under the given name. It panics on
 // double registration to surface bugs at process start. Names should be
-// snake_case (e.g. "funding_arb_basic").
+// snake_case (e.g. "noop", "dca_buy").
 func Register(name string, c Constructor) {
 	regMu.Lock()
 	defer regMu.Unlock()

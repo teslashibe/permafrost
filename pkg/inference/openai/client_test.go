@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/teslashibe/permafrost/internal/inference"
+	"github.com/teslashibe/permafrost/pkg/inference"
 )
 
 func newServer(t *testing.T, h http.HandlerFunc) (*httptest.Server, *Client) {

@@ -1,8 +1,8 @@
 # Permafrost — MVP Scope
 
-> Permafrost is an open-source DeFi market-making and hedge-fund protocol that uses agents to deploy capital into a range of AI trading strategies. Capital and gains are locked into the permafrost.
+> Permafrost is an open-source DeFi market-making and hedge-fund framework that uses agents to deploy capital into a range of AI trading strategies. Capital and gains are locked into the permafrost.
 
-This document defines the framework for the MVP. Implementation order, interfaces, data model, and decisions are all here. Build this scaffold first; the first agent (`funding_arb_basic`) comes after.
+This document defines the framework architecture. The framework ships with `noop` as a reference strategy; real strategies are added by anyone (including the maintainer) under `strategies/` per [`STRATEGY_AUTHORS.md`](STRATEGY_AUTHORS.md).
 
 ---
 
@@ -59,52 +59,54 @@ Five primitives the system revolves around:
 ```
 permafrost/
 ├── cmd/
-│   ├── permafrost/         # CLI entrypoint (cobra)
-│   └── permafrostd/        # API server entrypoint (fiber)
-├── internal/
-│   ├── config/             # viper config, env, secrets
-│   ├── vault/              # deposits, NAV, lockups, accounting
-│   ├── allocator/          # capital allocation across agents + chains
-│   ├── agent/              # agent runtime, scheduler, lifecycle
-│   ├── strategy/           # Strategy interface + registry
-│   │   └── funding_arb_basic/   # first strategy
-│   ├── exchange/           # Venue interface (orderbook venues)
-│   │   └── hyperliquid/    # HL SDK adapter (perp venue)
-│   ├── swap/               # SwapVenue interface (DEX/aggregator)
-│   │   └── jupiter/        # Solana via Jupiter
-│   ├── chain/              # chain-level RPC clients + tx tracking
-│   │   └── solana/         # Solana RPC, Jito bundle client, priority fees
-│   ├── wallet/             # keystore, signers, address book
-│   │   ├── keystore.go     # encrypted JSON, passphrase from env
-│   │   ├── solana.go       # ed25519 signer
-│   │   └── hyperliquid.go  # HL signer
-│   ├── assets/             # asset registry (perp ↔ chain mint mapping)
-│   │   └── registry.yaml   # hand-curated, source of truth
-│   ├── inference/          # OpenAI-compatible client
-│   │   ├── provider.go
-│   │   ├── openai/
-│   │   └── mock/
-│   ├── risk/               # pre-trade + portfolio risk checks
-│   ├── marketdata/         # subscriptions, candles, funding cache
-│   ├── store/              # Timescale repo layer (sqlc + pgx)
-│   │   ├── migrations/
-│   │   └── queries/
-│   ├── api/                # fiber handlers, middleware, DTOs
-│   ├── telemetry/          # logs, metrics, traces
-│   └── eventbus/           # in-proc pub/sub (NATS-ready interface)
-├── pkg/                    # public exports (interfaces if open-sourcing SDK)
+│   ├── permafrost/             # CLI entrypoint (cobra)
+│   └── permafrostd/            # daemon entrypoint
+│       ├── main.go
+│       ├── strategies.go       # committed: blank-imports community/reference strategies
+│       └── strategies_local.go # gitignored: blank-imports private strategies
+├── pkg/                        # stable public SAPI (used by strategy authors)
+│   ├── strategy/               # Strategy, Decision, Services, registry
+│   ├── types/                  # OrderIntent, SwapIntent, Position, ChainID, ...
+│   └── inference/              # Provider interface + OpenAI-compatible client
+├── strategies/                 # canonical home for strategy packages
+│   ├── noop/                   # reference implementation
+│   ├── <community_name>/       # public strategies, committed
+│   └── private/                # gitignored as a directory
+│       └── <your_strategy>/    # private/local strategies
+├── internal/                   # framework internals (not part of the SAPI)
+│   ├── config/                 # viper config, env, secrets
+│   ├── vault/                  # deposits, NAV, lockups, accounting
+│   ├── agent/                  # agent runtime, scheduler, lifecycle, killswitch
+│   ├── exchange/               # Venue interface (orderbook venues)
+│   │   └── hyperliquid/        # HL SDK adapter (perp venue)
+│   ├── swap/                   # SwapVenue interface (DEX/aggregator)
+│   │   ├── jupiter/            # Solana via Jupiter
+│   │   └── oneinch/            # EVM chains via 1inch v6
+│   ├── chain/                  # chain-level RPC clients + tx tracking
+│   │   ├── evm/
+│   │   └── solana/
+│   ├── wallet/                 # keystore, signers, address book
+│   ├── assets/                 # asset registry (perp ↔ chain mint mapping)
+│   │   └── registry.yaml       # hand-curated, source of truth
+│   ├── risk/                   # pre-trade + portfolio risk checks
+│   ├── reconcile/              # position reconciliation
+│   ├── pnl/                    # PnL accounting
+│   ├── store/                  # Timescale repo layer (sqlc + pgx)
+│   ├── api/                    # fiber handlers
+│   ├── cli/                    # cobra command tree
+│   ├── backtest/               # CSV-driven backtest harness
+│   └── telemetry/              # logs, metrics
 ├── deploy/
-│   ├── docker/
-│   └── compose/
-├── migrations/             # goose migrations
-├── docs/
 └── SCOPE.md
 ```
 
 **Layering rules:**
-- `internal/strategy/*` and `internal/agent` may only depend on the four core interfaces (`Strategy`, `Venue`, `SwapVenue`, `Provider`, `Risk`) — never on concrete adapters.
+- Strategies (under `strategies/`) depend on `pkg/strategy` and `pkg/types`. They MAY also import `internal/*` packages directly (single-module repo) but doing so couples them to internals that may change without notice.
+- `internal/agent.BuildStrategy` is a pure registry lookup — no per-strategy special-casing. Strategies own their own typed config parsing inside their `Constructor` and pull framework services (logger, inference, ...) from `WarmupInput.Services`.
 - `internal/store` is the only package that imports `pgx`.
 - `internal/wallet` is the only package that touches private key bytes. Everything else uses `Signer`.
+
+See [`STRATEGY_AUTHORS.md`](STRATEGY_AUTHORS.md) for the strategy authoring guide.
 
 ---
 

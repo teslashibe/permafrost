@@ -1,9 +1,19 @@
-// Package strategy defines the Strategy contract: the pure-logic interface
-// that proposes orders and swaps in response to market state.
+// Package strategy defines the Permafrost Strategy contract: the pure-logic
+// interface that proposes orders and swaps in response to market state.
 //
-// A Strategy is stateless across restarts; all persistent state lives in the
-// store. Implementations live in subpackages such as
-// internal/strategy/funding_arb_basic.
+// This package is the stable public SAPI. New strategies live as sibling
+// subdirectories under strategies/ in the repo root (e.g. strategies/noop,
+// strategies/<your_name>) and depend only on this package and pkg/types.
+//
+// Lifecycle:
+//   - Register a Constructor under a stable snake_case name in init().
+//   - The agent runtime calls Warmup(ctx, WarmupInput) once after
+//     construction, supplying framework Services (logger, inference, ...).
+//   - The runtime then calls Decide(ctx, DecisionInput) on every tick.
+//     Implementations MUST be deterministic given DecisionInput.
+//
+// A Strategy is stateless across process restarts; all persistent state
+// lives in the framework's store and is rehydrated into DecisionInput.
 package strategy
 
 import (
@@ -32,10 +42,20 @@ type Strategy interface {
 }
 
 // WarmupInput is supplied once at strategy construction time.
+//
+// Universe is the per-agent symbol list from agents.universe; strategies
+// that filter by symbol should respect it.
+//
+// Services carries framework-provided dependencies (logger, inference
+// provider, etc.). Strategies that require a service MUST check it is
+// non-nil and return an error from Warmup if it is missing — the
+// framework will refuse to start the agent.
 type WarmupInput struct {
-	AgentID string
-	Config  map[string]any
-	Now     time.Time
+	AgentID  string
+	Universe []string
+	Config   map[string]any
+	Now      time.Time
+	Services Services
 }
 
 // DecisionInput carries everything the strategy needs to make a single

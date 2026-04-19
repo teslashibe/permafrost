@@ -36,6 +36,10 @@ config.local.yaml
 keystore.json
 ~/.permafrost/
 
+## Private strategies (Hummingbot-style local extension; see STRATEGY_AUTHORS.md)
+/strategies/private/
+/cmd/permafrostd/strategies_local.go
+
 ## Build artifacts
 tmp/
 .cache/

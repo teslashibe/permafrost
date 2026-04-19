@@ -5,32 +5,37 @@ import (
 	"testing"
 
 	"github.com/teslashibe/permafrost/internal/assets"
-	"github.com/teslashibe/permafrost/pkg/types"
 	walletnoop "github.com/teslashibe/permafrost/internal/wallet/noop"
+	"github.com/teslashibe/permafrost/pkg/types"
+
+	// Register noop so BuildStrategy can resolve a known-good strategy
+	// name in these tests without depending on any out-of-tree strategy.
+	_ "github.com/teslashibe/permafrost/strategies/noop"
 )
 
-func TestBuildStrategy_FundingArbAppliesConfigOverrides(t *testing.T) {
-	reg, err := assets.LoadEmbedded()
-	if err != nil {
-		t.Fatal(err)
-	}
+// TestBuildStrategy_LooksUpFromRegistry verifies the post-#25 BuildStrategy
+// is a pure registry lookup with no per-strategy special-casing. Strategies
+// own their own typed config parsing inside their Constructor.
+func TestBuildStrategy_LooksUpFromRegistry(t *testing.T) {
 	a := Agent{
 		ID:       "ag-x",
-		Strategy: "funding_arb_basic",
+		Strategy: "noop",
 		Universe: []string{"WIF"},
-		Config: map[string]any{
-			"entry_annualised_funding": 0.05,
-			"exit_annualised_funding":  0.02,
-			"position_cap_usdc":        100,
-			"slippage_bps":             25,
-		},
+		Config:   map[string]any{},
 	}
-	s, err := BuildStrategy(a, reg)
+	s, err := BuildStrategy(a)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s == nil || s.Name() != "funding_arb_basic" {
+	if s == nil || s.Name() != "noop" {
 		t.Fatalf("unexpected strategy: %+v", s)
+	}
+}
+
+func TestBuildStrategy_UnknownNameErrors(t *testing.T) {
+	a := Agent{ID: "ag", Strategy: "definitely-not-registered"}
+	if _, err := BuildStrategy(a); err == nil {
+		t.Fatal("expected error for unknown strategy name")
 	}
 }
 
@@ -124,7 +129,7 @@ func TestBuildDeps_PerAgentNetworkPlumbed(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			a := Agent{
 				ID:       "ag",
-				Strategy: "funding_arb_basic",
+				Strategy: "noop",
 				Network:  tc.stored,
 				Universe: []string{"WIF"},
 			}
@@ -187,7 +192,7 @@ func TestBuildDeps_PopulatesSwapWhenSolanaConfigured(t *testing.T) {
 	}
 	a := Agent{
 		ID:       "ag",
-		Strategy: "funding_arb_basic",
+		Strategy: "noop",
 		Universe: []string{"WIF"},
 	}
 	ks := walletnoop.NewKeystore("solana")
@@ -211,7 +216,7 @@ func TestBuildDeps_PopulatesSwapWhenSolanaConfigured(t *testing.T) {
 
 func TestBuildDeps_LeavesSwapNilWhenSolanaUnconfigured(t *testing.T) {
 	reg, _ := assets.LoadEmbedded()
-	a := Agent{ID: "ag", Strategy: "funding_arb_basic", Universe: []string{"WIF"}}
+	a := Agent{ID: "ag", Strategy: "noop", Universe: []string{"WIF"}}
 	deps, err := BuildDeps(a, reg, nil, nil, nil, BuildOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -226,7 +231,7 @@ func TestBuildDeps_LeavesSwapNilWhenSolanaUnconfigured(t *testing.T) {
 
 func TestBuildDeps_DegradesWhenSolanaConfiguredButNoSigner(t *testing.T) {
 	reg, _ := assets.LoadEmbedded()
-	a := Agent{ID: "ag", Strategy: "funding_arb_basic", Universe: []string{"WIF"}}
+	a := Agent{ID: "ag", Strategy: "noop", Universe: []string{"WIF"}}
 	deps, err := BuildDeps(a, reg, nil, nil, nil, BuildOptions{
 		Solana: SolanaSpot{RPCURL: "http://localhost:8899"},
 	})
@@ -243,7 +248,7 @@ func TestBuildDeps_DegradesWhenSolanaConfiguredButNoSigner(t *testing.T) {
 // keystore = warn + skip, never error.
 func TestBuildDeps_DegradesWhenEVMConfiguredButNoSigner(t *testing.T) {
 	reg, _ := assets.LoadEmbedded()
-	a := Agent{ID: "ag", Strategy: "funding_arb_basic", Universe: []string{"WIF"}}
+	a := Agent{ID: "ag", Strategy: "noop", Universe: []string{"WIF"}}
 	deps, err := BuildDeps(a, reg, nil, nil, nil, BuildOptions{
 		EVM: map[types.ChainID]EVMSpot{
 			types.ChainBase: {RPCURL: "https://mainnet.base.org", OneInchAPIKey: "stub"},
@@ -281,16 +286,19 @@ func TestEVMSpot_IsEnabled(t *testing.T) {
 	}
 }
 
-func TestApplyFundingArbConfig_NumericTypes(t *testing.T) {
-	cases := []map[string]any{
-		{"entry_annualised_funding": 0.5},          // float64 (JSON default)
-		{"entry_annualised_funding": int(1)},        // int (rare via flags)
-		{"entry_annualised_funding": int64(1)},      // int64
-		{"entry_annualised_funding": "0.25"},        // string
+// TestDecimalFromAny exercises the JSONB-numeric helper that
+// BuildRiskEngine and any other framework-side config parser uses.
+// Strategy-specific config parsing now lives inside each strategy.
+func TestDecimalFromAny(t *testing.T) {
+	cases := []any{
+		0.5,         // float64 (JSON default)
+		int(1),      // int (rare via flags)
+		int64(1),    // int64
+		"0.25",      // string
 	}
-	for _, m := range cases {
-		if _, err := decimalFromAny(m["entry_annualised_funding"]); err != nil {
-			t.Errorf("decimalFromAny rejected %T: %v", m["entry_annualised_funding"], err)
+	for _, v := range cases {
+		if _, err := decimalFromAny(v); err != nil {
+			t.Errorf("decimalFromAny rejected %T: %v", v, err)
 		}
 	}
 	if _, err := decimalFromAny(struct{}{}); err == nil {
