@@ -134,18 +134,35 @@ Default mode is `paper` — no real orders are placed until the agent is explici
 For real-money operation you'll also need:
 
 ```bash
-# Import a Solana keypair (for the spot leg of any basis-style strategy)
+# Import a Solana keypair (for the spot leg of any basis-style strategy).
+# Accepts a Phantom-style JSON array file, a base58 secret, or hex 32/64 bytes.
 permafrost wallet import --chain solana --from ~/.config/solana/id.json
 
-# Import a Hyperliquid signer key (for placing real perp orders)
-permafrost wallet import --chain hyperliquid --hex 0x...
+# Import a Hyperliquid signer key (for placing real perp orders).
+# Save the hex private key (with or without 0x prefix) to a file first,
+# then point --from at it.
+echo "0xYOUR_HYPERLIQUID_PRIVATE_KEY" > /tmp/hl-key
+permafrost wallet import --chain hyperliquid --from /tmp/hl-key
+shred -u /tmp/hl-key   # (or `rm` on macOS) — don't leave it on disk
 
-# Initialize vault accounting (off-chain in v1)
+# Initialize vault accounting (off-chain in v1).
 permafrost vault init
 
-# Promote the agent to live (asks for explicit confirmation)
-permafrost agent set-mode ag-... live --confirm-live
+# Flip the agent to live mode. This is just a state change on the agent
+# record; the --confirm-live gate fires when you actually start the agent.
+permafrost agent set-mode ag-... live
+
+# Start the agent in the foreground with the explicit live acknowledgement.
+# This is the recommended way to bring a live agent online for the first time
+# so you can watch the first few decisions.
+permafrost agent run ag-... --confirm-live
+
+# After you trust it, switch to daemon-supervised:
+permafrost agent start ag-...    # marks status=running
+permafrost serve                  # supervisor picks it up
 ```
+
+> ⚠ **Live-mode gating note (v1):** `--confirm-live` is currently only enforced by `agent run` (foreground). The daemon supervisor does not re-prompt — once an agent is `mode=live, status=running`, `permafrost serve` will start it. Tracked by [#38](https://github.com/teslashibe/permafrost/issues/38) for hardening.
 
 **EVM RPCs**: pick fresh ones from [chainlist.org](https://chainlist.org/) and drop them into `config.yaml` under `evm.chains.<name>.rpc_url`. Public defaults work for testing but rate-limit aggressively in production.
 
