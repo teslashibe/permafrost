@@ -1,0 +1,27 @@
+/**
+ * Permafrost docs theme.
+ * Cool blues + cyan accents matching the project's badge palette.
+ */
+
+:root {
+  --ifm-color-primary: #00525c;
+  --ifm-color-primary-dark: #004a52;
+  --ifm-color-primary-darker: #00464d;
+  --ifm-color-primary-darkest: #003940;
+  --ifm-color-primary-light: #006674;
+  --ifm-color-primary-lighter: #006d7c;
+  --ifm-color-primary-lightest: #008092;
+  --ifm-code-font-size: 92%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #50d2c2;
+  --ifm-color-primary-dark: #34cab9;
+  --ifm-color-primary-darker: #28c6b3;
+  --ifm-color-primary-darkest: #20a394;
+  --ifm-color-primary-light: #6cd9cb;
+  --ifm-color-primary-lighter: #79ddd1;
+  --ifm-color-primary-lightest: #a3e8e0;
+  --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.08);
+}
