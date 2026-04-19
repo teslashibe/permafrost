@@ -115,6 +115,8 @@ permafrost agent create \
 permafrost agent start <id>
 ```
 
+`agent start` marks the agent runnable so the daemon supervisor (`permafrost serve` / `make up`) picks it up. For one-shot foreground iteration in a single shell without the daemon, use `permafrost agent run <id>` instead.
+
 The OSS build ships with `noop` registered; that's enough to confirm your install, database, and venue connections are working. To run a real strategy, see the [strategy authors guide](https://teslashibe.github.io/permafrost/strategies/sapi) — adding one is a folder + a registration call + one import line per binary.
 
 Default mode is `paper` — no real orders are placed until the agent is explicitly promoted to `live`.
@@ -124,16 +126,20 @@ Default mode is `paper` — no real orders are placed until the agent is explici
 ## CLI
 
 ```
-permafrost wallet     import | show | balances
-permafrost vault      init | deposit | status | nav
-permafrost agent      create | start | stop | logs | decisions | positions | pnl
+permafrost wallet     show | generate | import | path
+permafrost vault      init | deposit | withdraw | lockup | status | record-nav | nav
+permafrost agent      create | list | status | decisions | set-mode | set-network | start | stop | tick | run
 permafrost strategy   list | backtest
-permafrost inference  test
+permafrost inference  test | list
 permafrost swap       quote
 permafrost risk       show
+permafrost pnl        summary | positions | history
+permafrost reconcile
 permafrost db         migrate
 permafrost serve
 ```
+
+See the [CLI reference](https://teslashibe.github.io/permafrost/reference/cli) for flags and semantics.
 
 ---
 

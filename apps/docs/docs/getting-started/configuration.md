@@ -96,7 +96,7 @@ A few first-class env variables:
 
 - `PERMAFROST_CONFIG` — path to the config file (default `./config.yaml`).
 - `PERMAFROST_HYPERLIQUID_NETWORK` — daemon-wide override of every agent's stored network. Useful for "panic switch all agents to testnet" scenarios.
-- `KEYSTORE_PASSPHRASE` — passphrase to decrypt the keystore at startup.
+- `PERMAFROST_KEYSTORE_PASSPHRASE` — passphrase to decrypt the keystore at startup.
 
 ## Next steps
 

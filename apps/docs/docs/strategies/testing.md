@@ -75,7 +75,7 @@ Run it twice in CI; if it ever drifts, you have a regression.
 
 ## Live-mode smoke tests
 
-For end-to-end testing against real venues, use **paper mode**:
+For end-to-end testing against real venues, use **paper mode**. The fastest iteration loop is `agent run` (foreground, single shell, no daemon needed):
 
 ```bash
 permafrost agent create \
@@ -83,7 +83,10 @@ permafrost agent create \
     --perp hyperliquid \
     --network testnet \
     --alloc 100
-permafrost agent start <id>
+permafrost agent run <id>          # foreground; SIGINT to stop
+# OR, for daemon-supervised runs:
+permafrost agent start <id>        # marks status=running
+permafrost serve                   # picks it up
 ```
 
 Paper mode reads real market data and produces real `Decision`s but does not place real orders. Pair it with `--network testnet` for the perp venue when iterating on a new strategy.

@@ -27,35 +27,35 @@ permafrost agent create \
     --tick-secs 30
 # → created agent id=ag-... name= strategy=noop mode=paper network=mainnet alloc=1000
 
-# 4. Start the agent
+# 4. Mark the agent runnable; the daemon supervisor picks it up.
+#    For one-shot iteration without the daemon, see `agent run` below.
 permafrost agent start ag-...
 
-# 5. Watch the decisions land
-permafrost agent decisions ag-... --follow
-# Each tick logs: confidence=0.00 swaps=0 orders=0 cancels=0 notes="noop"
+# 5. Inspect the most recent decisions
+permafrost agent decisions ag-...
+# Each tick logged: confidence=0.00 swaps=0 orders=0 cancels=0 notes="noop"
 ```
 
 If you see decisions appearing every 30 seconds, the daemon is healthy: the scheduler is firing, the runtime is calling `Strategy.Decide`, results are being persisted to TimescaleDB, and the kill-switch is monitoring without tripping.
+
+For one-shot foreground iteration in a single shell (no daemon), use `permafrost agent run ag-...` instead — that runs the tick loop in the foreground and exits on SIGINT.
 
 ## Inspecting agent state
 
 ```bash
 permafrost agent status ag-...      # high-level health
-permafrost agent positions ag-...   # any reconciled positions (none for noop)
-permafrost agent pnl ag-...         # PnL since start (zero for noop)
+permafrost pnl positions ag-...     # any reconciled positions (none for noop)
+permafrost pnl summary              # PnL across all agents
 ```
 
-## Stopping cleanly
+## Stopping
 
 ```bash
-permafrost agent stop ag-...
+permafrost agent stop ag-...           # one agent
+permafrost agent stop --all            # every agent
 ```
 
-`stop` is graceful: the runtime finishes the current tick and exits the loop. It does **not** change the persisted agent status — to permanently halt an agent across daemon restarts, set its status to `halted`:
-
-```bash
-permafrost agent set-mode ag-... --halt
-```
+`agent stop` sets the agent's persisted status to `halted` so a subsequent `permafrost serve` will not auto-resume it. To restart later, use `agent start <id>` again.
 
 ## Next steps
 

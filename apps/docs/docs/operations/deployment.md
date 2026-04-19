@@ -24,7 +24,7 @@ The same docker-compose works on a server. Notes:
 - **TimescaleDB** is configured with a small footprint by default. For production, mount a real volume and tune `shared_buffers` / `work_mem`.
 - **Persistence.** Mount `/var/lib/postgresql/data` as a named volume (compose does this) and add it to your snapshot/backup schedule.
 - **Reverse proxy.** The Fiber API listens on `:8080` by default. Front it with caddy / nginx + TLS if exposed publicly. Most operators don't expose it — they SSH in and use the CLI directly.
-- **Process supervision.** Systemd is the easiest non-Docker path: `ExecStart=/usr/local/bin/permafrostd`, set `KEYSTORE_PASSPHRASE` via `EnvironmentFile`, restart on failure.
+- **Process supervision.** Systemd is the easiest non-Docker path: `ExecStart=/usr/local/bin/permafrostd`, set `PERMAFROST_KEYSTORE_PASSPHRASE` via `EnvironmentFile`, restart on failure.
 
 ## Building a custom binary
 
@@ -56,7 +56,7 @@ docker run --rm -it \
     -v $(pwd)/config.yaml:/etc/permafrost/config.yaml:ro \
     -v $(pwd)/keystore.json:/etc/permafrost/keystore.json:ro \
     -e PERMAFROST_CONFIG=/etc/permafrost/config.yaml \
-    -e KEYSTORE_PASSPHRASE \
+    -e PERMAFROST_KEYSTORE_PASSPHRASE \
     permafrost:local
 ```
 

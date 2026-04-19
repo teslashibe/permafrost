@@ -21,11 +21,18 @@ strategies/
 
 ## Enabling private strategies in your build
 
-`cmd/permafrostd/strategies.go` (committed) blank-imports community strategies.
+Permafrost ships **two** binaries — the daemon (`permafrostd`) and the CLI (`permafrost`) — and a strategy must be linked into *both* to be both runnable and backtest-able. Each binary has a symmetric pair of files:
 
-`cmd/permafrostd/strategies_local.go` (gitignored) blank-imports your private ones:
+| File | Tracking | Purpose |
+|---|---|---|
+| `cmd/permafrostd/strategies.go` | committed | Community / reference strategies for the daemon |
+| `cmd/permafrostd/strategies_local.go` | gitignored | Your private strategies for the daemon |
+| `cmd/permafrost/strategies.go` | committed | Same set, for the CLI (`strategy backtest`, `strategy list`) |
+| `cmd/permafrost/strategies_local.go` | gitignored | Same set, for the CLI |
 
-```go title="cmd/permafrostd/strategies_local.go"
+Example local file (you maintain a copy in *both* `cmd/permafrostd/` and `cmd/permafrost/`):
+
+```go title="cmd/permafrostd/strategies_local.go (and the CLI mirror)"
 package main
 
 import (
@@ -34,13 +41,14 @@ import (
 )
 ```
 
-Both files are in `package main` and compile into the same binary. The framework's registry sees both sets at startup. Build:
+Both files compile into their respective binaries; the registry sees both sets at startup. Build:
 
 ```bash
 go build -o bin/permafrostd ./cmd/permafrostd
+go build -o bin/permafrost  ./cmd/permafrost
 ```
 
-To run an OSS-only build (no private strategies), delete `strategies_local.go`. To remove a single private strategy from a build, delete its line.
+To run an OSS-only build (no private strategies), delete both `strategies_local.go` files. To remove a single private strategy from a build, delete its line in both files.
 
 ## Backups (you have to think about this)
 
@@ -76,6 +84,8 @@ Three failure modes:
 2. **IDE auto-stage.** Some setups stage all changes. Check yours.
 
 3. **Branch pushes.** A branch that includes a stash apply may carry private files. `git status` before every push.
+
+The `agent run` foreground iteration command lives on the CLI binary; the daemon `permafrostd` is the production-grade supervisor. Both need the same set of strategy registrations — that's why the four-file pattern exists. If you only ever run the daemon, you can skip the two `cmd/permafrost/strategies*.go` files, but `strategy backtest` will then refuse to load your private strategy by name.
 
 ## Sharing a private strategy across machines
 

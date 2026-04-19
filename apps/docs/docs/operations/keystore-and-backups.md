@@ -8,7 +8,7 @@ Permafrost holds private keys directly. This page covers what's stored, where, h
 
 ## What's in the keystore
 
-`internal/wallet` manages an encrypted JSON keystore (`keystore.json` by default). It contains, per chain:
+`internal/wallet` manages an encrypted JSON keystore (default path `~/.permafrost/keystore.json`; override via `wallet.keystore_path` in `config.yaml`). It contains, per chain:
 
 - **Solana** — an ed25519 private key.
 - **Hyperliquid** — an ECDSA private key used to sign Hyperliquid orders. (HL itself has no on-chain wallet to fund; this key authenticates API requests.)
@@ -18,9 +18,9 @@ Permafrost holds private keys directly. This page covers what's stored, where, h
 
 ## Encryption
 
-The keystore JSON is encrypted with a passphrase loaded from the `KEYSTORE_PASSPHRASE` environment variable at daemon startup. The passphrase is never written to disk by Permafrost.
+The keystore JSON is encrypted with a passphrase loaded from the `PERMAFROST_KEYSTORE_PASSPHRASE` environment variable at daemon startup. The passphrase is never written to disk by Permafrost.
 
-In Docker / systemd deployments, supply `KEYSTORE_PASSPHRASE` via:
+In Docker / systemd deployments, supply `PERMAFROST_KEYSTORE_PASSPHRASE` via:
 
 - A `.env` file outside the container, mounted read-only.
 - A secrets manager (Doppler, 1Password CLI, Vault, AWS Secrets Manager).
@@ -39,7 +39,7 @@ permafrost wallet import --chain ethereum --hex 0x...
 permafrost wallet import --chain hyperliquid --hex 0x...
 ```
 
-The CLI prompts for `KEYSTORE_PASSPHRASE` if not set in the env. Repeated imports for the same chain replace the existing entry (no key rotation history is kept on disk).
+The CLI prompts for `PERMAFROST_KEYSTORE_PASSPHRASE` if not set in the env. Repeated imports for the same chain replace the existing entry (no key rotation history is kept on disk).
 
 ## Listing what you have
 

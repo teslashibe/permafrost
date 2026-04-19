@@ -83,21 +83,28 @@ func (Strategy) Decide(_ context.Context, _ strategy.DecisionInput) (strategy.De
 }
 ```
 
-Enable it in the local build:
+Enable it in both binaries (one line each — the daemon for runtime, the CLI for `strategy backtest`):
 
 ```go title="cmd/permafrostd/strategies.go"
 import _ "github.com/teslashibe/permafrost/strategies/dca_buy"
 ```
 
-Build and run:
+```go title="cmd/permafrost/strategies.go"
+import _ "github.com/teslashibe/permafrost/strategies/dca_buy"
+```
+
+Build and run. `agent start` marks the agent runnable so `permafrost serve` (the daemon) picks it up; `agent run` is the foreground equivalent for paper-mode iteration in a single shell:
 
 ```bash
 go build -o bin/permafrostd ./cmd/permafrostd
+go build -o bin/permafrost  ./cmd/permafrost
 permafrost agent create --strategy dca_buy --perp hyperliquid --alloc 100
-permafrost agent start <id>
+permafrost agent start <id>     # production: daemon picks up
+# OR
+permafrost agent run   <id>     # foreground iteration; SIGINT to stop
 ```
 
-That's the whole loop.
+That's the whole loop. See [private strategies](/strategies/private-strategies) for the gitignored variants when you want a strategy that doesn't ship in the public repo.
 
 ## Reference: `noop`
 

@@ -13,10 +13,18 @@ type Services struct {
     // Logger is an agent-scoped slog logger. Always non-nil.
     Logger *slog.Logger
 
-    // Inference is the LLM provider for this agent, resolved from the
-    // agent's configured "provider:model" string. nil if no inference
-    // provider was configured.
+    // Inference is the resolved LLM Provider for this agent. nil when
+    // the operator did not configure agent.Inference.
     Inference inference.Provider
+
+    // InferenceModel is the model id parsed from agent.Inference (the
+    // part after ":"). Surfaced so strategies can use the operator's
+    // chosen model as a default and override via their own typed cfg.
+    InferenceModel string
+
+    // Registry is the curated asset registry. Always non-nil when set
+    // by BuildDeps; the embedded copy is loaded on every BuildDeps call.
+    Registry assets.Registry
 }
 ```
 
@@ -35,12 +43,20 @@ func (s *Strategy) Warmup(_ context.Context, in strategy.WarmupInput) error {
     s.log = in.Services.Logger
     s.inference = in.Services.Inference
 
+    // Use the operator's chosen model as a default if the typed cfg
+    // didn't override it.
+    if s.cfg.Model == "" {
+        s.cfg.Model = in.Services.InferenceModel
+    }
+
     if s.cfg.UseLLMVeto && s.inference == nil {
         return fmt.Errorf("my_strategy: use_llm_veto=true but no inference provider configured for agent")
     }
     return nil
 }
 ```
+
+`Warmup` is once-guarded by the runtime — even if a foreground CLI drives ticks via `TickOnce` instead of `Start`, the framework calls `Warmup` exactly once before the first decision. Authors can rely on Warmup having completed.
 
 The `Warmup` error path matters: validation failures here surface as agent-launch errors, so the operator notices immediately. Without this, the strategy would launch and fail on the first decision tick.
 

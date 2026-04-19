@@ -4,100 +4,112 @@ sidebar_position: 3
 
 # Killswitch tuning
 
-The killswitch is the framework's last line of defense. It runs continuously and can halt every agent in milliseconds.
+The killswitch is the framework's last line of defence. This page documents what it actually does today (per the v1 implementation in `internal/agent/killswitch.go`) — not aspirational behaviour.
 
-## What it does when it fires
+## What the killswitch is
 
-In order:
+A single function on `Runtime`:
 
-1. **Cancel** every open order on every venue across every running agent.
-2. **Optionally market-close** open perp shorts. Configurable per-agent.
-3. **Optionally swap** open spot legs back to USDC. Configurable per-agent.
-4. **Stop** all agent runtimes (the loop exits; persisted status is set to `halted`).
-5. **Persist** a killswitch event with the trigger reason for post-mortem.
+```go
+type KillSwitchOptions struct {
+    CloseShorts   bool   // flatten any open perp positions via reduce-only market orders
+    LiquidateSpot bool   // ALSO swap open spot legs back to USDC (not implemented in v1)
+    Reason        string // recorded on the agent run
+}
 
-## Triggers
+func (r *Runtime) Trip(ctx context.Context, opts KillSwitchOptions) error
+```
 
-The killswitch can be invoked manually:
+When `Trip` fires, in order:
+
+1. **Stop** the runtime's tick loop.
+2. **Set `status='halted'`** on the agent (so a daemon restart does not auto-resume it).
+3. **Cancel open orders** on the perp venue (best-effort — see "Known limits" below).
+4. If `CloseShorts`, **flatten open perp positions** with reduce-only market orders.
+5. If `LiquidateSpot`, log a warning that spot liquidation is not implemented in v1.
+
+Errors during steps 3 and 4 are logged but do not stop the rest of the sequence — a single venue failure should not prevent flattening on the others.
+
+## How it gets invoked
+
+Two paths:
 
 ```bash
-permafrost agent stop --all --reason "manual: market dislocation"
+# Operator-initiated, daemon-mediated (cancels orders + closes shorts):
+permafrost agent stop --all --reason "<reason>"
 ```
 
-Or fired automatically by:
+The `agent stop --all` CLI sets every agent's status to `halted`. The full kill switch (Trip) is invoked by the running daemon's supervisor when it observes the status change. If you don't have the daemon running, `agent stop` only does the persistent state change.
 
-- **Repeated breaker trips on multiple agents.** If two or more agents trip a breaker within a configurable window, the framework escalates to a system-wide killswitch. Tunable per breaker type.
-- **Daemon-level kill conditions.** RPC error storm (sustained > N% errors over N seconds), DB unreachable, inference rate-limit storm.
-
-## Per-agent breaker configuration
-
-Each agent's `risk` config controls the breakers that fire for that agent. Set via `agent create --config-json` or `agent set-config`:
-
-```json
-{
-  "risk": {
-    "max_drawdown":       0.10,    // 10% of NAV high-water mark
-    "max_daily_loss":     "200",   // USDC
-    "max_concurrent_positions": 5,
-    "max_notional_per_leg":     "1000",
-    "max_total_basis_exposure": "5000",
-    "max_spot_slippage_bps":    50
-  }
-}
+```bash
+# Per-agent halt (no order cancellation; just persistent state change):
+permafrost agent stop <id>
 ```
 
-`max_drawdown=0` disables the drawdown breaker. `max_daily_loss=0` disables the daily-loss breaker.
+## Per-agent risk limits + breakers
 
-## Daemon-wide killswitch settings
+Before the killswitch fires, per-agent risk limits and circuit breakers handle most bad situations. These live in `internal/risk/` and are configured via the agent's `risk:` config block:
 
-Configured in `config.yaml`:
-
-```yaml
-killswitch:
-  # If N or more agents trip a breaker within window_secs, fire the system killswitch.
-  multi_agent_breaker_threshold: 2
-  multi_agent_breaker_window_secs: 60
-
-  # When the killswitch fires:
-  cancel_all_orders: true        # always
-  market_close_perp_shorts: true # close shorts at market
-  swap_spot_to_usdc: false       # leave spot in place by default
-
-  # Daemon-level kill conditions
-  rpc_error_rate_threshold: 0.5  # 50% error rate
-  rpc_error_window_secs: 30
-  inference_rate_limit_threshold: 10  # 10 rate-limits in window
-  inference_rate_limit_window_secs: 60
+```bash
+permafrost agent create \
+    --strategy <name> \
+    --config-json '{
+        "risk": {
+            "max_concurrent_positions":     5,
+            "max_notional_per_leg":         "1000",
+            "max_total_basis_exposure":     "5000",
+            "max_daily_loss":               "200",
+            "max_spot_slippage_bps":        50,
+            "max_drawdown":                 0.10
+        }
+    }'
 ```
 
-Default values are intentionally conservative; tune up for aggressive trading or down for a hair-trigger.
+The framework installs two breakers automatically and reads the config above:
+
+- **MaxDrawdownBreaker** — tracks NAV drawdown vs the agent's high-water mark. `max_drawdown: 0` disables it; otherwise expressed as a fraction (e.g. `0.10` = 10%).
+- **DailyLossBreaker** — tracks absolute USDC loss within a UTC day. `max_daily_loss: 0` disables it.
+
+Additional breakers (basis blowout, funding flip, RPC health) are part of the framework's roadmap; what's in v1 today is the two above plus the pre-trade limits.
+
+## Practical tuning advice
+
+Defaults are intentionally conservative; tune up only as you build confidence.
+
+- **First week of live trading:** set `max_drawdown` low (5%) and `max_daily_loss` to a small absolute number (e.g. 1% of allocation). You're catching sizing bugs, not real market moves.
+- **`CloseShorts: true`** is the safe default — leaving naked shorts running after a kill is rarely what you want.
+- **`LiquidateSpot: true`** is **a no-op in v1**. If/when you need spot liquidation, you'll wire your own path (or watch this space — implementing the asset-registry-aware liquidation routine is a planned follow-up).
+
+## Known limits
+
+These are explicit gaps the v1 killswitch acknowledges:
+
+- **`cancelOpenOrders` is currently a no-op.** The `exchange.Venue` interface does not yet expose an `OpenOrders` method, so the killswitch logs a warning and asks the operator to cancel manually via the exchange UI. When `OpenOrders` lands as a small follow-up, this becomes a loop over `v.OpenOrders(); v.Cancel(id)` and the warning goes away.
+- **Spot liquidation is not implemented.** `LiquidateSpot: true` logs a warning. Auto-liquidating spot legs requires an asset-registry-aware caller threaded into the supervisor; deferred.
+- **No daemon-wide killswitch trigger.** Multi-agent breaker escalation, RPC error storms, and inference rate-limit storms are not auto-triggered by the framework. An operator hitting `permafrost agent stop --all` is the manual equivalent today.
+
+These limits are documented in `internal/agent/killswitch.go` itself; the source is the authoritative reference for what behaviour is wired vs aspirational.
 
 ## After a killswitch fires
 
 The framework leaves agents in `halted` state. Restart is a manual two-step:
 
 ```bash
-# Inspect the trigger reason
-permafrost agent killswitch-events --limit 10
+# Inspect what halted (decisions log carries the agent's last activity)
+permafrost agent decisions <id> --limit 20
 
 # Once you've understood and addressed the cause:
-permafrost agent set-mode <id> --status running
-permafrost agent start <id>
+permafrost agent set-mode <id> paper      # downgrade to paper while diagnosing
+permafrost agent start <id>               # mark running; supervisor picks it up
 ```
 
-This is intentional friction. The killswitch fired because something looked wrong; restarting should require an operator decision.
-
-## Practical tuning advice
-
-- **First week of live trading:** set `max_drawdown` low (5%) and `max_daily_loss` to a small absolute number (e.g. 1% of allocation). You're catching sizing bugs, not real market moves.
-- **After a few weeks:** loosen if you have evidence the strategy behaves as expected; tighten if you don't.
-- **Multi-agent threshold:** keep it at 2. One agent tripping is an agent issue; two simultaneously is a market issue.
-- **`swap_spot_to_usdc`:** leave it `false` for delta-neutral strategies — closing the spot leg into a thin market amplifies whatever caused the kill in the first place. Set it `true` only for directional strategies where holding the spot leg without the perp hedge is itself the risk.
+This is intentional friction. The killswitch fired (or was tripped) for a reason; restarting should require an operator decision.
 
 ## Where it lives
 
 - `internal/agent/killswitch.go` — the killswitch implementation.
 - `internal/risk/breakers.go` — the per-agent breakers.
+- `internal/risk/policy.go` — the pre-trade risk policy.
 
 ## Next steps
 
