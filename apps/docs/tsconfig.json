@@ -4,7 +4,11 @@
 {
   "extends": "@docusaurus/tsconfig",
   "compilerOptions": {
-    "baseUrl": ".",
+    // baseUrl is set by @docusaurus/tsconfig and is deprecated in TS 6
+    // (removed in 7). The workspace's installed TS 6.0.3 accepts "6.0"
+    // as the canonical silencer; if your IDE flags this value as
+    // invalid, your IDE is using a TypeScript older than 6.0 — set it
+    // to use the workspace's TypeScript (see .vscode/settings.json).
     "ignoreDeprecations": "6.0",
     "strict": true
   },

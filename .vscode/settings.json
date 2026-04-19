@@ -1,0 +1,8 @@
+{
+  // Use the workspace's TypeScript (apps/docs has TS 6.0+) instead of
+  // VS Code / Cursor's bundled version. This makes `ignoreDeprecations: "6.0"`
+  // recognised as a valid value; without this, older IDE-bundled TS
+  // versions flag it as invalid.
+  "typescript.tsdk": "apps/docs/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}

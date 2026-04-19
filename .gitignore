@@ -20,6 +20,8 @@ go.work.sum
 ## Editor / OS
 .idea/
 .vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
 *.swp
 *.swo
 .DS_Store
