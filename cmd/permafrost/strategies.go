@@ -15,5 +15,7 @@ package main
 // full extension flow.
 
 import (
+	_ "github.com/teslashibe/permafrost/strategies/dca_buy"
+	_ "github.com/teslashibe/permafrost/strategies/market_maker_basic"
 	_ "github.com/teslashibe/permafrost/strategies/noop"
 )
