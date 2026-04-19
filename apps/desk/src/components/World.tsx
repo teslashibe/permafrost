@@ -338,7 +338,9 @@ const SpriteHint: React.FC = () => {
   const h = HINTS[i];
   return (
     <div style={{
-      position: 'fixed', bottom: 12, left: '50%', transform: 'translateX(-50%)',
+      // Pinned ABOVE the disconnect-footer (which sits at bottom: 12)
+      // so the two never overlap when the daemon is unreachable.
+      position: 'fixed', bottom: 56, left: '50%', transform: 'translateX(-50%)',
       zIndex: 40, fontSize: 11, opacity: 0.85,
       display: 'flex', alignItems: 'center', gap: 8,
       background: 'rgba(10,27,54,0.78)', padding: '6px 14px', borderRadius: 14,
