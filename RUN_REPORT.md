@@ -7,36 +7,40 @@ Approach: chained PRs targeting main, audited per .cursor/rules/issue-audit-user
 
 ## Status board
 
-| # | Title | Branch | PR | CI | Audit | Notes |
+| # | Title | Branch | PR | CI | Audit fixes | Notes |
 |---|---|---|---|---|---|---|
-| 31, 32, 33 | README + roadmap + safety docs | chain/01-readme-quickstart | [#44](https://github.com/teslashibe/permafrost/pull/44) | ⏳ | ✅ inline | rolled together — all README/docs touches |
-| 34 | permafrost doctor | chain/02-doctor | — | — | — | next |
-| 35 | permafrost init wizard | chain/03-init-wizard | — | — | — | pending |
-| 36 | make demo | chain/04-make-demo | — | — | — | pending |
+| 31, 32, 33 | README + roadmap + safety docs | chain/01-readme-quickstart | [#44](https://github.com/teslashibe/permafrost/pull/44) | ✓ | H1 (--hex flag), H2 (--confirm-live placement) | shipped |
+| 34 | permafrost doctor | chain/02-doctor | [#45](https://github.com/teslashibe/permafrost/pull/45) | ✓ | H1 (http timeout), M1 (Solana method), L1 (test coverage) | shipped |
+| 35 | permafrost init wizard | chain/03-init-wizard | [#46](https://github.com/teslashibe/permafrost/pull/46) | ⏳ | clean self-audit | shipped |
+| 36 | make demo | chain/04-make-demo | — | — | — | next |
 | 37 | Docker image w/ both binaries | chain/05-docker-image | — | — | — | pending |
 | 38 | Killswitch impl completion | chain/06-killswitch-impl | — | — | — | pending |
 | 39 | Reference strategies | chain/07-reference-strategies | — | — | — | pending |
 | 40 | strategy new scaffolding | chain/08-strategy-new | — | — | — | pending |
-| 41 | Trading Desk UI (arctic theme) | chain/09-trading-desk | — | — | — | pending |
+| 41 | Trading Desk UI (arctic theme) | chain/09-trading-desk | — | — | — | pending — sprite work |
 | 43 | Brand narrative + sprites | chain/10-brand-narrative | — | — | — | pending |
 
 (#42 hosted demo deferred: requires domain ownership + cloud account credentials.)
 
 ## Brand pivot
 
-Mario theme replaced with **Arctic / Permafrost** theme per maintainer decision (better for the brand, zero IP risk, native to "frozen capital" tagline). Cast:
+Mario theme replaced with **Arctic / Permafrost** theme per maintainer decision. Cast:
 
 - 🐻 **Pole the polar bear (Captain)** — operator avatar, top of pyramid
-- 🐧 **Penguin** (color-variant scarves) — strategy agents
+- 🐧 **Penguin traders** — strategy agents
 - 🦄 **Narwhals** — LLM advisors whispering decisions
 - 🦉 **Aurora (snowy owl)** — risk monitor
 - 🦦 **Skipper (husky)** — reconciliation runner
-- 🦣 **Kelp (walrus)** — swap router
 - 🐙 **Frostbite (kraken)** — killswitch
 - 🦣 **Tusk (mammoth)** — operator's gitignored private strategies
-- 🪙 **Coins** — accumulated PnL (kept the universal term)
 
-Mario Kart-style cute pixel-art SVGs, hand-authored. Will be applied to epic #30, #41, #43 once textual chain ships.
+Mario Kart-style cute pixel-art SVGs, hand-authored. Will be applied in chain/09 (#41).
+
+## Audit fixes applied to PR chain so far
+
+- **PR #44** added safer wallet-import flow (file-based hex), corrected `--confirm-live` placement, added daemon-supervisor live-mode caveat, +`env.local` gitignore catch.
+- **PR #45** added explicit HTTP client timeout (TLS-handshake hang protection), switched Solana to `getSlot` (commercial-provider compatibility), added 6 httptest-based coverage tests for the HTTP check paths.
+- **PR #46** clean — no findings beyond accepted trade-offs (passphrase echoed once, no pre-flight write check).
 
 ## Credential coverage
 
