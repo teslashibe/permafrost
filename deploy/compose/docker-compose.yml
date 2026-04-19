@@ -60,6 +60,27 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # CLI convenience service. Not started by default (profile: cli).
+  # Usage:
+  #   docker compose -f deploy/compose/docker-compose.yml --profile cli \
+  #     run --rm cli agent list
+  # Mounts the operator's keystore + config from the host so commands work
+  # without having to copy them into the container. Override with env vars
+  # if you keep them elsewhere.
+  cli:
+    image: ${PERMAFROST_IMAGE:-permafrost:latest}
+    profiles: [cli]
+    depends_on:
+      timescale:
+        condition: service_healthy
+    entrypoint: ["permafrost"]
+    environment:
+      PERMAFROST_DATABASE__URL: postgres://permafrost:permafrost@timescale:5432/permafrost?sslmode=disable
+      PERMAFROST_LOGGING__LEVEL: ${PERMAFROST_LOGGING__LEVEL:-warn}
+      PERMAFROST_KEYSTORE_PASSPHRASE: ${PERMAFROST_KEYSTORE_PASSPHRASE:-}
+    volumes:
+      - ${PERMAFROST_CONFIG_DIR:-./.permafrost-cli}:/etc/permafrost:ro
+
 volumes:
   timescale_data:
     name: permafrost_timescale_data

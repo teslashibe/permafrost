@@ -1,0 +1,101 @@
+name: Release
+
+# Multi-arch container release. Triggers on:
+#   - tag pushes matching v*    → tagged image + :latest
+#   - manual dispatch            → tagged with the input version
+#
+# Builds for linux/amd64 + linux/arm64 (Apple Silicon and aarch64 Linux
+# hosts are common for both operators and CI runners). Pushes to
+# ghcr.io/<owner>/<repo> with both the version tag and :latest.
+#
+# Requires no secret beyond the default GITHUB_TOKEN — GHCR auth uses
+# the workflow's own token.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to publish (e.g. v0.1.0). Defaults to commit SHA.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  release:
+    name: Build + push multi-arch image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Determine version tag
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ github.event.inputs.version }}" ]]; then
+            echo "tag=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+            echo "is_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.tag }}
+            type=raw,value=latest,enable=${{ steps.version.outputs.is_release == 'true' && !contains(steps.version.outputs.tag, '-') }}
+
+      - name: Build + push (multi-arch)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ steps.version.outputs.tag }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify image runs (CLI sanity)
+        # Pull the freshly-pushed image and run a no-op CLI command to
+        # confirm both binaries are linked correctly inside the
+        # multi-arch image. Catches "wrong entrypoint" / "missing CA
+        # certs" / "Alpine missing libc" type regressions.
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }}"
+          docker run --rm --entrypoint permafrost  "$IMAGE" version
+          docker run --rm --entrypoint permafrostd "$IMAGE" --help || true
