@@ -251,7 +251,16 @@ img { -webkit-user-drag: none; user-select: none; }
 .actor img {
   display: block;
   image-rendering: pixelated;
+  /* Don't let the IMG eat the parent's pointer events -- if it does,
+   * the user can't drag-from-the-img and we lose the drag handle. */
+  pointer-events: none;
 }
+
+/* Draggable actor affordance: cursor: grab on hover, slight lift on
+ * hover so the sprite reads as "grabbable". Skipper (running-across)
+ * is NOT draggable so this never applies to him. */
+.actor.draggable      { cursor: grab; }
+.actor.draggable:hover { filter: drop-shadow(0 6px 10px rgba(80,210,194,0.45)); }
 
 /* Workstation -- small ice block under each penguin agent so they
  * look like they're standing at a trading desk rather than floating. */

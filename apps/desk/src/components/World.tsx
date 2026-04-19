@@ -171,9 +171,12 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
           nameplate={`${a.name || a.id.slice(0, 12)} - ${a.strategy}`}
           speech={speeches[a.id]}
           zIndex={20}
+          dragId={`actor:penguin:${a.id}`}
         />
         {/* Permanent narwhal companion for LLM-using strategies,
-            floating in the sky above the workstation. */}
+            floating in the sky above the workstation. Draggable
+            independently -- if the user drags the penguin, the
+            narwhal stays where the user puts it (and vice versa). */}
         {usesLLM && (
           <Actor
             name="narwhal"
@@ -183,6 +186,7 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
             state="perched"
             nameplate={`${a.name || a.id.slice(0, 12)}'s LLM advisor`}
             zIndex={19}
+            dragId={`actor:narwhal:${a.id}`}
           />
         )}
       </React.Fragment>
@@ -198,7 +202,8 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
 
       {/* === permanent characters === */}
 
-      {/* Pole the Polar Bear sits stage-left, watches the camp. */}
+      {/* Pole the Polar Bear sits stage-left, watches the camp.
+          Draggable. */}
       <Actor
         name="pole"
         x={12}
@@ -207,10 +212,11 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
         state="idle"
         nameplate="Pole the Polar Bear"
         zIndex={25}
+        dragId="actor:pole"
       />
 
       {/* Aurora the snowy owl floats high above the right side of
-          the ice (no iceberg perch any more -- she just hovers). */}
+          the ice. Draggable. */}
       <Actor
         name="owl"
         x={87}
@@ -219,9 +225,11 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
         state={`perched ${alertActive ? 'alert' : ''}`}
         nameplate={alertActive ? 'Aurora is ALERT' : 'Aurora is watching'}
         zIndex={26}
+        dragId="actor:owl"
       />
 
-      {/* Kelp the walrus on a small ice patch in front of Pole. */}
+      {/* Kelp the walrus on a small ice patch in front of Pole.
+          Draggable. */}
       <Actor
         name="walrus"
         x={23}
@@ -230,6 +238,7 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
         state="idle"
         nameplate="Kelp - swap router"
         zIndex={22}
+        dragId="actor:walrus"
       />
 
       {/* Skipper trots rightward forever via a single infinite CSS
@@ -285,7 +294,7 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
 
       {/* Tusk lurks at the back-right of the ice IF a private strategy
           is registered. Maintainer easter egg -- visible only on
-          the maintainer's local build. */}
+          the maintainer's local build. Draggable. */}
       {agents.some(a => a.strategy === 'funding_arb_basic') && (
         <Actor
           name="mammoth"
@@ -295,6 +304,7 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
           state="idle"
           nameplate="Tusk - private"
           zIndex={15}
+          dragId="actor:tusk"
         />
       )}
 

@@ -35,7 +35,7 @@ const DragHandle: React.FC = () => (
 export const VaultHud: React.FC<{ navUSD: number; drawdownPct?: number }> = ({
   navUSD, drawdownPct = 0,
 }) => {
-  const drag = useDraggable('vault');
+  const drag = useDraggable('hud:vault');
   const coinCount = Math.max(1, Math.min(16, Math.round(navUSD / 100)));
   const inDrawdown = drawdownPct > 0.05;
   return (
@@ -70,7 +70,7 @@ const STATUS_COLOUR: Record<Agent['status'], string> = {
 };
 
 export const AgentLegendHud: React.FC<{ agents: Agent[] }> = ({ agents }) => {
-  const drag = useDraggable('legend');
+  const drag = useDraggable('hud:legend');
   return (
     <div ref={drag.ref} className="hud legend" style={drag.style}>
       <h3 {...drag.handleProps}>Camp roster<DragHandle /></h3>
@@ -105,7 +105,7 @@ export const AgentLegendHud: React.FC<{ agents: Agent[] }> = ({ agents }) => {
 // Fixed height so the panel doesn't grow as more decisions arrive
 // (the body scrolls instead).
 export const DecisionLogHud: React.FC<{ decisions: DecisionLite[] }> = ({ decisions }) => {
-  const drag = useDraggable('log');
+  const drag = useDraggable('hud:log');
   return (
     <div ref={drag.ref} className="hud log" style={drag.style}>
       <h3 {...drag.handleProps}>Decision log<DragHandle /></h3>
@@ -152,7 +152,7 @@ const CAST_ENTRIES: Array<{ name: import('./Sprite').CharacterName; label: strin
 ];
 
 export const CastHud: React.FC = () => {
-  const drag = useDraggable('cast');
+  const drag = useDraggable('hud:cast');
   return (
     <div ref={drag.ref} className="hud cast" style={drag.style}>
       <h3 {...drag.handleProps}>The expedition<DragHandle /></h3>

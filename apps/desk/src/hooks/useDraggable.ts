@@ -39,11 +39,14 @@ export interface DraggableHandle {
 }
 
 export function useDraggable(id: string): DraggableHandle {
-  const storageKey = `permafrost-desk:hud:${id}`;
+  // Caller passes a fully-qualified id including its namespace
+  // (e.g. "hud:vault", "actor:pole", "actor:penguin:ag-pip-01") so
+  // sprites and HUDs can share this hook without colliding.
+  const storageKey = id ? `permafrost-desk:${id}` : '';
   const ref = useRef<HTMLDivElement>(null);
 
   const [pos, setPos] = useState<Pos | null>(() => {
-    if (typeof window === 'undefined') return null;
+    if (!id || typeof window === 'undefined') return null;
     try {
       const raw = localStorage.getItem(storageKey);
       if (!raw) return null;
@@ -121,16 +124,21 @@ export function useDraggable(id: string): DraggableHandle {
 
   // Persist whenever the user-set position changes.
   useEffect(() => {
-    if (pos === null) return;
+    if (!id || pos === null) return;
     try {
       localStorage.setItem(storageKey, JSON.stringify(pos));
     } catch {
       /* ignore */
     }
-  }, [pos, storageKey]);
+  }, [pos, storageKey, id]);
 
+  // When pos is set, override the host element's transform too.
+  // Actors use `transform: translate(-50%, -50%)` to centre on their
+  // (x%, y%) position; without overriding that, a dragged actor would
+  // jump by half its size on the first move. Setting transform: none
+  // makes the user-set top/left the literal top-left of the element.
   const style: React.CSSProperties = pos
-    ? { top: pos.top, left: pos.left, right: 'auto', bottom: 'auto' }
+    ? { top: pos.top, left: pos.left, right: 'auto', bottom: 'auto', transform: 'none' }
     : {};
 
   return {
@@ -138,7 +146,7 @@ export function useDraggable(id: string): DraggableHandle {
     style,
     handleProps: {
       onPointerDown,
-      style: { cursor: 'move', userSelect: 'none', touchAction: 'none' },
+      style: { cursor: 'grab', userSelect: 'none', touchAction: 'none' },
     },
   };
 }
