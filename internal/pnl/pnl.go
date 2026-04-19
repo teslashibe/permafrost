@@ -196,9 +196,9 @@ func (e *Engine) valueOne(ctx context.Context, p types.BasisPosition, perpBySymb
 
 	// Spot leg valuation: quote token → USDC at current price.
 	// Spot quantity (in tokens) is approximated as the perp leg's size,
-	// matching funding_arb_basic's delta-neutral 1:1 sizing. The strategy
-	// always holds spot_qty ≈ perp_size; if they diverge in future
-	// strategies we'll thread a real BaseQty through BasisLeg.
+	// matching the delta-neutral 1:1 sizing assumption: a basis-style
+	// strategy is expected to hold spot_qty ≈ perp_size. If a future
+	// strategy diverges from this, thread a real BaseQty through BasisLeg.
 	v.SpotQty = perpLeg.Qty
 	swapVenue := e.SwapVenueFor(spotLeg.Asset.Chain)
 	gotSpotMark := false

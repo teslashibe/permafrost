@@ -31,3 +31,25 @@ jobs:
 
       - name: test
         run: go test ./... -race -count=1
+
+  no-tracked-private-strategies:
+    # Guards the gitignored-private-strategies contract: the public
+    # repo must never have strategies/private/ or any strategies_local.go
+    # tracked in git. A `git add -f` slip would bypass .gitignore and
+    # leak alpha. CI fails this job if it happens.
+    name: contract — no tracked private strategies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: assert
+        run: |
+          set -euo pipefail
+          leaks=$(git ls-files | grep -E '^(strategies/private/|cmd/permafrost(d)?/strategies_local\.go$)' || true)
+          if [ -n "$leaks" ]; then
+            echo "ERROR: private strategy paths are tracked in git but should be gitignored:" >&2
+            echo "$leaks" >&2
+            echo "" >&2
+            echo "Either add them to .gitignore or move them out of strategies/private/." >&2
+            exit 1
+          fi
+          echo "OK: no tracked private strategy paths."

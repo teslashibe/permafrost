@@ -504,8 +504,8 @@ func (r *Runtime) reconcileOpenBasis(ctx context.Context, now time.Time, decisio
 
 	// Closes first — for any reduce-only order where we already track an
 	// open basis on that BasisKey (or perp symbol fallback), drop it.
-	// This matches funding_arb_basic's closeIntents shape (reduce-only
-	// buy + spot→USDC swap).
+	// This is the framework-side mirror of a typical basis-strategy close
+	// (reduce-only buy + spot→USDC swap).
 	for _, o := range dec.Orders {
 		if !o.ReduceOnly {
 			continue

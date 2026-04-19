@@ -19,9 +19,9 @@ import (
 // FundingTick is one observation in the input series.
 //
 // MarkPrice is optional; if zero, MarketSnapshotAt fills in a sentinel
-// $1.00 mark so strategies that gate on mark price (e.g. funding_arb_basic
-// which sizes perp legs as cap_usdc / mark) keep working in synthetic
-// backtests. Real CSVs from venue history should include the mark.
+// $1.00 mark so strategies that gate on mark price (e.g. ones that size
+// perp legs as cap_usdc / mark) keep working in synthetic backtests.
+// Real CSVs from venue history should include the mark.
 type FundingTick struct {
 	Time      time.Time
 	Symbol    string

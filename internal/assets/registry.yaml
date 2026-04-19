@@ -1,9 +1,10 @@
 # Permafrost asset registry — curated mapping between Hyperliquid perp
-# symbols and Solana spot mints used by funding-arb strategies.
+# symbols and on-chain spot mints used by basis-style (delta-neutral)
+# strategies.
 #
-# Entries here are the SOURCE OF TRUTH for what `funding_arb_basic` may
-# trade. Adding an entry here makes that token tradable; removing it stops
-# new positions (existing positions still unwind normally).
+# Entries here are the SOURCE OF TRUTH for what those strategies may
+# trade. Adding an entry here makes that token tradable; removing it
+# stops new positions (existing positions still unwind normally).
 #
 # Operators MUST verify each spot.mint against on-chain records (Solscan,
 # Jupiter token list) before going live. A wrong mint will result in trading
