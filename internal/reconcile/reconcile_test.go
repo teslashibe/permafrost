@@ -8,6 +8,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"github.com/teslashibe/permafrost/internal/exchange"
 	"github.com/teslashibe/permafrost/internal/swap"
 	"github.com/teslashibe/permafrost/pkg/types"
 )
@@ -42,6 +43,9 @@ func (s *stubPerp) Place(_ context.Context, _ types.OrderIntent) (types.OrderAck
 	return types.OrderAck{}, nil
 }
 func (s *stubPerp) Cancel(_ context.Context, _ types.OrderID) error { return nil }
+func (s *stubPerp) OpenOrders(_ context.Context) ([]exchange.OpenOrder, error) {
+	return nil, nil
+}
 
 type stubSwap struct {
 	chain   types.ChainID

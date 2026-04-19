@@ -21,4 +21,10 @@ import (
 type Engine interface {
 	PreTrade(ctx context.Context, agentID string, intent any, snap types.PortfolioSnapshot) types.Verdict
 	Portfolio(ctx context.Context, snap types.PortfolioSnapshot) types.Verdict
+	// Limits returns the hard limits this engine enforces. Used by
+	// non-trade callers (e.g. the kill switch) that need to consult
+	// the agent's risk envelope without going through PreTrade —
+	// for example, to size a liquidation swap inside the agent's
+	// max_spot_slippage_bps tolerance.
+	Limits() types.RiskLimits
 }
