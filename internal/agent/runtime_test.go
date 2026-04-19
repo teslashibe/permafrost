@@ -2,17 +2,20 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/shopspring/decimal"
 
+	"github.com/teslashibe/permafrost/internal/assets"
 	exchangenoop "github.com/teslashibe/permafrost/internal/exchange/noop"
 	"github.com/teslashibe/permafrost/internal/risk"
-	"github.com/teslashibe/permafrost/internal/strategy"
 	"github.com/teslashibe/permafrost/internal/swap"
 	swapnoop "github.com/teslashibe/permafrost/internal/swap/noop"
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/inference"
+	"github.com/teslashibe/permafrost/pkg/strategy"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // risknew is a small helper for runtime tests: builds a risk.Policy with
@@ -363,4 +366,121 @@ func TestRuntime_StartStop(t *testing.T) {
 	if r.IsRunning() {
 		t.Fatal("expected stopped")
 	}
+}
+
+// recordingStrategy counts Warmup calls and records the WarmupInput it
+// received, so tests can assert that the runtime invokes Warmup exactly
+// once and populates Services correctly.
+type recordingStrategy struct {
+	name        string
+	warmupCalls int
+	warmupIn    strategy.WarmupInput
+	warmupErr   error
+	decision    strategy.Decision
+}
+
+func (s *recordingStrategy) Name() string { return s.name }
+func (s *recordingStrategy) Warmup(_ context.Context, in strategy.WarmupInput) error {
+	s.warmupCalls++
+	s.warmupIn = in
+	return s.warmupErr
+}
+func (s *recordingStrategy) Decide(_ context.Context, _ strategy.DecisionInput) (strategy.Decision, error) {
+	return s.decision, nil
+}
+
+// TestRuntime_WarmupCalledExactlyOnce_ViaTickOnce verifies the runtime
+// invokes Strategy.Warmup before the first decision even when the caller
+// drives ticks directly via TickOnce (the foreground `agent run` and
+// `agent tick` paths) and never invokes Start.
+func TestRuntime_WarmupCalledExactlyOnce_ViaTickOnce(t *testing.T) {
+	strat := &recordingStrategy{name: "rec"}
+	a := Agent{ID: "ag-warmup", Strategy: "rec", Universe: []string{"WIF", "BONK"}, Mode: ModePaper}
+	r := NewRuntime(a, Deps{Strategy: strat})
+
+	for i := 0; i < 3; i++ {
+		if _, err := r.TickOnce(context.Background()); err != nil {
+			t.Fatalf("tick %d: %v", i, err)
+		}
+	}
+	if strat.warmupCalls != 1 {
+		t.Fatalf("Warmup should be called exactly once across multiple ticks, got %d", strat.warmupCalls)
+	}
+	if strat.warmupIn.AgentID != "ag-warmup" {
+		t.Errorf("WarmupInput.AgentID: got %q want ag-warmup", strat.warmupIn.AgentID)
+	}
+	if got := strat.warmupIn.Universe; len(got) != 2 || got[0] != "WIF" || got[1] != "BONK" {
+		t.Errorf("WarmupInput.Universe: got %v want [WIF BONK]", got)
+	}
+	if strat.warmupIn.Services.Logger == nil {
+		t.Error("WarmupInput.Services.Logger should be non-nil (defaulted to slog.Default)")
+	}
+}
+
+// TestRuntime_WarmupSurfacesError ensures a Warmup that returns an error
+// causes every TickOnce to fail with the same wrapped error (sync.Once
+// caches the result).
+func TestRuntime_WarmupSurfacesError(t *testing.T) {
+	want := errors.New("boom")
+	strat := &recordingStrategy{name: "rec", warmupErr: want}
+	a := Agent{ID: "ag-warmup-err", Strategy: "rec", Mode: ModePaper}
+	r := NewRuntime(a, Deps{Strategy: strat})
+
+	_, err1 := r.TickOnce(context.Background())
+	_, err2 := r.TickOnce(context.Background())
+	if err1 == nil || err2 == nil {
+		t.Fatalf("both ticks should fail when Warmup errors; got %v / %v", err1, err2)
+	}
+	if !errors.Is(err1, want) || !errors.Is(err2, want) {
+		t.Errorf("ticks should wrap the original Warmup error; got %v / %v", err1, err2)
+	}
+	if strat.warmupCalls != 1 {
+		t.Errorf("Warmup should still only run once on error path, got %d calls", strat.warmupCalls)
+	}
+}
+
+// TestRuntime_Services_PopulatedFromDeps verifies Services fields land
+// in WarmupInput exactly as Deps was constructed. This is the regression
+// test for the audit's H1 finding: an inference Provider supplied to
+// Deps must surface as Services.Inference (and similarly for Registry +
+// InferenceModel).
+func TestRuntime_Services_PopulatedFromDeps(t *testing.T) {
+	strat := &recordingStrategy{name: "rec"}
+	a := Agent{ID: "ag-svc", Strategy: "rec", Mode: ModePaper}
+
+	wantInf := mockInferenceProvider{name: "mock"}
+	wantReg := assets.Registry{Version: 1, Assets: []assets.Asset{{Symbol: "WIF"}}}
+	r := NewRuntime(a, Deps{
+		Strategy:       strat,
+		Inference:      wantInf,
+		InferenceModel: "claude-sonnet-4.5",
+		Registry:       wantReg,
+	})
+
+	if _, err := r.TickOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	svc := strat.warmupIn.Services
+	if svc.Inference == nil || svc.Inference.Name() != "mock" {
+		t.Errorf("Services.Inference: want non-nil mock, got %+v", svc.Inference)
+	}
+	if svc.InferenceModel != "claude-sonnet-4.5" {
+		t.Errorf("Services.InferenceModel: got %q want claude-sonnet-4.5", svc.InferenceModel)
+	}
+	if svc.Registry.Version != 1 || len(svc.Registry.Assets) != 1 {
+		t.Errorf("Services.Registry not propagated: got %+v", svc.Registry)
+	}
+}
+
+// mockInferenceProvider satisfies pkg/inference.Provider with no real
+// behaviour. Used in TestRuntime_Services_PopulatedFromDeps to verify
+// the runtime threads a Provider through to the strategy unchanged.
+type mockInferenceProvider struct{ name string }
+
+func (m mockInferenceProvider) Name() string { return m.name }
+func (m mockInferenceProvider) Complete(_ context.Context, _ inference.Request) (inference.Response, error) {
+	return inference.Response{}, nil
+}
+func (m mockInferenceProvider) Embed(_ context.Context, _ inference.EmbedRequest) (inference.EmbedResponse, error) {
+	return inference.EmbedResponse{}, nil
 }

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 func TestNewEVMSigner_DerivesSameAddressAsHL(t *testing.T) {

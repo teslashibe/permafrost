@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	exchangenoop "github.com/teslashibe/permafrost/internal/exchange/noop"
-	"github.com/teslashibe/permafrost/internal/strategy"
+	"github.com/teslashibe/permafrost/pkg/strategy"
 )
 
 type stubStrategy struct{}

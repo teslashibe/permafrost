@@ -1,6 +1,6 @@
 package openai
 
-import "github.com/teslashibe/permafrost/internal/inference"
+import "github.com/teslashibe/permafrost/pkg/inference"
 
 // NewProvider adapts Client to the inference.ProviderFactory signature so it
 // can be passed to inference.NewRegistry without creating an import cycle.

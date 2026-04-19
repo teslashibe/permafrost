@@ -1,7 +1,7 @@
 // Package vault models the off-chain accounting layer: deposits,
 // withdrawals, lockups, and NAV snapshots. v1 is single-asset (USDC) and
 // single-vault per deployment; the multi-asset / multi-tenant story is v2
-// (see SCOPE.md §15).
+// (out of scope for v1; on-chain vault contracts are deferred to v2).
 package vault
 
 import (

@@ -6,7 +6,7 @@ import (
 	"context"
 
 	"github.com/teslashibe/permafrost/internal/risk"
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // Engine allows every intent and reports the portfolio as healthy.

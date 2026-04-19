@@ -6,8 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/teslashibe/permafrost/internal/inference"
-	"github.com/teslashibe/permafrost/internal/inference/openai"
+	"github.com/teslashibe/permafrost/pkg/inference"
+	"github.com/teslashibe/permafrost/pkg/inference/openai"
 )
 
 func init() { addCommandFactory(newInferenceCmd) }

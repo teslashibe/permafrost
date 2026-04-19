@@ -5,7 +5,7 @@ package noop
 import (
 	"context"
 
-	"github.com/teslashibe/permafrost/internal/strategy"
+	"github.com/teslashibe/permafrost/pkg/strategy"
 )
 
 // Name is the registered identifier for this strategy.

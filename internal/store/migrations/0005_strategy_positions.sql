@@ -1,7 +1,7 @@
 -- +goose Up
 -- +goose StatementBegin
 
--- Strategy-level paired positions (e.g. funding-arb basis).
+-- Strategy-level paired positions (e.g. delta-neutral basis: long spot + short perp).
 -- One row per opened basis; state transitions to 'closed' on unwind.
 -- Per-leg detail (orders, fills, swaps) lives in those tables and joins
 -- back via decision_id. Realised fees / funding / basis-pnl roll up here.

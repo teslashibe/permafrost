@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/teslashibe/permafrost/internal/config"
-	"github.com/teslashibe/permafrost/internal/inference"
+	"github.com/teslashibe/permafrost/pkg/inference"
 )
 
 // stubProvider records calls and lets tests assert on construction args.

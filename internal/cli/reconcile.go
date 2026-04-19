@@ -13,6 +13,8 @@ import (
 	"github.com/teslashibe/permafrost/internal/agent"
 	"github.com/teslashibe/permafrost/internal/assets"
 	"github.com/teslashibe/permafrost/internal/reconcile"
+	"github.com/teslashibe/permafrost/pkg/inference"
+	"github.com/teslashibe/permafrost/pkg/inference/openai"
 )
 
 func init() { addCommandFactory(newReconcileCmd) }
@@ -67,10 +69,11 @@ CI job.`,
 				return err
 			}
 			ks, _ := openKeystore(c) // best-effort
+			infReg, _ := inference.NewRegistry(g.Config.Inference, openai.NewProvider)
 
 			combined := reconcile.Report{}
 			for _, a := range agents {
-				deps, err := agent.BuildDeps(a, reg, s, ks, g.Log, agent.BuildOptions{
+				deps, err := agent.BuildDeps(a, reg, s, ks, infReg, g.Log, agent.BuildOptions{
 					Solana: solanaSpotFromConfig(g.Config.Solana),
 					EVM:    evmSpotsFromConfig(g.Config.EVM, os.Getenv),
 				})

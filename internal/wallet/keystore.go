@@ -16,7 +16,7 @@ import (
 
 	"golang.org/x/crypto/scrypt"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 const (

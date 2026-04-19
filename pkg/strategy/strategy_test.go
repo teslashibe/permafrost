@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/teslashibe/permafrost/internal/strategy"
-	_ "github.com/teslashibe/permafrost/internal/strategy/noop"
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/strategy"
+	_ "github.com/teslashibe/permafrost/strategies/noop"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 func TestRegistry(t *testing.T) {

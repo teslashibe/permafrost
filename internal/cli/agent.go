@@ -21,8 +21,9 @@ import (
 	"github.com/teslashibe/permafrost/internal/exchange"
 	exchangenoop "github.com/teslashibe/permafrost/internal/exchange/noop"
 	"github.com/teslashibe/permafrost/internal/store"
-	fab "github.com/teslashibe/permafrost/internal/strategy/funding_arb_basic"
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/inference"
+	"github.com/teslashibe/permafrost/pkg/inference/openai"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 func init() { addCommandFactory(newAgentCmd) }
@@ -39,11 +40,48 @@ func newAgentCmd() *cobra.Command {
 		newAgentDecisionsCmd(),
 		newAgentSetModeCmd(),
 		newAgentSetNetworkCmd(),
+		newAgentStartCmd(),
 		newAgentStopCmd(),
 		newAgentTickCmd(),
 		newAgentRunCmd(),
 	)
 	return cmd
+}
+
+// newAgentStartCmd persists status='running' so the daemon supervisor
+// (`permafrost serve`) picks the agent up on its next loader pass and on
+// every subsequent restart. This is the canonical "turn this agent on"
+// command for production use; `agent run` is the foreground equivalent
+// for paper-mode iteration in a single shell.
+func newAgentStartCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "start <id>",
+		Short: "Mark an agent as running so `permafrost serve` will start it",
+		Long: `Sets the agent's persisted status to 'running'. The next loader pass in
+the daemon (` + "`permafrost serve`" + `) will pick it up; on subsequent daemon
+restarts it auto-resumes.
+
+For one-off paper-mode iteration in a single shell (no daemon), use
+` + "`permafrost agent run <id>`" + ` instead — that runs the tick loop
+in the foreground and exits on SIGINT.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			st, db, err := openAgentStore(c)
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+			a, err := st.Get(c.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			if err := st.SetStatus(c.Context(), a.ID, agent.StatusRunning); err != nil {
+				return err
+			}
+			fmt.Printf("agent %s status -> running (will start on next `permafrost serve`)\n", a.ID)
+			return nil
+		},
+	}
 }
 
 func newAgentSetNetworkCmd() *cobra.Command {
@@ -211,7 +249,7 @@ testnet data (e.g. while developing a live-mode signing flow).`,
 	}
 	cmd.Flags().StringVar(&id, "id", "", "agent id (defaults to a generated value)")
 	cmd.Flags().StringVar(&name, "name", "", "human-readable label")
-	cmd.Flags().StringVar(&strategy, "strategy", "funding_arb_basic", "registered strategy name")
+	cmd.Flags().StringVar(&strategy, "strategy", "noop", "registered strategy name")
 	cmd.Flags().StringVar(&perp, "perp", "hyperliquid", "perp venue")
 	cmd.Flags().StringVar(&spot, "spot", "jupiter", "spot venue")
 	cmd.Flags().StringVar(&inferenceRef, "inference", "", "inference provider:model (e.g. openrouter:anthropic/claude-sonnet-4.5)")
@@ -392,14 +430,19 @@ Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 				if _, err := ks.Signer(types.ChainHyperliquid); err != nil {
 					return fmt.Errorf("live mode requires a hyperliquid signer in the keystore: %w", err)
 				}
-				if isBasisStrategy(a.Strategy) {
+				// Basis-style strategies (those that need a spot leg) are
+				// identified by the agent's stored SpotVenue. If set, the
+				// runtime expects a Solana signer + RPC for the spot side.
+				// This is a property of the agent's wiring, not the strategy
+				// code, so the framework no longer special-cases by name.
+				if a.SpotVenue != "" {
 					if _, err := ks.Signer(types.ChainSolana); err != nil {
-						return fmt.Errorf("live mode for basis strategy %q requires a Solana signer: %w",
-							a.Strategy, err)
+						return fmt.Errorf("live mode for agent %q (spot_venue=%s) requires a Solana signer: %w",
+							a.ID, a.SpotVenue, err)
 					}
 					if g.Config.Solana.RPCURL == "" {
-						return fmt.Errorf("live mode for basis strategy %q requires solana.rpc_url in config",
-							a.Strategy)
+						return fmt.Errorf("live mode for agent %q (spot_venue=%s) requires solana.rpc_url in config",
+							a.ID, a.SpotVenue)
 					}
 				}
 			}
@@ -410,9 +453,13 @@ Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 			}
 			// Keystore is best-effort here; funding rates work without one.
 			ks, _ := openKeystore(c)
+			// Inference registry is best-effort: the agent may not need
+			// inference, in which case BuildDeps tolerates a nil registry.
+			// A configured-but-unresolvable provider still errors.
+			infReg, _ := inference.NewRegistry(g.Config.Inference, openai.NewProvider)
 			// Empty networkOverride lets the builder fall back to a.Network
 			// (which is the operator's stored choice, default mainnet).
-			deps, err := agent.BuildDeps(a, reg, st, ks, g.Log, agent.BuildOptions{
+			deps, err := agent.BuildDeps(a, reg, st, ks, infReg, g.Log, agent.BuildOptions{
 				HyperliquidNetwork: networkOverride,
 				HyperliquidAddress: hlAddress,
 				Solana:             solanaSpotFromConfig(g.Config.Solana),
@@ -507,11 +554,7 @@ func newAgentTickCmd() *cobra.Command {
 				return fmt.Errorf("agent %q is mode=%q; tick is only safe for paper", a.ID, a.Mode)
 			}
 
-			reg, err := assets.LoadEmbedded()
-			if err != nil {
-				return err
-			}
-			strat, err := agent.BuildStrategy(a, reg)
+			strat, err := agent.BuildStrategy(a)
 			if err != nil {
 				return err
 			}
@@ -608,18 +651,6 @@ func (v *tickFundingVenue) FundingRates(_ context.Context, _ []string) ([]types.
 
 // Compile-time check.
 var _ exchange.Venue = (*tickFundingVenue)(nil)
-
-// isBasisStrategy reports whether a strategy emits SwapIntents (and
-// therefore needs a working spot leg in live mode). Right now
-// funding_arb_basic is the only one, but new basis strategies should
-// register here.
-func isBasisStrategy(name string) bool {
-	switch name {
-	case fab.Name:
-		return true
-	}
-	return false
-}
 
 // solanaSpotFromConfig translates the cli config view into the agent
 // builder's view (the agent package can't import config without an

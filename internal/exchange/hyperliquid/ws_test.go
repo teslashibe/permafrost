@@ -3,7 +3,7 @@ package hyperliquid
 import (
 	"testing"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 func TestParseAllMids(t *testing.T) {

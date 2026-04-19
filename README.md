@@ -17,9 +17,11 @@
 
 ## Overview
 
-Permafrost is a self-custodied, locally-runnable trading protocol. It uses AI agents wrapped around deterministic strategy logic to capture yield from on-chain and off-chain markets while keeping spot custody fully self-hosted.
+Permafrost is a self-custodied, locally-runnable trading framework. It is an open agent runtime around the Strategy SAPI: write a deterministic Go strategy, register it, and the framework handles exchange adapters, swap routing, reconciliation, PnL accounting, risk gates, the killswitch, decision provenance, and LLM augmentation.
 
-The first agent — `funding_arb_basic` — captures perpetual funding by holding a spot position on a Solana DEX and shorting the matching perpetual on Hyperliquid, fully delta-neutral.
+Strategies are first-class extensions, not patches: each one lives as its own subdirectory under `strategies/`, calls `strategy.Register` in `init()`, and is enabled by adding one blank-import line to `cmd/permafrostd/strategies.go`. See the [strategy authors guide](https://teslashibe.github.io/permafrost/strategies/sapi) for the full extension flow.
+
+The framework ships with `noop` as the reference implementation. Real strategies — basis trades, market makers, anything you can express as Go — are yours to build, share, or keep private.
 
 > **Status:** MVP, single-operator, local-first. v2 will introduce hosted vaults with on-chain accounting.
 
@@ -27,9 +29,9 @@ The first agent — `funding_arb_basic` — captures perpetual funding by holdin
 
 ## Why Permafrost
 
-- **Self-custodied spot leg.** The long side of every trade is held in your own Solana wallet. No CEX can freeze, rehypothecate, or lose your tokens.
+- **Self-custodied spot leg.** The long side of every trade is held in your own wallet. No CEX can freeze, rehypothecate, or lose your tokens.
 - **AI agents, deterministic execution.** Strategies are deterministic Go code. The LLM augments — vetoing risky entries based on news, tuning thresholds — but never invents orders.
-- **Open source, local-first.** Clone, configure, and run. The same codebase will later power hosted vaults; today, it's yours.
+- **Open framework, your strategies.** Drop a folder in `strategies/`, register, build. Keep your code public, private, or somewhere in between. The framework doesn't care.
 - **Built for transparency.** Every decision the agent makes — including the exact prompt and model response — is persisted in TimescaleDB and joinable to the resulting orders.
 
 ---
@@ -45,7 +47,7 @@ The first agent — `funding_arb_basic` — captures perpetual funding by holdin
                 │  └──────────┘   └────────────┘  └────┬───┘  │
                 │                                       │      │
                 │  ┌──────────────────────────────┐    │      │
-                │  │  Strategy: funding_arb_basic │◄───┘      │
+                │  │  Strategy (your code)        │◄───┘      │
                 │  └──────┬─────────┬─────────┬───┘           │
                 │         │         │         │                │
                 │         ▼         ▼         ▼                │
@@ -69,7 +71,7 @@ The first agent — `funding_arb_basic` — captures perpetual funding by holdin
               └────────────────────────┘
 ```
 
-See [`SCOPE.md`](SCOPE.md) for the full architectural specification.
+For the full architectural specification, the agent runtime, the strategy SAPI, and operations guidance, see the [docs site](https://teslashibe.github.io/permafrost/).
 
 ---
 
@@ -105,13 +107,13 @@ make up                                      # bring up Timescale + permafrostd
 permafrost wallet import --chain solana --from <keypair.json>
 permafrost vault init
 permafrost agent create \
-    --strategy funding_arb_basic \
-    --perp hyperliquid --spot solana \
-    --universe wif,bonk,popcat \
-    --alloc 5000 \
-    --funding-entry-bps 50 --funding-exit-bps 10
+    --strategy noop \
+    --perp hyperliquid \
+    --alloc 5000
 permafrost agent start <id>
 ```
+
+The OSS build ships with `noop` registered; that's enough to confirm your install, database, and venue connections are working. To run a real strategy, see the [strategy authors guide](https://teslashibe.github.io/permafrost/strategies/sapi) — adding one is a folder + a registration call + one import line per binary.
 
 Default mode is `paper` — no real orders are placed until the agent is explicitly promoted to `live`.
 
@@ -147,8 +149,7 @@ permafrost serve
 | M7 | Vault & accounting | Planned |
 | M8 | Agent runtime | Planned |
 | M9 | Risk + circuit breakers + kill switch | Planned |
-| M10 | First strategy: `funding_arb_basic` | Planned |
-| M11 | Backtest harness | Planned |
+| M10 | Backtest harness | Planned |
 
 After v1: additional chains (Base, Arbitrum), auto-bridging via CCTP, hosted deployments, on-chain vault contracts, additional strategies.
 
@@ -170,7 +171,7 @@ A leveraged AI agent will absolutely try to nuke a vault if you let it. Permafro
 
 ## Contributing
 
-This is an open-source project and contributions are welcome. Please read [`SCOPE.md`](SCOPE.md) before opening a PR — it defines the framework boundaries we're working within for v1.
+This is an open-source project and contributions are welcome. Please read the [strategy authors guide](https://teslashibe.github.io/permafrost/strategies/sapi) (for new strategies) and the [architecture docs](https://teslashibe.github.io/permafrost/introduction/architecture) before opening a PR.
 
 ---
 

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // rpcURLForMainnet picks the RPC URL from env or a free public endpoint.

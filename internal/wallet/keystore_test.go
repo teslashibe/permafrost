@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 func TestLocalKeystore_RoundTrip(t *testing.T) {

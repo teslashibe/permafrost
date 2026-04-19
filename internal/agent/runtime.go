@@ -15,13 +15,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
+	"github.com/teslashibe/permafrost/internal/assets"
 	"github.com/teslashibe/permafrost/internal/exchange"
-	"github.com/teslashibe/permafrost/internal/inference"
 	"github.com/teslashibe/permafrost/internal/pnl"
 	"github.com/teslashibe/permafrost/internal/risk"
-	"github.com/teslashibe/permafrost/internal/strategy"
 	"github.com/teslashibe/permafrost/internal/swap"
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/inference"
+	"github.com/teslashibe/permafrost/pkg/strategy"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // Deps bundles the dependencies a Runtime needs to execute one Agent.
@@ -42,10 +43,21 @@ type Deps struct {
 	// downgrades that intent to paper-spot bookkeeping.
 	Swaps map[types.ChainID]swap.SwapVenue
 
+	// Inference is the resolved LLM Provider for this agent. nil when
+	// the agent has no inference configured (a.Inference == "") or
+	// when no inference Registry was supplied to BuildDeps.
 	Inference inference.Provider
-	Risk      risk.Engine
-	Store     *Store
-	Logger    *slog.Logger
+	// InferenceModel is the model id parsed from a.Inference (the part
+	// after ":"). Surfaced to strategies via Services so they can use
+	// the operator's chosen model as a default.
+	InferenceModel string
+	// Registry is the curated asset registry. Always non-nil when set
+	// by BuildDeps; surfaced to strategies via Services.
+	Registry assets.Registry
+
+	Risk   risk.Engine
+	Store  *Store
+	Logger *slog.Logger
 }
 
 // SwapVenueForChain returns the venue routed for the given chain or nil
@@ -66,6 +78,13 @@ type Runtime struct {
 	mu      sync.Mutex
 	running bool
 	cancel  context.CancelFunc
+
+	// warmupOnce guarantees Strategy.Warmup is invoked exactly once per
+	// Runtime regardless of which entrypoint runs first (Start, TickOnce
+	// from a foreground CLI, or a backtest/test harness). warmupErr
+	// captures the result so subsequent callers see the same outcome.
+	warmupOnce sync.Once
+	warmupErr  error
 
 	// openBasis tracks paper-mode (and to-be-fully-persisted live-mode)
 	// basis positions across ticks within a Run. Keyed by underlying symbol.
@@ -128,11 +147,49 @@ func (r *Runtime) Start(parent context.Context) error {
 	if r.running {
 		return errors.New("runtime: already running")
 	}
+	if err := r.Warmup(parent); err != nil {
+		return fmt.Errorf("runtime: strategy warmup: %w", err)
+	}
 	ctx, cancel := context.WithCancel(parent)
 	r.cancel = cancel
 	r.running = true
 	go r.loop(ctx)
 	return nil
+}
+
+// Warmup invokes Strategy.Warmup with the per-agent context and the
+// framework Services bag. It is safe and cheap to call multiple times:
+// the underlying invocation runs at most once per Runtime via sync.Once,
+// and subsequent calls return the cached error (nil on success).
+//
+// Start calls Warmup automatically. Foreground CLI paths (`agent run`,
+// `agent tick`) and any test harness that drives the runtime via
+// TickOnce should not need to call it explicitly — TickOnce performs
+// the same once-guarded call before the first decision so strategies
+// always see a Warmup-completed receiver. Calling Warmup directly is
+// useful when a caller wants to surface the error before the first tick.
+func (r *Runtime) Warmup(ctx context.Context) error {
+	r.warmupOnce.Do(func() {
+		r.warmupErr = r.deps.Strategy.Warmup(ctx, strategy.WarmupInput{
+			AgentID:        r.agent.ID,
+			Universe:       r.agent.Universe,
+			Config:         r.agent.Config,
+			Now:            r.now(),
+			Services:       r.services(),
+		})
+	})
+	return r.warmupErr
+}
+
+// services builds the Services bag the runtime exposes to the strategy.
+// Centralised so any future Service field gets wired in one place.
+func (r *Runtime) services() strategy.Services {
+	return strategy.Services{
+		Logger:         r.deps.Logger,
+		Inference:      r.deps.Inference,
+		InferenceModel: r.deps.InferenceModel,
+		Registry:       r.deps.Registry,
+	}
 }
 
 // Stop gracefully halts the tick loop. It does NOT change the persisted
@@ -174,6 +231,14 @@ func (r *Runtime) TickOnce(ctx context.Context) (strategy.Decision, error) {
 }
 
 func (r *Runtime) tickOnce(ctx context.Context) (strategy.Decision, error) {
+	if err := r.Warmup(ctx); err != nil {
+		// Warmup is once-guarded; the same error surfaces every tick
+		// until the operator restarts. Logged once at first occurrence
+		// would be ideal, but for v1 we accept the per-tick log so the
+		// failure stays visible in tail-the-log workflows.
+		r.deps.Logger.Error("strategy warmup failed", "agent_id", r.agent.ID, "err", err)
+		return strategy.Decision{}, fmt.Errorf("strategy warmup: %w", err)
+	}
 	now := r.now()
 	in, err := r.buildDecisionInput(ctx, now)
 	if err != nil {
@@ -313,7 +378,7 @@ func (r *Runtime) persistDecision(ctx context.Context, now time.Time, decisionID
 }
 
 // executeSwapsThenOrders runs swaps first (spot leg), then orders (perp leg)
-// — this is the spot-first invariant called for in SCOPE.md §11.
+// — this is the spot-first invariant the runtime guarantees.
 //
 // Each leg's success is tracked per-symbol so reconcileOpenBasis only
 // marks a basis "open" when BOTH legs succeeded. A failed swap or order
@@ -439,8 +504,8 @@ func (r *Runtime) reconcileOpenBasis(ctx context.Context, now time.Time, decisio
 
 	// Closes first — for any reduce-only order where we already track an
 	// open basis on that BasisKey (or perp symbol fallback), drop it.
-	// This matches funding_arb_basic's closeIntents shape (reduce-only
-	// buy + spot→USDC swap).
+	// This is the framework-side mirror of a typical basis-strategy close
+	// (reduce-only buy + spot→USDC swap).
 	for _, o := range dec.Orders {
 		if !o.ReduceOnly {
 			continue

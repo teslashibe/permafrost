@@ -7,7 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/teslashibe/permafrost/internal/exchange"
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // KillSwitchOptions controls the aggressiveness of an emergency stop.

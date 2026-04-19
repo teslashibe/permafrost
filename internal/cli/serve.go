@@ -15,6 +15,8 @@ import (
 	"github.com/teslashibe/permafrost/internal/assets"
 	"github.com/teslashibe/permafrost/internal/store"
 	"github.com/teslashibe/permafrost/internal/wallet"
+	"github.com/teslashibe/permafrost/pkg/inference"
+	"github.com/teslashibe/permafrost/pkg/inference/openai"
 )
 
 // newServeCmd returns the `permafrost serve` subcommand which runs the
@@ -82,11 +84,22 @@ func Serve(ctx context.Context, g *Globals, opts ServeOptions) error {
 		if err != nil {
 			g.Log.Warn("supervisor: load registry failed; agents will not start", "err", err)
 		} else {
+			// Inference is best-effort at the daemon level: the registry
+			// is built from config.yaml. Agents that don't reference any
+			// provider work fine with no inference configured. Agents
+			// that do reference one but find it missing will surface a
+			// clear error in BuildDeps.
+			infReg, infErr := inference.NewRegistry(g.Config.Inference, openai.NewProvider)
+			if infErr != nil {
+				g.Log.Warn("supervisor: inference registry build failed; agents that need inference will fail to start", "err", infErr)
+				infReg = nil
+			}
 			loader := &agent.Loader{
-				Store:    agent.NewStore(db.Pool),
-				Registry: reg,
-				Keystore: ks,
-				Logger:   g.Log,
+				Store:     agent.NewStore(db.Pool),
+				Registry:  reg,
+				Keystore:  ks,
+				Inference: infReg,
+				Logger:    g.Log,
 				BuildOpts: agent.BuildOptions{
 					HyperliquidNetwork: opts.HyperliquidNetworkOverride,
 					Solana:             solanaSpotFromConfig(g.Config.Solana),

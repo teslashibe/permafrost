@@ -42,10 +42,10 @@ type Quote struct {
 // the runtime for idempotency.
 //
 // BasisKey identifies the basis position this leg belongs to. Strategies
-// that emit paired swap+order intents (funding_arb_basic) set the same
-// BasisKey on both legs so the runtime can reconcile them — necessary
-// for multi-chain where the spot OutToken.Symbol (registry name like
-// "ETH-BASE") differs from the perp Symbol (HL name like "ETH").
+// that emit paired swap+order intents set the same BasisKey on both
+// legs so the runtime can reconcile them — necessary for multi-chain
+// where the spot OutToken.Symbol (registry name like "ETH-BASE")
+// differs from the perp Symbol (HL name like "ETH").
 type SwapIntent struct {
 	Chain        ChainID         `json:"chain"`
 	InToken      Asset           `json:"in_token"`

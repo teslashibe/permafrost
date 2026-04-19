@@ -12,7 +12,8 @@
 //	GET /approve/transaction          — calldata for an approve() to the router
 //
 // 1inch is mainnet-only. Testnet aggregator support does not exist;
-// see SCOPE.md for how we test (mock + mainnet-with-cap).
+// Tests use a mock 1inch HTTP server; live runs cap notional via
+// the per-agent risk limits.
 package oneinch
 
 import (

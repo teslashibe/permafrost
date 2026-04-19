@@ -1,6 +1,6 @@
 // Package assets owns the curated asset registry that maps a token to its
-// Hyperliquid perp symbol and Solana spot mint. It is the source of truth
-// for what funding-arb strategies may trade.
+// Hyperliquid perp symbol and on-chain spot mint(s). It is the source of
+// truth for what basis-style (delta-neutral) strategies may trade.
 //
 // The registry lives in registry.yaml. It is embedded into the binary so a
 // fresh deployment can boot without an external file; operators may also
@@ -17,7 +17,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // Asset is one fully-resolved registry entry.
@@ -80,7 +80,7 @@ func (r Registry) Get(symbol string) (Asset, bool) {
 }
 
 // Tradable returns the subset of assets that have both perp and spot legs
-// configured (the universe a funding-arb strategy may consider).
+// configured (the universe a basis-style strategy may consider).
 func (r Registry) Tradable() []Asset {
 	out := make([]Asset, 0, len(r.Assets))
 	for _, a := range r.Assets {

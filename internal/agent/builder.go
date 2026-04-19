@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -12,15 +13,14 @@ import (
 	"github.com/teslashibe/permafrost/internal/assets"
 	"github.com/teslashibe/permafrost/internal/exchange"
 	"github.com/teslashibe/permafrost/internal/exchange/hyperliquid"
-	"github.com/teslashibe/permafrost/internal/inference"
 	"github.com/teslashibe/permafrost/internal/risk"
-	"github.com/teslashibe/permafrost/internal/strategy"
-	fab "github.com/teslashibe/permafrost/internal/strategy/funding_arb_basic"
 	"github.com/teslashibe/permafrost/internal/swap"
 	"github.com/teslashibe/permafrost/internal/swap/jupiter"
 	"github.com/teslashibe/permafrost/internal/swap/oneinch"
-	"github.com/teslashibe/permafrost/internal/types"
 	"github.com/teslashibe/permafrost/internal/wallet"
+	"github.com/teslashibe/permafrost/pkg/inference"
+	"github.com/teslashibe/permafrost/pkg/strategy"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 // BuildDeps assembles dependencies for a single Agent's Runtime. It is the
@@ -46,12 +46,21 @@ func BuildDeps(
 	reg assets.Registry,
 	store *Store,
 	keystore wallet.Keystore,
+	infReg *inference.Registry,
 	log *slog.Logger,
 	opts BuildOptions,
 ) (Deps, error) {
-	strat, err := BuildStrategy(a, reg)
+	strat, err := BuildStrategy(a)
 	if err != nil {
 		return Deps{}, fmt.Errorf("strategy: %w", err)
+	}
+	// Resolve the inference provider for this agent. agent.Inference is
+	// a "provider:model" string; we look up the provider name in the
+	// global registry and surface both the resolved Provider and the
+	// model id to strategies via Services.
+	infProv, infModel, err := resolveInference(a.Inference, infReg)
+	if err != nil {
+		return Deps{}, fmt.Errorf("inference: %w", err)
 	}
 	// Resolve network: explicit override wins, else fall back to what the
 	// agent itself records, else default to mainnet (paper-safe by design).
@@ -107,13 +116,54 @@ func BuildDeps(
 	}
 
 	return Deps{
-		Strategy: strat,
-		Perp:     venue,
-		Swaps:    swaps,
-		Risk:     BuildRiskEngine(a),
-		Store:    store,
-		Logger:   log.With("agent_id", a.ID, "network", network, "mode", a.Mode),
+		Strategy:       strat,
+		Perp:           venue,
+		Swaps:          swaps,
+		Inference:      infProv,
+		InferenceModel: infModel,
+		Registry:       reg,
+		Risk:           BuildRiskEngine(a),
+		Store:          store,
+		Logger:         log.With("agent_id", a.ID, "network", network, "mode", a.Mode),
 	}, nil
+}
+
+// resolveInference parses the "provider:model" string stored on the agent
+// and looks the provider name up in the supplied registry. Returns
+// (nil, "", nil) when the agent has no inference configured (empty
+// string) — that's a normal state for strategies that don't need it.
+// A configured-but-unresolvable provider is an error so the operator
+// notices at agent-launch time instead of on the first decision tick.
+//
+// Spec for agent.Inference:
+//
+//	""                                  → no inference for this agent
+//	"openrouter"                        → provider=openrouter, model=""
+//	"openrouter:claude-sonnet-4.5"      → provider=openrouter, model="claude-sonnet-4.5"
+//	"openrouter:vendor/model:variant"   → provider=openrouter, model="vendor/model:variant"
+//	                                      (only the first ":" is the separator)
+func resolveInference(spec string, reg *inference.Registry) (inference.Provider, string, error) {
+	spec = strings.TrimSpace(spec)
+	if spec == "" {
+		return nil, "", nil
+	}
+	provName, model, _ := strings.Cut(spec, ":")
+	provName = strings.TrimSpace(provName)
+	model = strings.TrimSpace(model)
+	if provName == "" {
+		return nil, "", fmt.Errorf("agent.inference %q has empty provider name", spec)
+	}
+	if reg == nil {
+		// No registry was supplied (e.g. the operator didn't configure
+		// any inference providers in config.yaml). Surface a clear
+		// error rather than silently dropping the provider.
+		return nil, "", fmt.Errorf("agent has inference=%q but no inference providers are configured in config.yaml", spec)
+	}
+	prov, err := reg.Get(provName)
+	if err != nil {
+		return nil, "", fmt.Errorf("provider %q (from agent.inference=%q): %w", provName, spec, err)
+	}
+	return prov, model, nil
 }
 
 // BuildRiskEngine constructs a risk.Policy from the agent's persisted
@@ -287,23 +337,46 @@ func BuildEVMSwapVenue(chain types.ChainID, cfg EVMSpot, keystore wallet.Keystor
 	}, signer)
 }
 
-// BuildStrategy is the strategy-construction switch shared between the
-// foreground CLI and the supervisor. Currently funding_arb_basic is the
-// only strategy that needs the asset registry; everything else goes through
-// the generic strategy.Constructor registry.
-func BuildStrategy(a Agent, reg assets.Registry) (strategy.Strategy, error) {
-	switch a.Strategy {
-	case fab.Name:
-		cfg := fab.Config{Universe: a.Universe}
-		applyFundingArbConfig(a.Config, &cfg)
-		return fab.New(cfg, reg, inference.Provider(nil))
-	default:
-		ctor, err := strategy.Get(a.Strategy)
-		if err != nil {
-			return nil, err
-		}
-		return ctor(a.Config)
+// BuildStrategy constructs the strategy by name from the registry. It is a
+// pure registry lookup with no special-casing per strategy: each strategy
+// owns its own typed config parsing inside its Constructor and pulls
+// framework services (asset registry, inference, etc.) from WarmupInput
+// later. Adding a new strategy never requires editing this function.
+func BuildStrategy(a Agent) (strategy.Strategy, error) {
+	ctor, err := strategy.Get(a.Strategy)
+	if err != nil {
+		return nil, err
 	}
+	return ctor(a.Config)
+}
+
+// decimalFromAny converts a JSONB-decoded numeric value into a decimal.
+// Used by BuildRiskEngine and any other framework-side config parsing.
+func decimalFromAny(v any) (decimal.Decimal, error) {
+	switch x := v.(type) {
+	case float64:
+		return decimal.NewFromFloat(x), nil
+	case int:
+		return decimal.NewFromInt(int64(x)), nil
+	case int64:
+		return decimal.NewFromInt(x), nil
+	case string:
+		return decimal.NewFromString(x)
+	}
+	return decimal.Zero, fmt.Errorf("agent: unrecognised numeric type %T", v)
+}
+
+// intFromAny converts a JSONB-decoded numeric value into an int.
+func intFromAny(v any) (int, error) {
+	switch x := v.(type) {
+	case float64:
+		return int(x), nil
+	case int:
+		return x, nil
+	case int64:
+		return int(x), nil
+	}
+	return 0, fmt.Errorf("agent: unrecognised int type %T", v)
 }
 
 // BuildHyperliquidVenue assembles a Hyperliquid Venue. Address resolution:
@@ -341,67 +414,6 @@ func BuildHyperliquidVenue(keystore wallet.Keystore, opts BuildOptions) (exchang
 	}, venueOpts...)
 }
 
-// applyFundingArbConfig copies known keys from agents.config (jsonb) into
-// the typed funding_arb_basic Config struct. Unknown keys are ignored.
-func applyFundingArbConfig(cfg map[string]any, out *fab.Config) {
-	if v, ok := cfg["entry_annualised_funding"]; ok {
-		if d, err := decimalFromAny(v); err == nil {
-			out.EntryAnnualisedFunding = d
-		}
-	}
-	if v, ok := cfg["exit_annualised_funding"]; ok {
-		if d, err := decimalFromAny(v); err == nil {
-			out.ExitAnnualisedFunding = d
-		}
-	}
-	if v, ok := cfg["position_cap_usdc"]; ok {
-		if d, err := decimalFromAny(v); err == nil {
-			out.PositionCapUSDC = d
-		}
-	}
-	if v, ok := cfg["slippage_bps"]; ok {
-		if i, err := intFromAny(v); err == nil {
-			out.SlippageBps = i
-		}
-	}
-	if v, ok := cfg["use_llm_veto"]; ok {
-		if b, ok := v.(bool); ok {
-			out.UseLLMVeto = b
-		}
-	}
-	if v, ok := cfg["veto_model"]; ok {
-		if s, ok := v.(string); ok {
-			out.VetoModel = s
-		}
-	}
-}
-
-func decimalFromAny(v any) (decimal.Decimal, error) {
-	switch x := v.(type) {
-	case float64:
-		return decimal.NewFromFloat(x), nil
-	case int:
-		return decimal.NewFromInt(int64(x)), nil
-	case int64:
-		return decimal.NewFromInt(x), nil
-	case string:
-		return decimal.NewFromString(x)
-	}
-	return decimal.Zero, fmt.Errorf("agent: unrecognised numeric type %T", v)
-}
-
-func intFromAny(v any) (int, error) {
-	switch x := v.(type) {
-	case float64:
-		return int(x), nil
-	case int:
-		return x, nil
-	case int64:
-		return int(x), nil
-	}
-	return 0, fmt.Errorf("agent: unrecognised int type %T", v)
-}
-
 // Loader is a small helper used by the supervisor inside `serve` to start
 // every running agent on daemon boot. It is safe to call multiple times.
 //
@@ -414,6 +426,7 @@ type Loader struct {
 	Store      *Store
 	Registry   assets.Registry
 	Keystore   wallet.Keystore
+	Inference  *inference.Registry
 	Logger     *slog.Logger
 	BuildOpts  BuildOptions
 	Supervisor *Supervisor
@@ -444,7 +457,7 @@ func (l *Loader) LoadAndStartRunning(ctx context.Context) (int, error) {
 			l.Logger.Warn("loader: get agent failed", "agent_id", a.ID, "err", err)
 			continue
 		}
-		deps, err := BuildDeps(full, l.Registry, l.Store, l.Keystore, l.Logger, l.BuildOpts)
+		deps, err := BuildDeps(full, l.Registry, l.Store, l.Keystore, l.Inference, l.Logger, l.BuildOpts)
 		if err != nil {
 			l.Logger.Error("loader: build deps failed", "agent_id", full.ID, "err", err)
 			continue

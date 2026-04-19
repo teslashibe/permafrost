@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/teslashibe/permafrost/internal/types"
+	"github.com/teslashibe/permafrost/pkg/types"
 )
 
 const testAddr = "0x1111111111111111111111111111111111111111"
