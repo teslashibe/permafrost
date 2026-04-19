@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -17,6 +18,7 @@ import (
 	"github.com/teslashibe/permafrost/internal/swap/jupiter"
 	"github.com/teslashibe/permafrost/internal/swap/oneinch"
 	"github.com/teslashibe/permafrost/internal/wallet"
+	"github.com/teslashibe/permafrost/pkg/inference"
 	"github.com/teslashibe/permafrost/pkg/strategy"
 	"github.com/teslashibe/permafrost/pkg/types"
 )
@@ -44,6 +46,7 @@ func BuildDeps(
 	reg assets.Registry,
 	store *Store,
 	keystore wallet.Keystore,
+	infReg *inference.Registry,
 	log *slog.Logger,
 	opts BuildOptions,
 ) (Deps, error) {
@@ -51,11 +54,14 @@ func BuildDeps(
 	if err != nil {
 		return Deps{}, fmt.Errorf("strategy: %w", err)
 	}
-	// reg is held by the caller and consumed by strategies that load their
-	// own registry copy via assets.LoadEmbedded(); the framework no longer
-	// special-cases who needs it. Kept on the signature so callers don't
-	// have to thread separate parameters.
-	_ = reg
+	// Resolve the inference provider for this agent. agent.Inference is
+	// a "provider:model" string; we look up the provider name in the
+	// global registry and surface both the resolved Provider and the
+	// model id to strategies via Services.
+	infProv, infModel, err := resolveInference(a.Inference, infReg)
+	if err != nil {
+		return Deps{}, fmt.Errorf("inference: %w", err)
+	}
 	// Resolve network: explicit override wins, else fall back to what the
 	// agent itself records, else default to mainnet (paper-safe by design).
 	network := opts.HyperliquidNetwork
@@ -110,13 +116,54 @@ func BuildDeps(
 	}
 
 	return Deps{
-		Strategy: strat,
-		Perp:     venue,
-		Swaps:    swaps,
-		Risk:     BuildRiskEngine(a),
-		Store:    store,
-		Logger:   log.With("agent_id", a.ID, "network", network, "mode", a.Mode),
+		Strategy:       strat,
+		Perp:           venue,
+		Swaps:          swaps,
+		Inference:      infProv,
+		InferenceModel: infModel,
+		Registry:       reg,
+		Risk:           BuildRiskEngine(a),
+		Store:          store,
+		Logger:         log.With("agent_id", a.ID, "network", network, "mode", a.Mode),
 	}, nil
+}
+
+// resolveInference parses the "provider:model" string stored on the agent
+// and looks the provider name up in the supplied registry. Returns
+// (nil, "", nil) when the agent has no inference configured (empty
+// string) — that's a normal state for strategies that don't need it.
+// A configured-but-unresolvable provider is an error so the operator
+// notices at agent-launch time instead of on the first decision tick.
+//
+// Spec for agent.Inference:
+//
+//	""                                  → no inference for this agent
+//	"openrouter"                        → provider=openrouter, model=""
+//	"openrouter:claude-sonnet-4.5"      → provider=openrouter, model="claude-sonnet-4.5"
+//	"openrouter:vendor/model:variant"   → provider=openrouter, model="vendor/model:variant"
+//	                                      (only the first ":" is the separator)
+func resolveInference(spec string, reg *inference.Registry) (inference.Provider, string, error) {
+	spec = strings.TrimSpace(spec)
+	if spec == "" {
+		return nil, "", nil
+	}
+	provName, model, _ := strings.Cut(spec, ":")
+	provName = strings.TrimSpace(provName)
+	model = strings.TrimSpace(model)
+	if provName == "" {
+		return nil, "", fmt.Errorf("agent.inference %q has empty provider name", spec)
+	}
+	if reg == nil {
+		// No registry was supplied (e.g. the operator didn't configure
+		// any inference providers in config.yaml). Surface a clear
+		// error rather than silently dropping the provider.
+		return nil, "", fmt.Errorf("agent has inference=%q but no inference providers are configured in config.yaml", spec)
+	}
+	prov, err := reg.Get(provName)
+	if err != nil {
+		return nil, "", fmt.Errorf("provider %q (from agent.inference=%q): %w", provName, spec, err)
+	}
+	return prov, model, nil
 }
 
 // BuildRiskEngine constructs a risk.Policy from the agent's persisted
@@ -379,6 +426,7 @@ type Loader struct {
 	Store      *Store
 	Registry   assets.Registry
 	Keystore   wallet.Keystore
+	Inference  *inference.Registry
 	Logger     *slog.Logger
 	BuildOpts  BuildOptions
 	Supervisor *Supervisor
@@ -409,7 +457,7 @@ func (l *Loader) LoadAndStartRunning(ctx context.Context) (int, error) {
 			l.Logger.Warn("loader: get agent failed", "agent_id", a.ID, "err", err)
 			continue
 		}
-		deps, err := BuildDeps(full, l.Registry, l.Store, l.Keystore, l.Logger, l.BuildOpts)
+		deps, err := BuildDeps(full, l.Registry, l.Store, l.Keystore, l.Inference, l.Logger, l.BuildOpts)
 		if err != nil {
 			l.Logger.Error("loader: build deps failed", "agent_id", full.ID, "err", err)
 			continue

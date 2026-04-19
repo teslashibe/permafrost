@@ -94,7 +94,7 @@ func (v *Venue) Name() string         { return VenueName }
 func (v *Venue) Chain() types.ChainID { return v.signer.Chain() }
 
 // Quote requests a price quote from 1inch. Native gas tokens are not
-// supported in v1 — see SCOPE.md.
+// supported in v1 (gas-token wrapping deferred).
 func (v *Venue) Quote(ctx context.Context, req types.QuoteRequest) (types.Quote, error) {
 	if err := guardNative(req.InToken, req.OutToken); err != nil {
 		return types.Quote{}, err
@@ -291,7 +291,7 @@ func (v *Venue) ensureApproved(ctx context.Context, token types.Asset) error {
 
 func guardNative(in, out types.Asset) error {
 	if isNativeMint(in.Mint) || isNativeMint(out.Mint) {
-		return errors.New("oneinch: native gas-token swaps are not supported in v1 (see SCOPE.md)")
+		return errors.New("oneinch: native gas-token swaps are not supported in v1")
 	}
 	return nil
 }

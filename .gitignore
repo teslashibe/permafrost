@@ -38,11 +38,16 @@ keystore.json
 
 ## Private strategies (Hummingbot-style local extension; see STRATEGY_AUTHORS.md)
 /strategies/private/
+/cmd/permafrost/strategies_local.go
 /cmd/permafrostd/strategies_local.go
 
 ## Build artifacts
 tmp/
 .cache/
+
+## Node (transitively required for the apps/docs site on the docs branch;
+## ignored everywhere so a fresh clone never indexes 500MB+ of deps)
+node_modules/
 
 ## Docker
 .docker/

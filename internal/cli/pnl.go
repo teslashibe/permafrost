@@ -17,6 +17,8 @@ import (
 	"github.com/teslashibe/permafrost/internal/agent"
 	"github.com/teslashibe/permafrost/internal/assets"
 	"github.com/teslashibe/permafrost/internal/pnl"
+	"github.com/teslashibe/permafrost/pkg/inference"
+	"github.com/teslashibe/permafrost/pkg/inference/openai"
 )
 
 func init() { addCommandFactory(newPnLCmd) }
@@ -329,7 +331,8 @@ func computeLiveNAV(c *cobra.Command, ctx context.Context, s *agent.Store, a age
 		return pnl.AgentNAV{}, err
 	}
 	ks, _ := openKeystore(c) // best-effort
-	deps, err := agent.BuildDeps(a, reg, s, ks, g.Log, agent.BuildOptions{
+	infReg, _ := inference.NewRegistry(g.Config.Inference, openai.NewProvider)
+	deps, err := agent.BuildDeps(a, reg, s, ks, infReg, g.Log, agent.BuildOptions{
 		Solana: solanaSpotFromConfig(g.Config.Solana),
 		EVM:    evmSpotsFromConfig(g.Config.EVM, os.Getenv),
 	})

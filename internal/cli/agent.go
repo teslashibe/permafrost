@@ -21,6 +21,8 @@ import (
 	"github.com/teslashibe/permafrost/internal/exchange"
 	exchangenoop "github.com/teslashibe/permafrost/internal/exchange/noop"
 	"github.com/teslashibe/permafrost/internal/store"
+	"github.com/teslashibe/permafrost/pkg/inference"
+	"github.com/teslashibe/permafrost/pkg/inference/openai"
 	"github.com/teslashibe/permafrost/pkg/types"
 )
 
@@ -38,11 +40,48 @@ func newAgentCmd() *cobra.Command {
 		newAgentDecisionsCmd(),
 		newAgentSetModeCmd(),
 		newAgentSetNetworkCmd(),
+		newAgentStartCmd(),
 		newAgentStopCmd(),
 		newAgentTickCmd(),
 		newAgentRunCmd(),
 	)
 	return cmd
+}
+
+// newAgentStartCmd persists status='running' so the daemon supervisor
+// (`permafrost serve`) picks the agent up on its next loader pass and on
+// every subsequent restart. This is the canonical "turn this agent on"
+// command for production use; `agent run` is the foreground equivalent
+// for paper-mode iteration in a single shell.
+func newAgentStartCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "start <id>",
+		Short: "Mark an agent as running so `permafrost serve` will start it",
+		Long: `Sets the agent's persisted status to 'running'. The next loader pass in
+the daemon (` + "`permafrost serve`" + `) will pick it up; on subsequent daemon
+restarts it auto-resumes.
+
+For one-off paper-mode iteration in a single shell (no daemon), use
+` + "`permafrost agent run <id>`" + ` instead — that runs the tick loop
+in the foreground and exits on SIGINT.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			st, db, err := openAgentStore(c)
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+			a, err := st.Get(c.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			if err := st.SetStatus(c.Context(), a.ID, agent.StatusRunning); err != nil {
+				return err
+			}
+			fmt.Printf("agent %s status -> running (will start on next `permafrost serve`)\n", a.ID)
+			return nil
+		},
+	}
 }
 
 func newAgentSetNetworkCmd() *cobra.Command {
@@ -414,9 +453,13 @@ Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 			}
 			// Keystore is best-effort here; funding rates work without one.
 			ks, _ := openKeystore(c)
+			// Inference registry is best-effort: the agent may not need
+			// inference, in which case BuildDeps tolerates a nil registry.
+			// A configured-but-unresolvable provider still errors.
+			infReg, _ := inference.NewRegistry(g.Config.Inference, openai.NewProvider)
 			// Empty networkOverride lets the builder fall back to a.Network
 			// (which is the operator's stored choice, default mainnet).
-			deps, err := agent.BuildDeps(a, reg, st, ks, g.Log, agent.BuildOptions{
+			deps, err := agent.BuildDeps(a, reg, st, ks, infReg, g.Log, agent.BuildOptions{
 				HyperliquidNetwork: networkOverride,
 				HyperliquidAddress: hlAddress,
 				Solana:             solanaSpotFromConfig(g.Config.Solana),

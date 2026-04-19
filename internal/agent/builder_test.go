@@ -2,10 +2,14 @@ package agent
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/teslashibe/permafrost/internal/assets"
+	"github.com/teslashibe/permafrost/internal/config"
 	walletnoop "github.com/teslashibe/permafrost/internal/wallet/noop"
+	"github.com/teslashibe/permafrost/pkg/inference"
+	"github.com/teslashibe/permafrost/pkg/inference/openai"
 	"github.com/teslashibe/permafrost/pkg/types"
 
 	// Register noop so BuildStrategy can resolve a known-good strategy
@@ -133,7 +137,7 @@ func TestBuildDeps_PerAgentNetworkPlumbed(t *testing.T) {
 				Network:  tc.stored,
 				Universe: []string{"WIF"},
 			}
-			deps, err := BuildDeps(a, reg, nil, nil, nil, BuildOptions{
+			deps, err := BuildDeps(a, reg, nil, nil, nil, nil, BuildOptions{
 				HyperliquidNetwork: tc.override,
 			})
 			if tc.expectError && err == nil {
@@ -196,7 +200,7 @@ func TestBuildDeps_PopulatesSwapWhenSolanaConfigured(t *testing.T) {
 		Universe: []string{"WIF"},
 	}
 	ks := walletnoop.NewKeystore("solana")
-	deps, err := BuildDeps(a, reg, nil, ks, nil, BuildOptions{
+	deps, err := BuildDeps(a, reg, nil, ks, nil, nil, BuildOptions{
 		HyperliquidNetwork: "testnet",
 		Solana: SolanaSpot{
 			RPCURL:     "http://localhost:8899",
@@ -217,7 +221,7 @@ func TestBuildDeps_PopulatesSwapWhenSolanaConfigured(t *testing.T) {
 func TestBuildDeps_LeavesSwapNilWhenSolanaUnconfigured(t *testing.T) {
 	reg, _ := assets.LoadEmbedded()
 	a := Agent{ID: "ag", Strategy: "noop", Universe: []string{"WIF"}}
-	deps, err := BuildDeps(a, reg, nil, nil, nil, BuildOptions{})
+	deps, err := BuildDeps(a, reg, nil, nil, nil, nil, BuildOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +236,7 @@ func TestBuildDeps_LeavesSwapNilWhenSolanaUnconfigured(t *testing.T) {
 func TestBuildDeps_DegradesWhenSolanaConfiguredButNoSigner(t *testing.T) {
 	reg, _ := assets.LoadEmbedded()
 	a := Agent{ID: "ag", Strategy: "noop", Universe: []string{"WIF"}}
-	deps, err := BuildDeps(a, reg, nil, nil, nil, BuildOptions{
+	deps, err := BuildDeps(a, reg, nil, nil, nil, nil, BuildOptions{
 		Solana: SolanaSpot{RPCURL: "http://localhost:8899"},
 	})
 	if err != nil {
@@ -249,7 +253,7 @@ func TestBuildDeps_DegradesWhenSolanaConfiguredButNoSigner(t *testing.T) {
 func TestBuildDeps_DegradesWhenEVMConfiguredButNoSigner(t *testing.T) {
 	reg, _ := assets.LoadEmbedded()
 	a := Agent{ID: "ag", Strategy: "noop", Universe: []string{"WIF"}}
-	deps, err := BuildDeps(a, reg, nil, nil, nil, BuildOptions{
+	deps, err := BuildDeps(a, reg, nil, nil, nil, nil, BuildOptions{
 		EVM: map[types.ChainID]EVMSpot{
 			types.ChainBase: {RPCURL: "https://mainnet.base.org", OneInchAPIKey: "stub"},
 		},
@@ -284,6 +288,80 @@ func TestEVMSpot_IsEnabled(t *testing.T) {
 	if !(EVMSpot{RPCURL: "x", OneInchAPIKey: "k"}).IsEnabled() {
 		t.Error("RPCURL + API key must enable")
 	}
+}
+
+// TestResolveInference covers the parsing + registry-lookup that turns
+// agent.Inference ("provider:model") into a concrete inference.Provider
+// surfaced via Services. Regression test for the audit's H1 finding.
+func TestResolveInference(t *testing.T) {
+	t.Run("empty string is no-op (no inference for this agent)", func(t *testing.T) {
+		prov, model, err := resolveInference("", nil)
+		if err != nil {
+			t.Fatalf("empty spec must not error, got %v", err)
+		}
+		if prov != nil {
+			t.Errorf("provider should be nil, got %T", prov)
+		}
+		if model != "" {
+			t.Errorf("model should be empty, got %q", model)
+		}
+	})
+
+	t.Run("configured but no registry → error", func(t *testing.T) {
+		_, _, err := resolveInference("openrouter:claude-sonnet-4.5", nil)
+		if err == nil {
+			t.Fatal("expected error when agent.Inference is set but no registry is supplied")
+		}
+	})
+
+	t.Run("provider missing from registry → error mentions both", func(t *testing.T) {
+		reg, _ := inference.NewRegistry(config.InferenceConfig{}, openai.NewProvider)
+		_, _, err := resolveInference("openrouter:claude", reg)
+		if err == nil {
+			t.Fatal("expected error for unknown provider")
+		}
+		if !strings.Contains(err.Error(), "openrouter") || !strings.Contains(err.Error(), "openrouter:claude") {
+			t.Errorf("error should reference provider name and full spec, got %q", err.Error())
+		}
+	})
+
+	t.Run("provider:model parsed; only first ':' is the separator", func(t *testing.T) {
+		reg, _ := inference.NewRegistry(
+			config.InferenceConfig{
+				Default: "openrouter",
+				Providers: map[string]config.InferenceProviderConfig{
+					"openrouter": {BaseURL: "https://openrouter.ai/api/v1"},
+				},
+			},
+			openai.NewProvider,
+		)
+		_, model, err := resolveInference("openrouter:vendor/model:variant", reg)
+		if err != nil {
+			t.Fatalf("expected success, got %v", err)
+		}
+		if model != "vendor/model:variant" {
+			t.Errorf("model should preserve trailing colons; got %q", model)
+		}
+	})
+
+	t.Run("provider only (no colon) → empty model", func(t *testing.T) {
+		reg, _ := inference.NewRegistry(
+			config.InferenceConfig{
+				Default: "openrouter",
+				Providers: map[string]config.InferenceProviderConfig{
+					"openrouter": {BaseURL: "https://openrouter.ai/api/v1"},
+				},
+			},
+			openai.NewProvider,
+		)
+		_, model, err := resolveInference("openrouter", reg)
+		if err != nil {
+			t.Fatalf("expected success, got %v", err)
+		}
+		if model != "" {
+			t.Errorf("model should be empty when no ':' supplied, got %q", model)
+		}
+	})
 }
 
 // TestDecimalFromAny exercises the JSONB-numeric helper that

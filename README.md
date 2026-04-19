@@ -71,7 +71,7 @@ The framework ships with `noop` as the reference implementation. Real strategies
               └────────────────────────┘
 ```
 
-See [`SCOPE.md`](SCOPE.md) for the full architectural specification.
+For the full architectural specification, the agent runtime, the strategy SAPI, and operations guidance, see the [docs site](https://teslashibe.github.io/permafrost/).
 
 ---
 
@@ -171,7 +171,7 @@ A leveraged AI agent will absolutely try to nuke a vault if you let it. Permafro
 
 ## Contributing
 
-This is an open-source project and contributions are welcome. Please read [`SCOPE.md`](SCOPE.md) before opening a PR — it defines the framework boundaries we're working within for v1.
+This is an open-source project and contributions are welcome. Please read [`STRATEGY_AUTHORS.md`](STRATEGY_AUTHORS.md) (for new strategies) and the [architecture docs](https://teslashibe.github.io/permafrost/introduction/architecture) before opening a PR.
 
 ---
 

@@ -31,7 +31,7 @@ func NewRootCmd(ctx context.Context) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "permafrost",
 		Short:         "Permafrost CLI — manage vaults, agents, and the Permafrost daemon",
-		Long:          "Permafrost is an open-source DeFi market-making and hedge-fund protocol where AI agents deploy capital into delta-neutral funding-arb strategies. This CLI is the operator's control plane.",
+		Long:          "Permafrost is an open-source DeFi trading framework where AI agents deploy capital into your strategies (deterministic Go code; LLM augments, never invents). This CLI is the operator's control plane.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}

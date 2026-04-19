@@ -11,13 +11,14 @@ import (
 
 	"github.com/teslashibe/permafrost/internal/backtest"
 	"github.com/teslashibe/permafrost/pkg/strategy"
-
-	// Register strategies that ship with the OSS framework. Local /
-	// private strategies are registered from cmd/permafrostd; the CLI
-	// only needs noop in scope so `strategy list` and `strategy backtest`
-	// work out of the box on a fresh clone.
-	_ "github.com/teslashibe/permafrost/strategies/noop"
 )
+
+// Strategy registration moved to cmd/permafrost/strategies.go (committed)
+// and cmd/permafrost/strategies_local.go (gitignored). The CLI binary
+// includes whatever those files blank-import; the daemon binary uses
+// the symmetric pair under cmd/permafrostd/. This is the same pattern
+// the daemon uses, so adding a strategy is one line in two import
+// files (or one if you only run the daemon).
 
 func init() { addCommandFactory(newStrategyCmd) }
 

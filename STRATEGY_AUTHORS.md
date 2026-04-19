@@ -48,12 +48,16 @@ type Constructor func(cfg map[string]any) (Strategy, error)
 
 ```go
 type Services struct {
-    Logger    *slog.Logger      // always non-nil
-    Inference inference.Provider // nil if no provider configured for this agent
+    Logger         *slog.Logger        // always non-nil
+    Inference      inference.Provider  // nil if no provider configured for this agent
+    InferenceModel string              // model id from agent.Inference; "" if unset
+    Registry       assets.Registry     // curated asset registry
 }
 ```
 
 If your strategy requires a service (e.g. `Inference` for an LLM-veto path), validate its presence in `Warmup` and return an error if it's missing. The framework will refuse to start the agent and the operator will see the error immediately, instead of getting a surprise on the first decision tick.
+
+`Warmup` is invoked exactly once per `Runtime`, regardless of which entrypoint runs first (`Start`, `TickOnce` from a foreground CLI, or a backtest harness). The runtime guards the call with `sync.Once` and reuses the cached error on subsequent ticks, so authors can rely on Warmup having completed before any `Decide` invocation.
 
 ## Registration
 
@@ -75,12 +79,16 @@ Registration is name-keyed (`snake_case`, must match what gets stored in `agents
 
 ## Enabling your strategy in a build
 
-Go has no auto-discovery for packages, so a strategy is only included in the binary if something blank-imports it. Two files do this:
+Go has no auto-discovery for packages, so a strategy is only included in a binary if something blank-imports it. Permafrost ships **two** binaries — the daemon (`permafrostd`) and the CLI (`permafrost`) — and a strategy needs to be registered in *both* to be both runnable and backtest-able. Each binary has a symmetric pair of files:
 
-- **`cmd/permafrostd/strategies.go`** — committed to the repo. Add a line here for any strategy that ships in the OSS framework or that you're contributing back.
-- **`cmd/permafrostd/strategies_local.go`** — gitignored. Add a line here for any private strategy you don't want pushed.
+| File | Tracking | Purpose |
+|---|---|---|
+| `cmd/permafrostd/strategies.go` | committed | Community / reference strategies for the daemon |
+| `cmd/permafrostd/strategies_local.go` | gitignored | Your private strategies for the daemon |
+| `cmd/permafrost/strategies.go` | committed | Same set, for the CLI (`strategy backtest`, `strategy list`) |
+| `cmd/permafrost/strategies_local.go` | gitignored | Same set, for the CLI |
 
-Example `strategies_local.go`:
+Example local file (you maintain a copy in *both* `cmd/permafrost/` and `cmd/permafrostd/`):
 
 ```go
 package main
@@ -91,7 +99,9 @@ import (
 )
 ```
 
-To remove a strategy from a build, delete its line. To revert to an OSS-only build (no private strategies), delete the whole `strategies_local.go` file.
+To remove a strategy from a build, delete its line in both files. To revert to an OSS-only build (no private strategies), delete both `strategies_local.go` files.
+
+Why two files per binary? Symmetry: contributing a strategy upstream means adding *one* line to each of `cmd/permafrostd/strategies.go` and `cmd/permafrost/strategies.go`. Keeping a strategy private means adding *one* line to each of the two `strategies_local.go` files. The pattern is identical for both modes.
 
 ## End-to-end: writing your first strategy
 
@@ -123,17 +133,27 @@ func (Strategy) Decide(_ context.Context, _ strategy.DecisionInput) (strategy.De
 }
 EOF
 
-# 3. Enable it in the local build
-cat >> cmd/permafrostd/strategies_local.go <<'EOF'
+# 3. Enable it in BOTH binaries (daemon + CLI). One line in each
+#    file. The first time you do this, the files don't exist yet —
+#    create them with the package declaration and one import.
+cat > cmd/permafrostd/strategies_local.go <<'EOF'
+package main
+
 import _ "github.com/teslashibe/permafrost/strategies/private/dca_buy"
 EOF
+cp cmd/permafrostd/strategies_local.go cmd/permafrost/strategies_local.go
 
-# 4. Build and run
+# 4. Build both binaries
 go build -o bin/permafrostd ./cmd/permafrostd
-./bin/permafrostd
+go build -o bin/permafrost  ./cmd/permafrost
+
+# 5. Run
+./bin/permafrost agent create --strategy dca_buy --perp hyperliquid --alloc 100
+./bin/permafrost agent start <id>          # marks status=running
+./bin/permafrostd                          # picks it up (or `permafrost serve`)
 ```
 
-The strategy is now registered. Create an agent with `--strategy dca_buy` and it'll start ticking.
+The strategy is now registered. For one-off paper-mode iteration in a single shell (no daemon), use `bin/permafrost agent run <id>` instead of `agent start` — that runs the tick loop in the foreground and exits on SIGINT.
 
 ## Reference: `noop`
 
