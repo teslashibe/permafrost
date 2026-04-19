@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 6
 ---
 
 # Running noop
@@ -9,14 +9,20 @@ sidebar_position: 4
 1. **Reference implementation.** Twenty lines of Go that demonstrate the SAPI surface.
 2. **End-to-end smoke test.** All of the framework's loops (scheduler, runtime, reconcile, killswitch, PnL) execute even with `noop` selected, so a successful `noop` run proves your install, database, keystore, and venue connections are all working.
 
-## Smoke test
+## The fast path
+
+Just run `make demo` — it does all the steps below for you. See [run the demo](/getting-started/make-demo).
+
+## Smoke test (manual)
 
 ```bash
 # 1. Install + bring up Postgres + daemon
 make up
 
-# 2. Confirm the registry sees noop
+# 2. Confirm the registry sees noop (and the other reference strategies)
 permafrost strategy list
+# → dca_buy
+# → market_maker_basic
 # → noop
 
 # 3. Create a paper-mode agent

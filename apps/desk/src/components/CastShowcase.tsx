@@ -12,7 +12,7 @@ const CAST: Array<{ name: CharacterName; role: string; blurb: string }> = [
   { name: 'owl',     role: 'Risk Monitor',  blurb: 'Watches breakers. Blinks red on a trip.' },
   { name: 'husky',   role: 'Reconciler',    blurb: 'Runs reconcile passes between camps.' },
   { name: 'walrus',  role: 'Swap Router',   blurb: 'Hauls tokens between chains via DEX aggregators.' },
-  { name: 'kraken',  role: 'Killswitch',    blurb: 'Sleeps deep. Wakes on a Whiteout. Run.' },
+  { name: 'whale',   role: 'Killswitch',    blurb: 'Surfaces only when the expedition has to be recalled.' },
   { name: 'mammoth', role: 'Private Strat', blurb: 'Visible only on the maintainer\'s build. Gitignored.' },
 ];
 

@@ -15,10 +15,13 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Getting Started',
+      collapsed: false,
       items: [
-        'getting-started/prerequisites',
+        'getting-started/make-demo',
+        'getting-started/init-and-doctor',
         'getting-started/local-install',
         'getting-started/configuration',
+        'getting-started/prerequisites',
         'getting-started/running-noop',
       ],
     },
@@ -40,6 +43,8 @@ const sidebars: SidebarsConfig = {
         'strategies/sapi',
         'strategies/decision-contract',
         'strategies/services',
+        'strategies/reference-strategies',
+        'strategies/scaffolding',
         'strategies/private-strategies',
         'strategies/testing',
       ],
@@ -49,6 +54,7 @@ const sidebars: SidebarsConfig = {
       label: 'Operations',
       items: [
         'operations/deployment',
+        'operations/trading-desk-ui',
         'operations/keystore-and-backups',
         'operations/killswitch-tuning',
       ],

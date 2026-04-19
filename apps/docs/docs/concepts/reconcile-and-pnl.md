@@ -30,7 +30,9 @@ The strategy never sees stale data. By the time `Decide` is called for the next 
 NAV is exposed via the API and CLI:
 
 ```bash
-permafrost agent pnl <id>
+permafrost pnl summary
+permafrost pnl positions <agent-id>
+permafrost pnl history   <agent-id>
 permafrost vault nav
 ```
 
