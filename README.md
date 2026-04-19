@@ -11,6 +11,8 @@
 [![Hyperliquid](https://img.shields.io/badge/perp-Hyperliquid-50D2C2)](https://hyperliquid.xyz/)
 [![Solana](https://img.shields.io/badge/spot-Solana-9945FF?logo=solana)](https://solana.com/)
 
+📚 **[Read the docs →](https://teslashibe.github.io/permafrost/)**
+
 </div>
 
 ---

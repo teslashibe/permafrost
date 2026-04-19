@@ -46,9 +46,11 @@ keystore.json
 tmp/
 .cache/
 
-## Node (transitively required for the apps/docs site on the docs branch;
-## ignored everywhere so a fresh clone never indexes 500MB+ of deps)
+## Docusaurus (apps/docs)
 node_modules/
+apps/docs/.docusaurus/
+apps/docs/build/
+apps/docs/.cache-loader/
 
 ## Docker
 .docker/
