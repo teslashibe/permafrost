@@ -248,6 +248,12 @@ img { -webkit-user-drag: none; user-select: none; }
   /* Subtle drop shadow so characters lift off the ice */
   filter: drop-shadow(0 4px 6px rgba(0,0,0,0.35));
 }
+.actor-content {
+  position: relative;
+  /* This wrapper holds the sprite + any per-actor children (e.g.
+   * the penguin's workstation pad). Animations apply HERE so all
+   * children move together. */
+}
 .actor img {
   display: block;
   image-rendering: pixelated;
@@ -263,25 +269,36 @@ img { -webkit-user-drag: none; user-select: none; }
 .actor.draggable:hover { filter: drop-shadow(0 6px 10px rgba(80,210,194,0.45)); }
 
 /* Workstation -- small ice block under each penguin agent so they
- * look like they're standing at a trading desk rather than floating. */
+ * look like they're standing at a trading desk rather than floating.
+ *
+ * Lives INSIDE the penguin's .actor-content so it inherits every
+ * animation (idle-bob, walking-translate). The whole "penguin on
+ * his ice shelf" moves as one unit -- penguin can't drift off
+ * his own ice patch.
+ *
+ * Positioned absolutely under the sprite (top: 100%) so it doesn't
+ * shift the actor's bounding box -- nameplate placement stays
+ * centered on the penguin's head. */
 .workstation {
   position: absolute;
-  width: 90px; height: 28px;
+  left: 50%;
+  top: 100%;
+  transform: translate(-50%, -55%);
+  width: 100px; height: 18px;
   pointer-events: none;
-  transform: translate(-50%, -10%);
-  z-index: 18;
+  z-index: -1;
 }
 .workstation .top {
-  position: absolute; inset: 0 4px auto 4px; top: 6px;
+  position: absolute; inset: 0 4px auto 4px; top: 4px;
   height: 8px;
   background: linear-gradient(180deg, #ECF6FF 0%, #C8DCF7 100%);
-  border-radius: 2px;
-  box-shadow: 0 2px 0 #7B9FCB;
+  border-radius: 4px;
+  box-shadow: 0 2px 0 #7B9FCB, 0 4px 8px rgba(0,0,0,0.18);
 }
 .workstation .glow {
   position: absolute; left: 50%; top: 0;
-  transform: translate(-50%, -120%);
-  width: 12px; height: 4px;
+  transform: translate(-50%, -160%);
+  width: 14px; height: 4px;
   background: var(--aurora-c);
   border-radius: 2px;
   filter: blur(2px);
@@ -346,17 +363,22 @@ img { -webkit-user-drag: none; user-select: none; }
   0%, 100% { transform: translateY(0); }
   50%      { transform: translateY(-3px); }
 }
-.actor.idle img { animation: idle-bob 3s ease-in-out infinite; }
+/* All idle/walk/halted animations target .actor-content so any
+ * children inside it (e.g. a penguin's workstation pad) animate
+ * together with the sprite. The only exception is .actor.halted's
+ * static drop -- it sets a fixed transform with no keyframe. */
+.actor.idle .actor-content { animation: idle-bob 3s ease-in-out infinite; }
 /* Stagger the bob so several penguins don't move in sync */
-.actor.idle:nth-child(2n) img { animation-delay: -1s; }
-.actor.idle:nth-child(3n) img { animation-delay: -2s; }
+.actor.idle:nth-child(2n) .actor-content { animation-delay: -1s; }
+.actor.idle:nth-child(3n) .actor-content { animation-delay: -2s; }
 
-/* Halted -- agent slumps, drops by 4px and stays */
-.actor.halted img { animation: idle-bob 6s ease-in-out infinite; opacity: 0.7; transform: translateY(2px); }
+/* Halted -- agent slumps slightly and bobs more slowly, opacity dims */
+.actor.halted .actor-content { animation: idle-bob 6s ease-in-out infinite; opacity: 0.7; transform: translateY(2px); }
 
 /* Walking penguin -- waddles back and forth across a small range.
- * Used when an agent has just made a decision (the penguin took an
- * action, so it briefly wanders before sitting back down). */
+ * Used when an agent has just made a decision. The whole content
+ * (sprite + workstation ice-shelf) translates together so the
+ * penguin and his ice patch move as one unit. */
 @keyframes walk {
   0%   { transform: translateX(0)    scaleX(1); }
   20%  { transform: translateX(20px) scaleX(1); }
@@ -365,7 +387,7 @@ img { -webkit-user-drag: none; user-select: none; }
   61%  { transform: translateX(-15px) scaleX(1); }
   100% { transform: translateX(0)    scaleX(1); }
 }
-.actor.walking img { animation: walk 4s ease-in-out infinite, idle-bob 0.4s ease-in-out infinite; }
+.actor.walking .actor-content { animation: walk 4s ease-in-out infinite, idle-bob 0.4s ease-in-out infinite; }
 
 /* Husky trot -- Skipper trots rightward across the world FOREVER.
  *
@@ -389,8 +411,8 @@ img { -webkit-user-drag: none; user-select: none; }
   50%   { transform: translate(calc(100vw - 50% + 240px), -50%); }
   100%  { transform: translate(calc(100vw - 50% + 240px), -50%); }
 }
-.actor.running-across img { animation: idle-bob 0.4s linear infinite; }
-.actor.running-across     { animation: husky-trot 16s linear infinite; }
+.actor.running-across .actor-content { animation: idle-bob 0.4s linear infinite; }
+.actor.running-across                { animation: husky-trot 16s linear infinite; }
 
 /* Narwhal swim -- comes up from under the ice (off-screen) when an
  * LLM consult fires, swims across to its assigned penguin, then
@@ -402,15 +424,15 @@ img { -webkit-user-drag: none; user-select: none; }
   80%  { opacity: 1; }
   100% { transform: translate(calc(-50% + 150px), calc(-50% + 60px)) rotate(8deg); opacity: 0; }
 }
-.actor.swim img { animation: idle-bob 1.2s ease-in-out infinite; }
-.actor.swim     { animation: narwhal-swim 5s ease-in-out forwards; }
+.actor.swim .actor-content { animation: idle-bob 1.2s ease-in-out infinite; }
+.actor.swim                { animation: narwhal-swim 5s ease-in-out forwards; }
 
 /* Owl head bob -- subtle, much smaller than penguin idle */
 @keyframes owl-bob {
   0%, 100% { transform: rotate(-2deg); }
   50%      { transform: rotate(2deg); }
 }
-.actor.perched img { animation: owl-bob 5s ease-in-out infinite; }
+.actor.perched .actor-content { animation: owl-bob 5s ease-in-out infinite; }
 
 /* Coin floating up to the vault. Preserves the centering offset. */
 @keyframes coin-float {

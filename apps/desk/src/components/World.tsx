@@ -36,6 +36,12 @@ export interface WorldProps {
   alertActive: boolean;
 }
 
+// All character sprites in the world are rendered at the same
+// canonical size so the cast feels like a coherent set. Coins and
+// transient effects keep their own sizes since they aren't
+// "characters". Adjust here once to scale every actor uniformly.
+const SPRITE_SIZE = 96;
+
 // Workstation slots distributed across the MIDDLE of the ice, in a
 // safe band that's clear of every corner HUD:
 //   - above the bottom-left decision log    (which extends to ~x=33%)
@@ -152,27 +158,26 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
     const state = isHalted ? 'halted' : (isWalking ? 'walking' : 'idle');
     return (
       <React.Fragment key={a.id}>
-        {/* Workstation pad under the penguin's feet */}
-        <div
-          className="workstation"
-          style={{ left: `${slot.x}%`, top: `calc(${slot.y}% + 38px)` }}
-        >
-          <div className="top" />
-          {/* small "alive" beacon when the agent is running */}
-          {!isHalted && <div className="glow" />}
-        </div>
-
         <Actor
           name="penguin"
           x={slot.x}
           y={slot.y}
-          size={84}
+          size={SPRITE_SIZE}
           state={state}
           nameplate={`${a.name || a.id.slice(0, 12)} - ${a.strategy}`}
           speech={speeches[a.id]}
           zIndex={20}
           dragId={`actor:penguin:${a.id}`}
-        />
+        >
+          {/* Workstation pad rendered INSIDE the actor so it
+              participates in every animation -- when the penguin
+              walks (decision tick) or bobs (idle), the ice shelf
+              moves with him. Also moves together when dragged. */}
+          <div className="workstation">
+            <div className="top" />
+            {!isHalted && <div className="glow" />}
+          </div>
+        </Actor>
         {/* Permanent narwhal companion for LLM-using strategies,
             floating in the sky above the workstation. Draggable
             independently -- if the user drags the penguin, the
@@ -182,7 +187,7 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
             name="narwhal"
             x={slot.x}
             y={slot.y - 24}
-            size={56}
+            size={SPRITE_SIZE}
             state="perched"
             nameplate={`${a.name || a.id.slice(0, 12)}'s LLM advisor`}
             zIndex={19}
@@ -208,20 +213,21 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
         name="pole"
         x={12}
         y={58}
-        size={150}
+        size={SPRITE_SIZE}
         state="idle"
         nameplate="Pole the Polar Bear"
         zIndex={25}
         dragId="actor:pole"
       />
 
-      {/* Aurora the snowy owl floats high above the right side of
-          the ice. Draggable. */}
+      {/* Aurora the snowy owl floats above the right side of the
+          ice. y=52 keeps her clear of the Camp Roster HUD which
+          spans the top-right corner down to ~y=34. Draggable. */}
       <Actor
         name="owl"
-        x={87}
-        y={42}
-        size={88}
+        x={84}
+        y={52}
+        size={SPRITE_SIZE}
         state={`perched ${alertActive ? 'alert' : ''}`}
         nameplate={alertActive ? 'Aurora is ALERT' : 'Aurora is watching'}
         zIndex={26}
@@ -234,7 +240,7 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
         name="walrus"
         x={23}
         y={66}
-        size={104}
+        size={SPRITE_SIZE}
         state="idle"
         nameplate="Kelp - swap router"
         zIndex={22}
@@ -248,7 +254,7 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
         name="husky"
         x={-5}
         y={70}
-        size={108}
+        size={SPRITE_SIZE}
         state="running-across"
         nameplate="Skipper"
         zIndex={28}
@@ -260,19 +266,25 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
       {/* === transient effects === */}
       {effects.map(e => {
         if (e.kind === 'narwhal') {
+          // Transient swim effect uses the same canonical size as
+          // the perched narwhal companion so they read as the same
+          // character mid-action.
           return (
             <Actor
               key={e.id}
               name="narwhal"
               x={e.x}
               y={e.y}
-              size={48}
+              size={SPRITE_SIZE}
               state="swim glowing"
               zIndex={30}
             />
           );
         }
         if (e.kind === 'coin') {
+          // Coins keep a small size -- they're a UI flourish (the
+          // PnL icon flying to the vault), not a "character" on the
+          // ice. Same size as the vault HUD's coin-stack icons.
           return (
             <Actor
               key={e.id}
@@ -300,7 +312,7 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
           name="mammoth"
           x={78}
           y={51}
-          size={80}
+          size={SPRITE_SIZE}
           state="idle"
           nameplate="Tusk - private"
           zIndex={15}
@@ -309,13 +321,14 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
       )}
 
       {/* Frostbite the Whale surfaces from the bottom-front of the
-          ice when an agent halts. Big, ominous, hard to miss. */}
+          ice when an agent halts. Same canonical size as the rest
+          of the cast for visual consistency. */}
       {alertActive && (
         <Actor
           name="whale"
           x={50}
           y={102}
-          size={160}
+          size={SPRITE_SIZE}
           state=""
           nameplate="Frostbite has surfaced"
           zIndex={40}

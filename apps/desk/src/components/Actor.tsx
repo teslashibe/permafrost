@@ -8,10 +8,23 @@ import { useDraggable } from '../hooks/useDraggable';
 // global.css. Optional nameplate is shown on hover; optional speech
 // bubble appears for `speech-pop` duration when set.
 //
-// If dragId is supplied, the actor becomes draggable by the user --
-// click-and-drag anywhere on the sprite moves it, and the position
-// is persisted in localStorage under the supplied id (use the
-// "actor:<name>" namespace to avoid collisions with HUD ids).
+// LAYOUT MODEL
+// ┌── .actor (positioned at x%, y%, transformed -50%/-50%) ──┐
+// │   ┌── .actor-content (THIS gets the walk/swim/etc animation)
+// │   │   <img />        (the sprite)
+// │   │   children        (e.g. workstation pad under a penguin)
+// │   ├──────────────────────────────────────────────────────┤
+// │   <nameplate />     (NOT animated; stays attached to .actor)
+// │   <speech />         (NOT animated; stays attached to .actor)
+// └──────────────────────────────────────────────────────────┘
+//
+// This split is what makes a penguin's ice-shelf workstation move
+// together with the penguin: pass the workstation as `children` and
+// it lives inside .actor-content, so the walk keyframe translates
+// img + workstation as a single unit.
+//
+// If dragId is supplied, the actor becomes draggable. Drag updates
+// the OUTER .actor position; the inner .actor-content keeps animating.
 
 export interface ActorProps {
   name: CharacterName;
@@ -34,11 +47,16 @@ export interface ActorProps {
    * stable id like `actor:pole` or `actor:penguin:<agent-id>`.
    */
   dragId?: string;
+  /**
+   * Children render INSIDE .actor-content (alongside the sprite),
+   * so they participate in any walk / swim / coin-fly animation
+   * applied to the actor. Use for the penguin's workstation pad.
+   */
   children?: ReactNode;
 }
 
 export const Actor: React.FC<ActorProps> = ({
-  name, size = 64, x, y, state = '', nameplate, speech, zIndex, style, dragId, children,
+  name, size = 96, x, y, state = '', nameplate, speech, zIndex, style, dragId, children,
 }) => {
   // Always call the hook (rules of hooks) but pass an empty id if
   // not draggable -- the hook short-circuits in that case and
@@ -63,10 +81,12 @@ export const Actor: React.FC<ActorProps> = ({
         ...(isDraggable ? drag.style : null),
       }}
     >
-      <Sprite name={name} size={size} />
+      <div className="actor-content">
+        <Sprite name={name} size={size} />
+        {children}
+      </div>
       {nameplate && <div className="nameplate">{nameplate}</div>}
       {speech && <div className="speech">{speech}</div>}
-      {children}
     </div>
   );
 };
