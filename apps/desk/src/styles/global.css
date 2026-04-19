@@ -459,10 +459,19 @@ img { -webkit-user-drag: none; user-select: none; }
 
 .hud h3 {
   margin: 0 0 8px 0;
+  padding: 2px 4px;
+  border-radius: 4px;
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   opacity: 0.8;
+  /* The h3 is the drag handle; tint on hover so the affordance is
+   * obvious. cursor: move comes from useDraggable's handleProps. */
+  transition: background 120ms ease-out, opacity 120ms ease-out;
+}
+.hud h3:hover {
+  opacity: 1;
+  background: rgba(80, 210, 194, 0.10);
 }
 
 .hud.vault {
@@ -514,8 +523,17 @@ img { -webkit-user-drag: none; user-select: none; }
 .hud.log {
   bottom: 24px; left: 24px;
   width: 380px;
-  max-height: 28vh;
+  /* Fixed total height. The h3 stays put; the body inside scrolls. */
+  height: 280px;
+  display: flex;
+  flex-direction: column;
+}
+.hud.log .hud-log-body {
+  flex: 1;
   overflow-y: auto;
+  /* Custom scrollbar so it blends with the dark theme */
+  scrollbar-width: thin;
+  scrollbar-color: var(--ice-edge) transparent;
 }
 .hud.log .row {
   display: grid;
