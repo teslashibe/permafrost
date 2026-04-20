@@ -61,8 +61,9 @@ const config: Config = {
     navbar: {
       title: 'Permafrost',
       logo: {
-        alt: 'Permafrost',
-        src: 'img/logo.svg',
+        alt: 'Pole the Polar Bear',
+        src: 'img/brand/pole.svg',
+        srcDark: 'img/brand/pole.svg',
       },
       items: [
         {
@@ -70,6 +71,11 @@ const config: Config = {
           sidebarId: 'docsSidebar',
           position: 'left',
           label: 'Docs',
+        },
+        {
+          to: '/brand/cast',
+          position: 'left',
+          label: 'The Cast',
         },
         {
           href: 'https://pkg.go.dev/github.com/teslashibe/permafrost',
