@@ -1,125 +1,119 @@
 <!--
-  Frostbite the Whale. Killswitch. Side-profile orca facing right -
-  iconic black-and-white pattern, large dorsal fin on top, vertical
-  tail fluke at the back-left. Friendly enough to be cute when idle,
-  intimidating enough that "Frostbite has surfaced" reads as bad
-  news.
-
-  Also literal: a "killer whale" is the killswitch.
-
+  Frostbite the Whale (v4). Friendly cartoon blue whale facing right.
+  Iterated v3 with a much more prominent vertical-spreading tail
+  fluke to match the reference. Body is slightly more compact so
+  the tail can take ~1/4 of the canvas like the reference.
   Hand-authored pixel art on a 32x32 grid scaled to 256x256.
-  Palette: deep navy body #1B2A4E, midnight outline #110A28,
-           white belly #ECF6FF, eye-patch white above eye,
-           tooth white #FFFFFF, mouth pink #F4B6C0,
-           menacing aqua eye #50D2C2.
+  Palette: black outline #000000, main blue #2C8FCE, lighter blue
+           #5DBBE8, very light highlight #87D0EE, white #FFFFFF,
+           pupil black #000000.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="256" height="256" shape-rendering="crispEdges" role="img" aria-label="Frostbite the Whale, killswitch">
   <title>Frostbite the Whale</title>
-  <desc>Killswitch. Killer whale that surfaces only when the expedition has to be recalled.</desc>
+  <desc>Friendly cartoon whale. Killswitch. Surfaces only when the expedition has to be recalled.</desc>
 
   <!-- ============================================================
-       Dorsal fin (tall, slightly hooked back, top of body)
+       WATER SPOUT - separate cluster floating above the head
        ============================================================ -->
-  <rect x="14" y="3"  width="2" height="1" fill="#110A28"/>
-  <rect x="13" y="4"  width="3" height="1" fill="#110A28"/>
-  <rect x="12" y="5"  width="4" height="1" fill="#110A28"/>
-  <rect x="12" y="6"  width="5" height="1" fill="#110A28"/>
-  <rect x="13" y="4"  width="2" height="2" fill="#1B2A4E"/>
-  <rect x="13" y="6"  width="3" height="1" fill="#1B2A4E"/>
+  <rect x="16" y="1"  width="2" height="1" fill="#5DBBE8"/>
+  <rect x="22" y="1"  width="2" height="1" fill="#5DBBE8"/>
+  <rect x="15" y="2"  width="2" height="1" fill="#5DBBE8"/>
+  <rect x="23" y="2"  width="2" height="1" fill="#5DBBE8"/>
+  <rect x="17" y="3"  width="2" height="1" fill="#5DBBE8"/>
+  <rect x="21" y="3"  width="2" height="1" fill="#5DBBE8"/>
+  <rect x="18" y="4"  width="4" height="1" fill="#5DBBE8"/>
 
   <!-- ============================================================
-       Body silhouette (single continuous shape, side profile,
-       facing right). Outline first, then fill.
+       BODY - shifted right slightly so the tail has room on the
+       left. Body now occupies cols 9-29.
        ============================================================ -->
+  <!-- Top edge -->
+  <rect x="13" y="6"  width="15" height="1" fill="#000000"/>
+  <rect x="11" y="7"  width="2"  height="1" fill="#000000"/>
+  <rect x="28" y="7"  width="1"  height="1" fill="#000000"/>
+  <rect x="10" y="8"  width="1"  height="1" fill="#000000"/>
+  <rect x="29" y="8"  width="1"  height="1" fill="#000000"/>
 
-  <!-- Top edge of body (curving from the back of the dorsal fin
-       down to the front of the head) -->
-  <rect x="6"  y="7"  width="6"  height="1" fill="#110A28"/>
-  <rect x="17" y="7"  width="8"  height="1" fill="#110A28"/>
-  <rect x="5"  y="8"  width="1"  height="1" fill="#110A28"/>
-  <rect x="25" y="8"  width="1"  height="2" fill="#110A28"/>
-  <rect x="4"  y="9"  width="1"  height="1" fill="#110A28"/>
-  <rect x="26" y="10" width="1"  height="3" fill="#110A28"/>
+  <!-- Right edge -->
+  <rect x="30" y="9"  width="1"  height="11" fill="#000000"/>
+  <rect x="29" y="20" width="1"  height="1" fill="#000000"/>
+  <rect x="28" y="21" width="1"  height="1" fill="#000000"/>
 
-  <!-- Bottom edge of body (head curve down to belly to tail) -->
-  <rect x="25" y="13" width="1"  height="2" fill="#110A28"/>
-  <rect x="24" y="15" width="1"  height="1" fill="#110A28"/>
-  <rect x="23" y="16" width="1"  height="1" fill="#110A28"/>
-  <rect x="6"  y="17" width="17" height="1" fill="#110A28"/>
-  <rect x="5"  y="16" width="1"  height="1" fill="#110A28"/>
+  <!-- Bottom edge -->
+  <rect x="11" y="22" width="17" height="1" fill="#000000"/>
+  <rect x="10" y="21" width="1"  height="1" fill="#000000"/>
 
-  <!-- Tail spine on the far left -->
-  <rect x="3"  y="10" width="1"  height="1" fill="#110A28"/>
-  <rect x="2"  y="11" width="1"  height="1" fill="#110A28"/>
-  <rect x="1"  y="12" width="1"  height="1" fill="#110A28"/>
-  <rect x="1"  y="13" width="1"  height="2" fill="#110A28"/>
-  <rect x="2"  y="15" width="1"  height="1" fill="#110A28"/>
-  <rect x="3"  y="16" width="1"  height="1" fill="#110A28"/>
+  <!-- Left edge curving in to the tail -->
+  <rect x="9"  y="9"  width="1"  height="12" fill="#000000"/>
+  <rect x="10" y="9"  width="1"  height="1" fill="#000000"/>
+
+  <!-- Body fill (main blue) -->
+  <rect x="13" y="7"  width="15" height="1" fill="#2C8FCE"/>
+  <rect x="11" y="8"  width="18" height="1" fill="#2C8FCE"/>
+  <rect x="10" y="9"  width="20" height="11" fill="#2C8FCE"/>
+  <rect x="11" y="20" width="18" height="1" fill="#2C8FCE"/>
+  <rect x="11" y="21" width="17" height="1" fill="#2C8FCE"/>
+
+  <!-- Top highlight stripes -->
+  <rect x="14" y="7"  width="12" height="1" fill="#5DBBE8"/>
+  <rect x="13" y="8"  width="14" height="1" fill="#5DBBE8"/>
+  <rect x="12" y="9"  width="16" height="1" fill="#87D0EE"/>
+  <rect x="13" y="10" width="14" height="1" fill="#87D0EE"/>
+  <rect x="15" y="11" width="9"  height="1" fill="#87D0EE"/>
 
   <!-- ============================================================
-       Body fill - main dark navy
+       EYE - big square white eye with black pupil
        ============================================================ -->
-  <rect x="6"  y="8"  width="19" height="1" fill="#1B2A4E"/>
-  <rect x="5"  y="9"  width="21" height="1" fill="#1B2A4E"/>
-  <rect x="4"  y="10" width="22" height="1" fill="#1B2A4E"/>
-  <rect x="4"  y="11" width="22" height="2" fill="#1B2A4E"/>
+  <rect x="23" y="12" width="5"  height="5" fill="#000000"/>
+  <rect x="24" y="13" width="3"  height="3" fill="#FFFFFF"/>
+  <rect x="25" y="14" width="2"  height="2" fill="#000000"/>
 
   <!-- ============================================================
-       White belly (the iconic orca pattern). Stretches from just
-       under the head, along the underside, to the tail base.
+       SMILE - curved line under the eye
        ============================================================ -->
-  <rect x="6"  y="13" width="17" height="4" fill="#ECF6FF"/>
-  <rect x="5"  y="14" width="1"  height="2" fill="#ECF6FF"/>
-  <rect x="23" y="13" width="1"  height="2" fill="#ECF6FF"/>
-  <rect x="22" y="15" width="2"  height="1" fill="#ECF6FF"/>
-
-  <!-- Soft transition strip between dark back and white belly -->
-  <rect x="5"  y="13" width="1"  height="1" fill="#1B2A4E"/>
+  <rect x="22" y="18" width="6"  height="1" fill="#000000"/>
+  <rect x="23" y="19" width="4"  height="1" fill="#000000"/>
 
   <!-- ============================================================
-       Eye-patch (the famous white smudge above an orca's eye)
+       WHITE BELLY - prominent white stripe along the underside,
+       wraps around the lower body
        ============================================================ -->
-  <rect x="19" y="9"  width="3" height="2" fill="#ECF6FF"/>
-
-  <!-- Eye (aqua glow inside the patch - "menacing-but-cute") -->
-  <rect x="20" y="10" width="2" height="1" fill="#50D2C2"/>
-  <rect x="20" y="10" width="1" height="1" fill="#FFFFFF"/>
-
-  <!-- ============================================================
-       Mouth (long line at the bottom-front of the head with a
-       hint of teeth and a gentle upward curve)
-       ============================================================ -->
-  <rect x="22" y="14" width="3" height="1" fill="#110A28"/>
-  <rect x="24" y="13" width="1" height="1" fill="#110A28"/>
-  <!-- One tiny tooth -->
-  <rect x="23" y="13" width="1" height="1" fill="#FFFFFF"/>
-  <!-- Pink mouth dab (cute) -->
-  <rect x="22" y="13" width="1" height="1" fill="#F4B6C0"/>
+  <rect x="11" y="20" width="14" height="1" fill="#FFFFFF"/>
+  <rect x="12" y="19" width="10" height="1" fill="#FFFFFF"/>
+  <rect x="11" y="21" width="14" height="1" fill="#FFFFFF"/>
 
   <!-- ============================================================
-       Tail flukes (left side, vertical spread)
+       TAIL - big forked fluke on the left, occupying cols 0-9.
+       The "wrist" at cols 7-9 connects to the body.
        ============================================================ -->
-  <rect x="2"  y="10" width="1" height="2" fill="#1B2A4E"/>
-  <rect x="2"  y="13" width="1" height="2" fill="#1B2A4E"/>
-  <rect x="3"  y="11" width="1" height="5" fill="#1B2A4E"/>
-  <rect x="0"  y="12" width="1" height="1" fill="#110A28"/>
-  <rect x="0"  y="14" width="1" height="1" fill="#110A28"/>
 
-  <!-- ============================================================
-       Pectoral fin (just under the body, side fin)
-       ============================================================ -->
-  <rect x="9"  y="17" width="5" height="1" fill="#110A28"/>
-  <rect x="10" y="18" width="4" height="1" fill="#110A28"/>
-  <rect x="11" y="19" width="2" height="1" fill="#110A28"/>
-  <rect x="9"  y="17" width="5" height="1" fill="#1B2A4E"/>
-  <rect x="10" y="18" width="3" height="1" fill="#1B2A4E"/>
+  <!-- Tail wrist (where the body narrows into the tail) -->
+  <rect x="7"  y="13" width="3"  height="5" fill="#2C8FCE"/>
+  <rect x="7"  y="13" width="1"  height="5" fill="#000000"/>
+  <rect x="7"  y="12" width="3"  height="1" fill="#000000"/>
+  <rect x="7"  y="18" width="3"  height="1" fill="#000000"/>
+  <rect x="8"  y="13" width="2"  height="1" fill="#5DBBE8"/>
 
-  <!-- ============================================================
-       Spout / blow (small puff above the dorsal fin - only barely
-       visible; suggests a freshly-surfaced whale)
-       ============================================================ -->
-  <rect x="20" y="2"  width="1" height="1" fill="#ECF6FF" opacity="0.7"/>
-  <rect x="19" y="3"  width="1" height="1" fill="#ECF6FF" opacity="0.7"/>
-  <rect x="21" y="3"  width="2" height="1" fill="#ECF6FF" opacity="0.7"/>
-  <rect x="20" y="4"  width="3" height="1" fill="#ECF6FF" opacity="0.7"/>
+  <!-- TOP fluke lobe (large, vertical) -->
+  <rect x="3"  y="9"  width="5"  height="1" fill="#000000"/>
+  <rect x="2"  y="10" width="1"  height="3" fill="#000000"/>
+  <rect x="8"  y="10" width="1"  height="2" fill="#000000"/>
+  <rect x="3"  y="13" width="3"  height="1" fill="#000000"/>
+  <rect x="6"  y="12" width="1"  height="1" fill="#000000"/>
+  <rect x="6"  y="13" width="1"  height="1" fill="#000000"/>
+  <!-- Top fluke fill -->
+  <rect x="3"  y="10" width="5"  height="3" fill="#2C8FCE"/>
+  <rect x="3"  y="10" width="5"  height="1" fill="#5DBBE8"/>
+  <rect x="4"  y="11" width="3"  height="1" fill="#5DBBE8"/>
+
+  <!-- BOTTOM fluke lobe (large, vertical) -->
+  <rect x="3"  y="18" width="3"  height="1" fill="#000000"/>
+  <rect x="6"  y="18" width="1"  height="1" fill="#000000"/>
+  <rect x="2"  y="19" width="1"  height="3" fill="#000000"/>
+  <rect x="8"  y="19" width="1"  height="2" fill="#000000"/>
+  <rect x="3"  y="22" width="5"  height="1" fill="#000000"/>
+  <!-- Bottom fluke fill -->
+  <rect x="3"  y="19" width="5"  height="3" fill="#2C8FCE"/>
+  <rect x="3"  y="19" width="5"  height="1" fill="#5DBBE8"/>
+  <rect x="4"  y="20" width="3"  height="1" fill="#5DBBE8"/>
 </svg>
