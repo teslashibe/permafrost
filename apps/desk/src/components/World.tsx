@@ -17,7 +17,19 @@ import { AuroraBand, IceFloes, SnowFlurry } from './Scenery';
 //
 // Layout is viewport-percentage based so it adapts to the window size.
 
-const STRATEGIES_WITH_LLM = new Set(['market_maker_basic', 'funding_arb_basic']);
+// Strategies in the public OSS registry. Anything outside this set is
+// a privately-registered strategy (Hummingbot-style local extension
+// under strategies/private/, registered via *_local.go), which the
+// world treats as a maintainer/operator surface -- the mammoth lurks
+// at the back-right when one is configured.
+const PUBLIC_STRATEGIES = new Set(['noop', 'dca_buy', 'market_maker_basic']);
+
+// Strategies known to consult an LLM via the inference Provider. Used
+// to decide whether to render the narwhal sidekick. Public OSS today:
+// just market_maker_basic. Private strategies that use inference can
+// add themselves here in a fork; we intentionally don't ship a
+// pluggable mechanism in v0.1.
+const STRATEGIES_WITH_LLM = new Set(['market_maker_basic']);
 
 interface Effect {
   id: string;
@@ -315,10 +327,13 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
         return null;
       })}
 
-      {/* Tusk lurks at the back-right of the ice IF a private strategy
-          is registered. Maintainer easter egg -- visible only on
-          the maintainer's local build. Draggable. */}
-      {agents.some(a => a.strategy === 'funding_arb_basic') && (
+      {/* Tusk lurks at the back-right of the ice IF any agent is
+          running a strategy that isn't in the public OSS registry
+          (i.e. a strategies/private/* extension registered via the
+          gitignored *_local.go). Maintainer easter egg -- visible
+          only when an operator has wired a private strategy.
+          Draggable. */}
+      {agents.some(a => !PUBLIC_STRATEGIES.has(a.strategy)) && (
         <Actor
           name="mammoth"
           x={78}

@@ -2,6 +2,7 @@ package hyperliquid
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -13,6 +14,12 @@ import (
 	"github.com/teslashibe/permafrost/pkg/types"
 	"github.com/teslashibe/permafrost/internal/wallet"
 )
+
+// ErrSignerRequired is returned when a write operation (Place/Cancel) is
+// attempted without a Signer configured. Real action signing lives in
+// sdk.go via sonirico/go-hyperliquid; the early stub in sign.go was
+// removed in v0.1.0 once the SDK path was the canonical implementation.
+var ErrSignerRequired = errors.New("hyperliquid: signer required for write operations; configure with WithSigner")
 
 // Venue is the Hyperliquid implementation of exchange.Venue.
 //

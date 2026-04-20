@@ -17,6 +17,38 @@ const (
 	ModeLive  Mode = "live"  // submit to venues
 )
 
+// ParseMode validates a mode string and returns the canonical Mode value.
+// Empty string returns ModePaper (the safe default). Anything else that
+// isn't an exact, lowercase "paper" or "live" returns an error — this
+// closes a footgun where a typo (e.g. "papre") falls through to live
+// execution because the runtime only branches paper on Mode == ModePaper.
+//
+// The runtime, store, and CLI all funnel mode-string input through this
+// function so the typo can't propagate past the input boundary.
+func ParseMode(s string) (Mode, error) {
+	switch s {
+	case "":
+		return ModePaper, nil
+	case string(ModePaper):
+		return ModePaper, nil
+	case string(ModeLive):
+		return ModeLive, nil
+	default:
+		return "", fmt.Errorf("agent: invalid mode %q (want paper or live)", s)
+	}
+}
+
+// Validate returns an error if m is not one of the recognised modes.
+// Empty mode is rejected here (use ParseMode if "" should default to
+// paper).
+func (m Mode) Validate() error {
+	switch m {
+	case ModePaper, ModeLive:
+		return nil
+	}
+	return fmt.Errorf("agent: invalid mode %q (want paper or live)", m)
+}
+
 // Network selects which Hyperliquid environment the agent reads/writes
 // against. Per-agent so a single deployment can run e.g. a paper-mainnet
 // research agent next to a live-testnet agent under development. v1 only

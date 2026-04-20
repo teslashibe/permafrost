@@ -75,9 +75,9 @@ steps.
 Templates:
   noop   (default) — minimal stub satisfying the SAPI; copy this and
                      fill in Decide() with your logic.
-  basis  TODO       — paired SwapIntent + OrderIntent skeleton (see
-                     strategies/private/funding_arb_basic for a complete
-                     example until the template lands).
+  basis  TODO       — paired SwapIntent + OrderIntent skeleton (planned
+                     for v0.1.x; copy the pattern from your own private
+                     strategy under strategies/private/ until then).
   maker  TODO       — perp-only OrderIntent skeleton with optional LLM
                      veto path (see strategies/market_maker_basic).
   dca    TODO       — SwapIntent-only DCA skeleton (see strategies/dca_buy).
@@ -111,7 +111,7 @@ func runStrategyNew(out interface{ Write([]byte) (int, error) }, name, tpl strin
 		// basis/maker/dca templates are TODO: ship as a small follow-up
 		// once we have time to ship them as real templates rather than
 		// half-finished placeholders.
-		return fmt.Errorf("template %q is not shipped yet (only 'noop' available in v1; see strategies/{dca_buy,market_maker_basic,private/funding_arb_basic} for full examples)", tpl)
+		return fmt.Errorf("template %q is not shipped yet (only 'noop' available in v0.1; copy strategies/dca_buy or strategies/market_maker_basic for full working examples)", tpl)
 	}
 
 	// Resolve target paths.
@@ -171,9 +171,9 @@ func runStrategyNew(out interface{ Write([]byte) (int, error) }, name, tpl strin
 }
 
 // validateStrategyName enforces snake_case. Permafrost's existing
-// registered names (noop, dca_buy, market_maker_basic, funding_arb_basic)
-// all match this pattern. Restricting here surfaces a clear error
-// instead of a confusing Go package-name compile error later.
+// registered names (noop, dca_buy, market_maker_basic) all match this
+// pattern. Restricting here surfaces a clear error instead of a
+// confusing Go package-name compile error later.
 var snakeCase = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
 func validateStrategyName(name string) error {

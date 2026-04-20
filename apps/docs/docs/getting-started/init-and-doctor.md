@@ -80,7 +80,7 @@ Permafrost preflight ───────────────────�
   ✓  solana RPC                 https://api.mainnet-beta.solana.com (slot 414335213)
   ✓  evm RPC: base              https://mainnet.base.org (block 0x2ad7400)
   ✓  evm RPC: ethereum          https://ethereum-rpc.publicnode.com (block 0x17c3237)
-  ✓  strategies registered      dca_buy, funding_arb_basic, market_maker_basic, noop
+  ✓  strategies registered      dca_buy, market_maker_basic, noop
 ─────────────────────────────────────────────────────────────────
 11 ok, 4 warning(s), 1 error(s). Fix errors before `permafrost agent start`.
 ```

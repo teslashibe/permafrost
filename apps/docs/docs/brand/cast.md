@@ -16,7 +16,7 @@ readable.
 
 ## The leadership
 
-### <img src="/img/brand/pole.svg" alt="Pole the polar bear" width="64" height="64" style={{verticalAlign: 'middle'}} /> Pole the polar bear (Captain)
+### <img src="/img/brand/pole.svg" alt="Pole the polar bear" width="64" height="64" style={{verticalAlign: 'middle'}} /> Pole the polar bear (Camp Director)
 
 The **Camp Director** -- your avatar. Pole presides over the trading
 desk, holds the keystore, sets allocations, picks strategies, and

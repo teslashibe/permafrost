@@ -37,9 +37,11 @@ func (s *Store) Create(ctx context.Context, a Agent) (Agent, error) {
 	if a.Strategy == "" {
 		return Agent{}, errors.New("agent: strategy required")
 	}
-	if a.Mode == "" {
-		a.Mode = ModePaper
+	mode, err := ParseMode(string(a.Mode))
+	if err != nil {
+		return Agent{}, err
 	}
+	a.Mode = mode
 	if a.Status == "" {
 		a.Status = StatusStopped
 	}
@@ -80,6 +82,15 @@ FROM agents WHERE id = $1`
 	); err != nil {
 		return Agent{}, fmt.Errorf("agent: get: %w", err)
 	}
+	// Validate mode at the boundary so a typo in the DB row (e.g. from a
+	// hand-edit) cannot fall through into the runtime's only-paper-is-paper
+	// branch and trigger live execution. Old rows that predate this check
+	// may exist with empty mode; treat empty as paper for safety.
+	mode, err := ParseMode(string(a.Mode))
+	if err != nil {
+		return Agent{}, fmt.Errorf("agent: get %s: %w", id, err)
+	}
+	a.Mode = mode
 	if len(cfg) > 0 {
 		_ = json.Unmarshal(cfg, &a.Config)
 	}
@@ -238,17 +249,27 @@ type PersistSwapInput struct {
 	TxHash      string
 	Status      string
 	Paper       bool
+	// ClientID is the deterministic per-intent idempotency key derived
+	// from (agentID, decisionID, slot, chain, in_mint, out_mint). The
+	// runtime stamps it on the SwapIntent before execution; persistence
+	// records the same value so the partial unique index on
+	// (agent_id, time, client_id) can dedupe replays at the DB layer.
+	// Empty client_id is permitted for back-compat with pre-v0.1 callers
+	// but new code paths always set it.
+	ClientID string
 }
 
-// PersistSwap appends a row to swaps.
+// PersistSwap appends a row to swaps. The conflict key is
+// (agent_id, time, client_id) — see migration 0008. Empty client_id
+// inserts skip the unique check (the partial index excludes NULLs).
 func (s *Store) PersistSwap(ctx context.Context, in PersistSwapInput) error {
 	const q = `INSERT INTO swaps
-(time, agent_id, decision_id, chain, dex, in_token, out_token, in_amount, out_amount, slippage_bps, gas_paid, tx_hash, status, paper)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-ON CONFLICT (agent_id, time, in_token, out_token) DO NOTHING;`
+(time, agent_id, decision_id, chain, dex, in_token, out_token, in_amount, out_amount, slippage_bps, gas_paid, tx_hash, status, paper, client_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+ON CONFLICT (agent_id, time, client_id) WHERE client_id IS NOT NULL DO NOTHING;`
 	if _, err := s.pool.Exec(ctx, q,
 		in.Time.UTC(), in.AgentID, in.DecisionID, in.Chain, in.DEX, in.InToken, in.OutToken,
-		in.InAmount, in.OutAmount, in.SlippageBps, in.GasPaid, nz(in.TxHash), in.Status, in.Paper,
+		in.InAmount, in.OutAmount, in.SlippageBps, in.GasPaid, nz(in.TxHash), in.Status, in.Paper, nz(in.ClientID),
 	); err != nil {
 		return fmt.Errorf("agent: persist swap: %w", err)
 	}

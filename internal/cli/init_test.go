@@ -100,6 +100,58 @@ func TestRunInit_FreshHappyPath(t *testing.T) {
 	}
 }
 
+// TestRunInit_DoesNotEchoPassphrase is a regression guard: stdout must
+// not contain the generated passphrase. Terminal scrollback / shell
+// history / screen-share tools all capture stdout, so leaking the
+// passphrase there negates the 0600 file-mode protection. Read the
+// passphrase env file's contents and assert no substring of it appears
+// in the wizard's output.
+func TestRunInit_DoesNotEchoPassphrase(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	envPath := filepath.Join(dir, "env")
+
+	var out bytes.Buffer
+	err := runInit(&out, nonInteractivePrompter{}, initOptions{
+		NonInteractive: true,
+		Theme:          "arctic",
+		ConfigPath:     cfgPath,
+		KeystorePath:   filepath.Join(dir, "keystore.json"),
+		EnvOut:         envPath,
+	})
+	if err != nil {
+		t.Fatalf("runInit: %v", err)
+	}
+
+	envBody, err := os.ReadFile(envPath)
+	if err != nil {
+		t.Fatalf("read env: %v", err)
+	}
+	// Pull out the hex passphrase from the env file (PERMAFROST_KEYSTORE_PASSPHRASE=<hex>).
+	const key = "PERMAFROST_KEYSTORE_PASSPHRASE="
+	idx := strings.Index(string(envBody), key)
+	if idx < 0 {
+		t.Fatalf("env file missing %s line; got:\n%s", key, envBody)
+	}
+	tail := string(envBody)[idx+len(key):]
+	end := strings.IndexAny(tail, "\n\r")
+	if end < 0 {
+		end = len(tail)
+	}
+	passphrase := strings.TrimSpace(tail[:end])
+	if len(passphrase) < 32 {
+		t.Fatalf("expected hex passphrase >= 32 chars, got %q", passphrase)
+	}
+
+	if strings.Contains(out.String(), passphrase) {
+		t.Errorf("wizard echoed the keystore passphrase to stdout — terminal logs would capture it.\nstdout:\n%s", out.String())
+	}
+	// And the wizard should still tell the operator how to read it.
+	if !strings.Contains(out.String(), "grep PERMAFROST_KEYSTORE_PASSPHRASE") {
+		t.Errorf("wizard should tell operator how to read the passphrase from disk; got:\n%s", out.String())
+	}
+}
+
 // TestRunInit_Idempotent re-runs the wizard against an existing
 // installation and asserts files aren't overwritten and the user is
 // told what was kept.

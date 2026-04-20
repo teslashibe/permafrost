@@ -21,8 +21,9 @@ the daemon keeps running until `make demo-clean`.
 
 The script (`scripts/demo.sh`) is short and readable. In order:
 
-1. **Preflight.** Confirm `docker` + `go` are present and the daemon
-   isn't already up.
+1. **Preflight.** Confirm `docker` + `go` are present. (If the daemon
+   is already running on port 8080, the compose `up` step will fail
+   loudly -- run `make down` or stop the existing process first.)
 2. **Build binaries.** `bin/permafrost` + `bin/permafrostd` if missing
    or stale. Cheap mtime-newer-than-binary check.
 3. **Compose stack.** `docker compose up -d` for Postgres + permafrostd.

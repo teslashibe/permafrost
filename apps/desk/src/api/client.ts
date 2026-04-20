@@ -75,9 +75,10 @@ export class APIError extends Error {
 }
 
 // Demo / disconnected mode -- what the UI shows when the daemon
-// isn't reachable. Provides a rich scene: 4 agents covering the full
-// strategy taxonomy plus a steady stream of decisions so the world
-// has something to animate.
+// isn't reachable. Provides a rich scene: 4 agents covering the
+// shipped public strategies (noop, dca_buy, market_maker_basic) plus
+// one private-strategy slot to demo the Tusk easter egg, alongside a
+// steady stream of decisions so the world has something to animate.
 //
 // `nextDemoBatch()` returns a fresh batch every call, simulating
 // activity over time. App.tsx uses static `demoData` for the agent
@@ -129,8 +130,13 @@ export const demoData: DemoData = {
     },
     {
       id: 'ag-arlo-04',
+      // Placeholder name representing an operator's privately-registered
+      // strategy (Hummingbot-style local extension under
+      // strategies/private/, blank-imported from the gitignored
+      // cmd/permafrost(d)/strategies_local.go). Anything not in
+      // PUBLIC_STRATEGIES (in World.tsx) triggers the Tusk easter egg.
       name: 'Arlo',
-      strategy: 'funding_arb_basic',
+      strategy: 'your_private_strategy',
       perp_venue: 'hyperliquid',
       spot_venue: 'jupiter',
       mode: 'paper',
@@ -177,10 +183,10 @@ export const demoData: DemoData = {
       agent_id: 'ag-arlo-04',
       ts: ts(18_000),
       confidence: 0.85,
-      notes: 'enter basis WIF: long spot, short perp, basis=42bps',
+      notes: 'private strategy: WIF basis=42bps (sample decision)',
       num_orders: 1,
       num_swaps: 1,
-      llm_used: true,
+      llm_used: false,
     },
     {
       id: 'd-mira-2',
@@ -207,13 +213,13 @@ const DEMO_TEMPLATES: Array<Omit<DecisionLite, 'id' | 'ts'>> = [
     num_orders: 0, num_swaps: 1, llm_used: false },
   { agent_id: 'ag-mira-03',    confidence: 0.7, notes: 'quote WIF: bid=0.998 ask=1.002 mid=1.000',
     num_orders: 2, num_swaps: 0, llm_used: true },
-  { agent_id: 'ag-arlo-04',    confidence: 0.85, notes: 'enter basis BONK: long spot, short perp',
+  { agent_id: 'ag-arlo-04',    confidence: 0.85, notes: 'private strategy: enter basis BONK',
     num_orders: 1, num_swaps: 1, llm_used: true },
   { agent_id: 'ag-mira-03',    confidence: 0.0, notes: 'vetoed: high vol, skip',
     num_orders: 0, num_swaps: 0, llm_used: true },
   { agent_id: 'ag-pip-01',     confidence: 0.0, notes: 'noop tick',
     num_orders: 0, num_swaps: 0, llm_used: false },
-  { agent_id: 'ag-arlo-04',    confidence: 0.9, notes: 'close basis BONK: realised +12bps',
+  { agent_id: 'ag-arlo-04',    confidence: 0.9, notes: 'private strategy: close basis BONK +12bps',
     num_orders: 1, num_swaps: 1, llm_used: false },
 ];
 export function nextDemoBatch(prev: DecisionLite[]): DecisionLite[] {
