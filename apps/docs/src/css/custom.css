@@ -1,27 +1,64 @@
-/**
- * Permafrost docs theme.
- * Cool blues + cyan accents matching the project's badge palette.
+/* Permafrost docs theme.
+ *
+ * Mirrors the Trading Desk UI palette so the docs site reads as
+ * the same product:
+ *   --aurora-c (cyan)   -- primary accent / CTAs
+ *   --aurora-p (purple) -- LLM/inference accent
+ *   --aurora-g (green)  -- healthy / shipped accent
+ *   --ice-deep / mid    -- night sky base for dark surfaces
+ *
+ * Light mode keeps Docusaurus's defaults but maps the primary to
+ * a slightly desaturated cyan so the brand carries through.
  */
 
 :root {
-  --ifm-color-primary: #00525c;
-  --ifm-color-primary-dark: #004a52;
-  --ifm-color-primary-darker: #00464d;
-  --ifm-color-primary-darkest: #003940;
-  --ifm-color-primary-light: #006674;
-  --ifm-color-primary-lighter: #006d7c;
-  --ifm-color-primary-lightest: #008092;
+  --ifm-color-primary:        #1F8E80;
+  --ifm-color-primary-dark:   #1B7F73;
+  --ifm-color-primary-darker: #18746A;
+  --ifm-color-primary-darkest: #135E55;
+  --ifm-color-primary-light:  #239D8E;
+  --ifm-color-primary-lighter: #25A695;
+  --ifm-color-primary-lightest: #2BC2AE;
   --ifm-code-font-size: 92%;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.08);
 }
 
 [data-theme='dark'] {
-  --ifm-color-primary: #50d2c2;
-  --ifm-color-primary-dark: #34cab9;
-  --ifm-color-primary-darker: #28c6b3;
-  --ifm-color-primary-darkest: #20a394;
-  --ifm-color-primary-light: #6cd9cb;
-  --ifm-color-primary-lighter: #79ddd1;
-  --ifm-color-primary-lightest: #a3e8e0;
+  --ifm-color-primary:        #50D2C2;
+  --ifm-color-primary-dark:   #34CAB9;
+  --ifm-color-primary-darker: #28C6B3;
+  --ifm-color-primary-darkest: #20A394;
+  --ifm-color-primary-light:  #6CD9CB;
+  --ifm-color-primary-lighter: #79DDD1;
+  --ifm-color-primary-lightest: #A3E8E0;
+
+  /* Match the Trading Desk world's deep arctic background */
+  --ifm-background-color: #0A1B36;
+  --ifm-background-surface-color: #122A52;
+  --ifm-navbar-background-color: rgba(10, 27, 54, 0.92);
+  --ifm-footer-background-color: #050E22;
   --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.08);
+}
+
+/* Pixelated rendering for the navbar logo (Pole) so the sprite
+ * stays crisp at small sizes instead of being browser-smoothed. */
+.navbar__logo img {
+  image-rendering: pixelated;
+}
+.navbar__logo {
+  width: 32px;
+  height: 32px;
+}
+
+/* Backdrop blur on the sticky navbar so the aurora bands behind
+ * the hero show through pleasantly. */
+[data-theme='dark'] .navbar {
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid #1F4380;
+}
+
+/* Pixelated sprites everywhere else they appear in markdown
+ * content (cast page, brand page, etc). */
+img[src*="/img/brand/"] {
+  image-rendering: pixelated;
 }
