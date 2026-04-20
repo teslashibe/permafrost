@@ -3,6 +3,14 @@
   "version": "0.0.1",
   "private": true,
   "description": "Permafrost Trading Desk — arctic-themed operator dashboard",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/teslashibe/permafrost.git"
+  },
+  "engines": {
+    "node": ">=20.0"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

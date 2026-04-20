@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a reproducible bug in Permafrost
+title: "[bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please include enough detail to reproduce.
+
+        If this is security-sensitive (fund-loss risk, key handling, auth bypass),
+        do **not** file it publicly. Use the private disclosure path in SECURITY.md.
+
+  - type: input
+    id: version
+    attributes:
+      label: permafrost version output
+      description: Run `permafrost version` and paste the result.
+      placeholder: permafrost v0.1.0 (darwin/arm64, go1.25.x)
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS / architecture
+      placeholder: macOS 15 arm64 / Ubuntu 24.04 amd64
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: Exact commands/config needed to reproduce.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / stack traces
+      description: Please redact secrets and private keys.
