@@ -41,6 +41,13 @@ export interface WorldProps {
 // transient effects keep their own sizes since they aren't
 // "characters". Adjust here once to scale every actor uniformly.
 const SPRITE_SIZE = 96;
+// Per-character size overrides for sprites that read better
+// slightly smaller than the canonical size:
+//   - Husky trots cross-screen; full size feels too domineering.
+//   - Narwhal floats in the sky beside its agent; smaller keeps
+//     the focus on the penguin trader on the workstation.
+const HUSKY_SIZE   = 76;
+const NARWHAL_SIZE = 72;
 
 // Workstation slots distributed across the MIDDLE of the ice, in a
 // safe band that's clear of every corner HUD:
@@ -179,15 +186,17 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
           </div>
         </Actor>
         {/* Permanent narwhal companion for LLM-using strategies,
-            floating in the sky above the workstation. Draggable
+            floating in the sky above the workstation. Smaller than
+            the canonical sprite size so it reads as a sidekick to
+            the penguin rather than competing with it. Draggable
             independently -- if the user drags the penguin, the
             narwhal stays where the user puts it (and vice versa). */}
         {usesLLM && (
           <Actor
             name="narwhal"
             x={slot.x}
-            y={slot.y - 24}
-            size={SPRITE_SIZE}
+            y={slot.y - 22}
+            size={NARWHAL_SIZE}
             state="perched"
             nameplate={`${a.name || a.id.slice(0, 12)}'s LLM advisor`}
             zIndex={19}
@@ -249,12 +258,14 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
 
       {/* Skipper trots rightward forever via a single infinite CSS
           animation -- runs across the ice, exits right, pauses,
-          re-enters from the left. Never moves backwards. */}
+          re-enters from the left. Never moves backwards. Uses a
+          smaller-than-canonical size so he doesn't visually compete
+          with the static cast. */}
       <Actor
         name="husky"
         x={-5}
         y={70}
-        size={SPRITE_SIZE}
+        size={HUSKY_SIZE}
         state="running-across"
         nameplate="Skipper"
         zIndex={28}
@@ -266,16 +277,16 @@ export const World: React.FC<WorldProps> = ({ agents, decisions, alertActive }) 
       {/* === transient effects === */}
       {effects.map(e => {
         if (e.kind === 'narwhal') {
-          // Transient swim effect uses the same canonical size as
-          // the perched narwhal companion so they read as the same
-          // character mid-action.
+          // Transient swim effect uses the same NARWHAL_SIZE as the
+          // perched companion so they read as the same character
+          // mid-action.
           return (
             <Actor
               key={e.id}
               name="narwhal"
               x={e.x}
               y={e.y}
-              size={SPRITE_SIZE}
+              size={NARWHAL_SIZE}
               state="swim glowing"
               zIndex={30}
             />

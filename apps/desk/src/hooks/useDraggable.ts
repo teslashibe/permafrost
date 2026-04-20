@@ -52,7 +52,12 @@ export function useDraggable(id: string): DraggableHandle {
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (typeof parsed?.top === 'number' && typeof parsed?.left === 'number') {
-        return { top: parsed.top, left: parsed.left };
+        // Migration: if a previously-saved position is behind the
+        // chrome bar (because a pre-fix drag let it slip up), pull
+        // it back down to the chrome boundary so the user can grab
+        // its title bar to drag it again.
+        const top = Math.max(parsed.top, CHROME_HEIGHT);
+        return { top, left: parsed.left };
       }
     } catch {
       /* ignore -- localStorage might be disabled or corrupt */
@@ -97,7 +102,10 @@ export function useDraggable(id: string): DraggableHandle {
       const w = ref.current.offsetWidth;
       const h = ref.current.offsetHeight;
       const left = clamp(dragRef.current.left0 + dx, 0, window.innerWidth - w);
-      const top = clamp(dragRef.current.top0 + dy, 0, window.innerHeight - h);
+      // Top minimum is CHROME_HEIGHT so HUDs can't slip behind the
+      // top chrome bar where the user can't grab their title to drag
+      // back. Bottom is window height minus the panel's height.
+      const top = clamp(dragRef.current.top0 + dy, CHROME_HEIGHT, window.innerHeight - h);
       setPos({ top, left });
     };
 
@@ -153,4 +161,29 @@ export function useDraggable(id: string): DraggableHandle {
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
+}
+
+// Min top offset for any draggable -- keeps panels and characters
+// below the fixed top chrome bar so the user can never drag a HUD
+// behind it (where its title would be unclickable). Matches the
+// chrome's height + padding in global.css.
+const CHROME_HEIGHT = 60;
+
+/**
+ * resetLayout clears every persisted drag position and reloads the
+ * page so the world snaps back to its CSS defaults. Wired to the
+ * "reset layout" button in App.tsx; useful if a user gets a HUD or
+ * sprite stuck behind something else (or just wants to start over).
+ */
+export function resetLayout(): void {
+  if (typeof window === 'undefined') return;
+  const prefix = 'permafrost-desk:';
+  // Snapshot keys first because we're mutating localStorage during iteration.
+  const toRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(prefix)) toRemove.push(k);
+  }
+  for (const k of toRemove) localStorage.removeItem(k);
+  window.location.reload();
 }
