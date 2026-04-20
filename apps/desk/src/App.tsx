@@ -79,9 +79,13 @@ export const App: React.FC = () => {
 
   return (
     <>
-      {/* Top chrome -- title + connection dot */}
+      {/* Top chrome -- title + connection dot. Three-column grid with
+          symmetric 1fr left/right tracks so the title cell is centered
+          relative to the viewport. Reset-layout button lives inline in
+          the right section so every nav element shares the same
+          horizontal baseline. */}
       <header className="chrome">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="left">
           <Sprite name="pole" size={48} />
           <div style={{ fontSize: 11, opacity: 0.7, letterSpacing: 0.5, textTransform: 'uppercase' }}>
             Camp Director
@@ -95,6 +99,18 @@ export const App: React.FC = () => {
           </div>
         </div>
         <div className="right">
+          <button
+            type="button"
+            className="reset-btn"
+            onClick={() => {
+              if (confirm('Reset all HUD and sprite positions to defaults?')) {
+                resetLayout();
+              }
+            }}
+            title="Reset all draggable HUD and sprite positions"
+          >
+            ↺ reset layout
+          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, opacity: 0.85 }}>
             <span className={`conn-dot ${connected ? 'live' : ''}`} />
             {connected ? 'connected' : 'demo'}
@@ -110,32 +126,6 @@ export const App: React.FC = () => {
       <AgentLegendHud agents={agents} />
       <DecisionLogHud decisions={decisions} />
       <CastHud />
-
-      {/* Reset-layout escape hatch -- if a HUD or sprite ends up in
-          an unrecoverable position (or the user just wants to
-          start over), one click clears every persisted position
-          and reloads. Pinned discreetly to the top-right edge,
-          beside the connection dot. */}
-      <button
-        type="button"
-        onClick={() => {
-          if (confirm('Reset all HUD and sprite positions to defaults?')) {
-            resetLayout();
-          }
-        }}
-        title="Reset all draggable HUD and sprite positions"
-        style={{
-          position: 'fixed', top: 20, right: 92, zIndex: 60,
-          background: 'rgba(10,27,54,0.7)', border: '1px solid var(--ice-edge)',
-          color: 'var(--ice-bright)', fontSize: 11, fontFamily: 'inherit',
-          padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
-          opacity: 0.65, transition: 'opacity 120ms ease-out',
-        }}
-        onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-        onMouseLeave={e => (e.currentTarget.style.opacity = '0.65')}
-      >
-        ↺ reset layout
-      </button>
 
       {/* Footer error banner -- only when offline AND we have an error */}
       {lastError && !connected && (
