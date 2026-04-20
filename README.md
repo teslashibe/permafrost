@@ -37,14 +37,14 @@ Permafrost uses a polar-camp metaphor for every moving part of the framework. Ev
 
 <table>
 <tr>
-<td align="center" width="11%"><img src="apps/desk/src/characters/pole.svg"    width="56" height="56" /><br/><b>Pole</b><br/><sub>Camp Director</sub></td>
-<td align="center" width="11%"><img src="apps/desk/src/characters/penguin.svg" width="56" height="56" /><br/><b>Penguin</b><br/><sub>Strategy agent</sub></td>
-<td align="center" width="11%"><img src="apps/desk/src/characters/narwhal.svg" width="56" height="56" /><br/><b>Narwhal</b><br/><sub>LLM consult</sub></td>
-<td align="center" width="11%"><img src="apps/desk/src/characters/owl.svg"     width="56" height="56" /><br/><b>Aurora</b><br/><sub>Risk monitor</sub></td>
-<td align="center" width="11%"><img src="apps/desk/src/characters/husky.svg"   width="56" height="56" /><br/><b>Skipper</b><br/><sub>Reconciler</sub></td>
-<td align="center" width="11%"><img src="apps/desk/src/characters/walrus.svg"  width="56" height="56" /><br/><b>Kelp</b><br/><sub>Swap router</sub></td>
-<td align="center" width="11%"><img src="apps/desk/src/characters/whale.svg"   width="56" height="56" /><br/><b>Frostbite</b><br/><sub>Killswitch</sub></td>
-<td align="center" width="11%"><img src="apps/desk/src/characters/mammoth.svg" width="56" height="56" /><br/><b>Tusk</b><br/><sub>Private strategy</sub></td>
+<td align="center" width="11%"><img src="apps/desk/src/characters/pole.svg"    width="56" height="56" alt="Pole the polar bear" /><br/><b>Pole</b><br/><sub>Camp Director</sub></td>
+<td align="center" width="11%"><img src="apps/desk/src/characters/penguin.svg" width="56" height="56" alt="Penguin trader" /><br/><b>Penguin</b><br/><sub>Strategy agent</sub></td>
+<td align="center" width="11%"><img src="apps/desk/src/characters/narwhal.svg" width="56" height="56" alt="Narwhal advisor" /><br/><b>Narwhal</b><br/><sub>LLM consult</sub></td>
+<td align="center" width="11%"><img src="apps/desk/src/characters/owl.svg"     width="56" height="56" alt="Aurora the snowy owl" /><br/><b>Aurora</b><br/><sub>Risk monitor</sub></td>
+<td align="center" width="11%"><img src="apps/desk/src/characters/husky.svg"   width="56" height="56" alt="Skipper the husky" /><br/><b>Skipper</b><br/><sub>Reconciler</sub></td>
+<td align="center" width="11%"><img src="apps/desk/src/characters/walrus.svg"  width="56" height="56" alt="Kelp the walrus" /><br/><b>Kelp</b><br/><sub>Swap router</sub></td>
+<td align="center" width="11%"><img src="apps/desk/src/characters/whale.svg"   width="56" height="56" alt="Frostbite the whale" /><br/><b>Frostbite</b><br/><sub>Killswitch</sub></td>
+<td align="center" width="11%"><img src="apps/desk/src/characters/mammoth.svg" width="56" height="56" alt="Tusk the mammoth" /><br/><b>Tusk</b><br/><sub>Private strategy</sub></td>
 </tr>
 </table>
 
@@ -98,11 +98,11 @@ The arctic-themed operator dashboard. Drag the HUDs, drag the characters, watch 
 
 ```mermaid
 flowchart LR
-    CLI[permafrost CLI] -->|REST| API
+    CLI[permafrost CLI] -->|REST + DB| API
     Desk[Trading Desk UI] -->|REST| API
     subgraph permafrostd
       API[Fiber API]
-      SCHED[Scheduler]
+      SUP[Supervisor]
       AGENT[Agent Runtime]
       STRAT[Strategy &lpar;your code&rpar;]
       RISK[Risk + Killswitch]
@@ -110,7 +110,7 @@ flowchart LR
       WAL[Wallet]
       RECON[Reconcile + PnL]
       API --> AGENT
-      SCHED --> AGENT
+      SUP --> AGENT
       AGENT --> STRAT
       AGENT --> RISK
       AGENT --> INF
@@ -148,23 +148,29 @@ permafrost agent run     <id> --confirm-live   # explicit foreground gate
 
 **EVM RPCs:** pick fresh ones from [chainlist.org](https://chainlist.org/) and drop them into `config.yaml`. Public defaults rate-limit aggressively in production.
 
-> ⚠ **Live-mode gating note:** `--confirm-live` is currently only enforced by `agent run`. The daemon supervisor doesn't re-prompt. Tracked by [#38](https://github.com/teslashibe/permafrost/issues/38).
-
 ---
 
 ## Safety
 
-A leveraged AI agent will absolutely try to nuke a vault if you let it. Permafrost ships with non-negotiable guardrails:
+A leveraged AI agent will absolutely try to nuke a vault if you let it. Permafrost ships with these guardrails:
 
 - **Spot-first execution** -- DEX swap must confirm before the perp short is sent
-- **Idempotent intents** -- every order and swap carries a deterministic client ID
-- **Decision provenance** -- every order links back to the exact prompt + model response
-- **Paper mode by default** -- real orders require explicit `--confirm-live`
-- **Per-agent circuit breakers** -- drawdown, daily loss, funding flip
-- **Real killswitch** -- cancels open orders, flattens shorts via reduce-only market orders, opt-in spot liquidation to USDC via the configured `SwapVenue`. Documented at [killswitch tuning](https://teslashibe.github.io/permafrost/operations/killswitch-tuning).
-- **Mainnet gating** -- Hyperliquid live mode behind explicit per-agent flags
+- **Idempotent intents** -- every order and swap carries a deterministic client ID, deduped at the DB layer
+- **Paper mode by default** -- new agents land in `paper`; promoting requires explicit `set-mode live` and `--confirm-live` on `agent run`
+- **Real killswitch** -- `permafrost agent kill <id>` cancels open orders, flattens shorts via reduce-only market orders, and (with `--liquidate-spot`) swaps every spot leg back to USDC via the configured `SwapVenue`. Documented at [killswitch tuning](https://teslashibe.github.io/permafrost/operations/killswitch-tuning).
+- **Mode validation** -- typo-resistant: `agent.ParseMode` rejects anything that isn't exactly `paper` or `live` at every input boundary
+- **Mainnet gating** -- Hyperliquid live mode behind explicit per-agent `network` + `mode` columns
 
 When something does go wrong, **Frostbite the Whale** surfaces -- that's the killswitch character on the dashboard.
+
+### Known limitations (v0.1.0)
+
+These are scaffolded in code but not yet wired end-to-end. None of them affect paper-mode operators. Tracked for v0.1.x; do not run real money against an agent that depends on any of them being fixed.
+
+- **Circuit breakers are scaffolded but not invoked per tick.** `MaxDrawdownBreaker` and `DailyLossBreaker` exist in `internal/risk/breakers.go` and are installed by `BuildRiskEngine`, but `Runtime` does not yet call `Risk.Portfolio` per tick, so they cannot trip. `FundingFlipBreaker` is defined but not registered.
+- **`--confirm-live` is only enforced by `permafrost agent run`.** `permafrostd serve` will start any agent with `mode=live, status=running` on boot without re-prompting. Tracked by [#38](https://github.com/teslashibe/permafrost/issues/38).
+- **Decision provenance stores the derived intent and rationale, not the raw LLM prompt/response.** The `agent_decisions` schema has columns for provider/model/tokens/cost; the runtime fills the first two but not the prompt/response blobs. `PersistInferenceCall` exists but has no callers yet.
+- **`market_maker_basic` does not persist maker state across restarts.** Treat it as a reference implementation, not a production maker.
 
 ---
 
@@ -177,14 +183,15 @@ permafrost strategy-new <name>       # scaffold a new strategy
 
 permafrost wallet     show | generate | import | path
 permafrost vault      init | deposit | withdraw | lockup | status | record-nav | nav
-permafrost agent      create | list | status | decisions | set-mode | set-network | start | stop | tick | run
+permafrost assets     list | sync
+permafrost agent      create | list | status | decisions | set-mode | set-network | start | stop | kill | tick | run
 permafrost strategy   list | backtest <name>
 permafrost inference  test | list
 permafrost swap       quote
 permafrost risk       show
 permafrost pnl        summary | positions | history
 permafrost reconcile
-permafrost db         migrate
+permafrost db         migrate up | down | status
 permafrost serve
 permafrost version
 ```
@@ -201,7 +208,7 @@ Full reference: [`/reference/cli`](https://teslashibe.github.io/permafrost/refer
 | HTTP API | [Fiber](https://gofiber.io/) |
 | Database | [TimescaleDB](https://www.timescale.com/) |
 | Migrations | [`goose`](https://github.com/pressly/goose) |
-| Query layer | [`sqlc`](https://sqlc.dev/) over [`pgx`](https://github.com/jackc/pgx) |
+| Query layer | [`pgx`](https://github.com/jackc/pgx) (hand-written SQL; sqlc planned for v0.2) |
 | CLI | [`cobra`](https://github.com/spf13/cobra) |
 | Config | [`viper`](https://github.com/spf13/viper) |
 | Logging | [`log/slog`](https://pkg.go.dev/log/slog) |

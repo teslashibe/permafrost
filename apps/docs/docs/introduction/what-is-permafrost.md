@@ -7,9 +7,9 @@ slug: /introduction/what-is-permafrost
 
 Permafrost is an open-source DeFi trading framework. It is an agent runtime built around a stable Strategy SAPI: write a deterministic Go strategy, register it, and the framework handles exchange adapters, swap routing, position reconciliation, PnL accounting, risk gates, the killswitch, decision provenance, and LLM augmentation.
 
-Strategies are first-class extensions, not patches. Each strategy lives as its own subdirectory under `strategies/`, calls `strategy.Register` in `init()`, and is enabled by adding one blank-import line to `cmd/permafrostd/strategies.go`. The framework knows nothing about any specific strategy -- `BuildStrategy` is a pure registry lookup.
+Strategies are first-class extensions, not patches. Each strategy lives as its own subdirectory under `strategies/`, calls `strategy.Register` in `init()`, and is enabled by adding one blank-import line to **both** `cmd/permafrost/strategies.go` (for the CLI's `strategy backtest`) **and** `cmd/permafrostd/strategies.go` (for the daemon supervisor). The framework knows nothing about any specific strategy -- `BuildStrategy` is a pure registry lookup.
 
-The OSS framework ships with `noop` as a reference implementation. Real strategies -- basis trades, market makers, anything you can express as deterministic Go -- are yours to build, share, or keep private.
+The OSS framework ships with `noop`, `dca_buy`, and `market_maker_basic` as reference strategies. Real strategies -- basis trades, additional market makers, anything you can express as deterministic Go -- are yours to build, share, or keep private under `strategies/private/`.
 
 ## Status
 

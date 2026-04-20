@@ -44,8 +44,9 @@ daemon and serve under `/ui`.
 | 🦣 Tusk the mammoth       | Operator's gitignored private strategies. |
 | 🪙 Coin                   | One per ~$100 of accumulated NAV.         |
 
-See [the brand narrative](../docs/docs/brand.md) for the full
-metaphor.
+See [the cast page](../docs/docs/brand/cast.md) and the
+[LLM-as-agent thesis](../docs/docs/brand/llm-as-agent.md) for the
+full metaphor.
 
 ## v1 scope
 

@@ -4,7 +4,7 @@ sidebar_position: 2
 
 # CLI reference
 
-The `permafrost` CLI talks to a running `permafrostd` daemon over REST for most agent operations. A handful (`db migrate`, `strategy backtest`, `wallet`) work without the daemon.
+The `permafrost` CLI shares the same Postgres-backed agent store as the `permafrostd` daemon: `agent` subcommands read/write directly through the DB, while `permafrostd` runs the supervisor + tick loops. Most subcommands work without the daemon running; commands that need venue connectivity (`agent run`, `agent kill --liquidate-spot`, `swap quote`) construct their own venue clients.
 
 Run `permafrost --help` or `permafrost <subcommand> --help` for the authoritative reference; this page is the index. Anything documented here is asserted by the CI build; if a command is in this page it exists in the binary.
 
@@ -16,14 +16,15 @@ permafrost doctor                                            # preflight check
 permafrost strategy-new <name> [--private] [--template noop] # scaffold a new strategy
 permafrost wallet      show | generate | import | path
 permafrost vault       init | deposit | withdraw | lockup | status | record-nav | nav
-permafrost agent       create | list | status | decisions | set-mode | set-network | start | stop | tick | run
+permafrost assets      list | sync
+permafrost agent       create | list | status | decisions | set-mode | set-network | start | stop | kill | tick | run
 permafrost strategy    list | backtest <name>
 permafrost inference   test | list
 permafrost swap        quote
 permafrost risk        show
 permafrost pnl         summary | positions | history
 permafrost reconcile   [agent-id]
-permafrost db          migrate
+permafrost db          migrate up | down | status
 permafrost serve
 permafrost version
 ```
@@ -96,6 +97,16 @@ permafrost vault record-nav
 permafrost vault nav
 ```
 
+## Assets
+
+```bash
+permafrost assets list                       # print the curated registry
+permafrost assets list --file ./assets.yaml  # use a non-embedded registry
+permafrost assets sync                       # upsert the registry into the DB
+```
+
+The asset registry maps `(symbol, perp_venue, spot_chain)` triples to mints + decimals + tradable flags. Strategies receive it via `WarmupInput.Services.Registry` and can resolve any symbol they trade. The embedded YAML at `internal/assets/registry.yaml` is the source of truth; `sync` writes it into the `assets` table for cross-process queries.
+
 ## Agent
 
 Agents are the unit of deployment: a database row that wraps a strategy with an inference provider, a perp venue, optional spot venues, risk limits, a tick schedule, and a decision log.
@@ -141,7 +152,18 @@ permafrost agent stop <id>            # halt one agent (sets status=halted)
 permafrost agent stop --all           # halt every agent
 ```
 
-`agent stop` performs the persistent state change. The full kill switch (cancel orders + close shorts + optional spot liquidation) runs inside the running daemon; see [risk and the killswitch](/concepts/risk-and-killswitch).
+`agent stop` performs the persistent state change.
+
+### Killswitch
+
+```bash
+permafrost agent kill <id>                       # halt + cancel + flatten shorts
+permafrost agent kill <id> --liquidate-spot      # also swap every spot leg back to USDC
+permafrost agent kill <id> --slippage-bps 200    # widen liquidation slippage
+permafrost agent kill <id> --reason "drawdown"   # freeform reason on the agent run
+```
+
+`agent kill` sets `status=halted`, then constructs the same venue stack `agent run` uses and calls `Runtime.Trip`: cancels every open order on the perp venue, sends reduce-only market orders to flatten any open short, and (with `--liquidate-spot`) swaps each open spot leg back to USDC via the configured `SwapVenue`. Hyperliquid orders are owned by the wallet, so this works whether or not the daemon is also running the agent. Paper-mode agents short-circuit to a status change. See [risk and the killswitch](/concepts/risk-and-killswitch) and [killswitch tuning](/operations/killswitch-tuning).
 
 ### Promoting to live
 
@@ -191,10 +213,16 @@ permafrost inference test --provider openrouter --model anthropic/claude-sonnet-
 ## Swap
 
 ```bash
-permafrost swap quote --chain solana --in USDC --out WIF --amount 100
+# Solana via Jupiter. Pass mints (not symbols) and decimals.
+# USDC mint shown; resolve any other token's mint from a Solana explorer.
+permafrost swap quote \
+    --in-mint  EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v \
+    --out-mint EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm \
+    --in-decimals 6 --out-decimals 6 \
+    --amount 100 --slippage-bps 50
 ```
 
-Quotes only -- does not broadcast. Useful for sanity-checking what an `OrderIntent` paired with a `SwapIntent` would experience.
+Quotes only -- does not broadcast. Useful for sanity-checking what a `SwapIntent` would experience. v0.1 only ships the Jupiter (Solana) quoter through this command; EVM 1inch quotes are exercised through the swap test harness.
 
 ## Risk
 

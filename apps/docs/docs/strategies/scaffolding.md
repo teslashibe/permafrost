@@ -81,7 +81,7 @@ The command refuses three things up-front, before touching the filesystem:
 | `maker` | planned | Perp-only OrderIntent skeleton with optional LLM veto |
 | `dca` | planned | SwapIntent-only DCA skeleton |
 
-For now, `dca_buy`, `market_maker_basic`, and (for maintainers) `funding_arb_basic` are the working examples to copy from while the templates land -- see [reference strategies](/strategies/reference-strategies).
+For now, `dca_buy` and `market_maker_basic` are the working examples to copy from while the templates land -- see [reference strategies](/strategies/reference-strategies).
 
 ## Top-level command name
 
