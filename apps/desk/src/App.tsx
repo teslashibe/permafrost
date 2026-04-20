@@ -3,6 +3,7 @@ import { APIClient, Agent, DecisionLite, demoData, nextDemoBatch } from './api/c
 import { World } from './components/World';
 import { VaultHud, AgentLegendHud, DecisionLogHud, CastHud } from './components/Hud';
 import { Sprite } from './components/Sprite';
+import { resetLayout } from './hooks/useDraggable';
 
 // App is the root view. The world fills the viewport; HUDs (Vault,
 // Agent legend, Decision log, Cast) overlay the corners. Title +
@@ -109,6 +110,32 @@ export const App: React.FC = () => {
       <AgentLegendHud agents={agents} />
       <DecisionLogHud decisions={decisions} />
       <CastHud />
+
+      {/* Reset-layout escape hatch -- if a HUD or sprite ends up in
+          an unrecoverable position (or the user just wants to
+          start over), one click clears every persisted position
+          and reloads. Pinned discreetly to the top-right edge,
+          beside the connection dot. */}
+      <button
+        type="button"
+        onClick={() => {
+          if (confirm('Reset all HUD and sprite positions to defaults?')) {
+            resetLayout();
+          }
+        }}
+        title="Reset all draggable HUD and sprite positions"
+        style={{
+          position: 'fixed', top: 20, right: 92, zIndex: 60,
+          background: 'rgba(10,27,54,0.7)', border: '1px solid var(--ice-edge)',
+          color: 'var(--ice-bright)', fontSize: 11, fontFamily: 'inherit',
+          padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
+          opacity: 0.65, transition: 'opacity 120ms ease-out',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+        onMouseLeave={e => (e.currentTarget.style.opacity = '0.65')}
+      >
+        ↺ reset layout
+      </button>
 
       {/* Footer error banner -- only when offline AND we have an error */}
       {lastError && !connected && (
