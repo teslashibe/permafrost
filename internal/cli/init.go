@@ -149,9 +149,14 @@ func runInit(out io.Writer, p prompter, opts initOptions) error {
 		fmt.Fprintf(out, "  ─ kept existing %s (re-run with rm if you want a fresh template)\n", configPath)
 	}
 	if wrotePassphrase {
-		fmt.Fprintf(out, "  ✓ generated keystore passphrase, saved to %s\n", envPath)
-		fmt.Fprintf(out, "    BACK UP THIS PASSPHRASE: %s\n", passphraseValue)
-		fmt.Fprintf(out, "    If you lose it, the keystore is unrecoverable.\n")
+		fmt.Fprintf(out, "  ✓ generated keystore passphrase, saved to %s (mode 0600)\n", envPath)
+		fmt.Fprintf(out, "    Read it with: grep PERMAFROST_KEYSTORE_PASSPHRASE %s\n", envPath)
+		fmt.Fprintf(out, "    BACK IT UP NOW. If you lose it, the keystore is unrecoverable.\n")
+		// Reference passphraseValue so unused-var lint is happy, but
+		// deliberately do NOT print it to stdout: terminal scrollback,
+		// shell history, screen-share tools, and wrapping loggers all
+		// capture that stream. Operators read it from the 0600 env file.
+		_ = passphraseValue
 	} else {
 		fmt.Fprintf(out, "  ─ kept existing passphrase env at %s\n", envPath)
 	}

@@ -720,6 +720,7 @@ func (r *Runtime) recordSwapWithDEX(ctx context.Context, now time.Time, decision
 		TxHash:      txHash,
 		Status:      string(status),
 		Paper:       paper,
+		ClientID:    s.ClientID, // deterministic per-intent (clientIDFromSwap)
 	}); err != nil {
 		r.deps.Logger.Warn("persist swap failed", "err", err)
 	}

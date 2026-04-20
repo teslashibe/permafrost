@@ -42,6 +42,7 @@ func newAgentCmd() *cobra.Command {
 		newAgentSetNetworkCmd(),
 		newAgentStartCmd(),
 		newAgentStopCmd(),
+		newAgentKillCmd(),
 		newAgentTickCmd(),
 		newAgentRunCmd(),
 	)
@@ -354,9 +355,17 @@ func newAgentSetModeCmd() *cobra.Command {
 				return err
 			}
 			defer db.Close()
-			mode := agent.Mode(args[1])
-			if mode != agent.ModePaper && mode != agent.ModeLive {
+			// ParseMode rejects typos (e.g. "papre") that would otherwise
+			// pass the inline equality check in older code and fall through
+			// to live execution because the runtime only branches paper on
+			// Mode == ModePaper. Empty string is rejected here too — callers
+			// must say what they want.
+			if args[1] == "" {
 				return fmt.Errorf("mode must be paper or live")
+			}
+			mode, err := agent.ParseMode(args[1])
+			if err != nil {
+				return err
 			}
 			res, err := db.Pool.Exec(c.Context(),
 				`UPDATE agents SET mode = $1, updated_at = now() WHERE id = $2`,
@@ -371,6 +380,124 @@ func newAgentSetModeCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// newAgentKillCmd is the operator-facing killswitch trigger. Until v0.1.0
+// the only way to fire Supervisor.Trip was from inside the daemon
+// process; this command makes it usable from any shell that can reach
+// the database + keystore.
+//
+// Behaviour:
+//   - Sets the agent's status to 'halted' so a future `permafrost serve`
+//     loader pass will not auto-resume it (matches `agent stop`).
+//   - In paper mode: that's it — there is nothing to cancel on a venue.
+//   - In live mode: builds the same Deps stack `agent run` does, calls
+//     Runtime.Trip, and prints what happened. This works regardless of
+//     whether the daemon is also running — Hyperliquid orders are owned
+//     by the wallet, not by a process, so cancel + flatten are safe to
+//     fire from any holder of the keystore. If the daemon was running
+//     it will discover status=halted on its next tick and stop its own
+//     loop.
+//
+// Spot liquidation is opt-in (--liquidate-spot) and best-effort: the
+// killswitch submits the swap and returns; it does NOT WaitConfirm. The
+// operator can follow up on the tx hash via the agent's decision log.
+func newAgentKillCmd() *cobra.Command {
+	var (
+		liquidateSpot bool
+		slippageBps   int
+		reason        string
+	)
+	cmd := &cobra.Command{
+		Use:   "kill <id>",
+		Short: "Trigger the kill switch for an agent: halt + cancel orders + flatten positions",
+		Long: `Killswitch entry point. Sets status=halted, cancels every open order on
+the agent's perp venue, and (if --liquidate-spot) swaps every open spot leg
+back to USDC via the configured SwapVenue for that chain.
+
+Paper-mode agents have nothing to cancel on a venue, so this command just
+sets status=halted (equivalent to ` + "`permafrost agent stop`" + `).
+
+Live-mode agents construct the full venue stack (same path as ` + "`agent run`" + `)
+and call Runtime.Trip. Hyperliquid orders are owned by the wallet, so this
+works whether or not the daemon is also running the agent — if the daemon
+was running it will discover status=halted on its next tick and stop its
+own loop.
+
+Spot liquidation is best-effort: each leg's swap is submitted and the
+killswitch returns immediately. Inspect the agent's decision log for the
+resulting tx hashes if you need to follow up.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			g := FromContext(c.Context())
+			if g == nil {
+				return errors.New("globals not initialised")
+			}
+			st, db, err := openAgentStore(c)
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+			a, err := st.Get(c.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			// Always halt the persisted state first. If anything below
+			// fails, the agent is at least flagged so a daemon restart
+			// won't auto-resume it.
+			if err := st.SetStatus(c.Context(), a.ID, agent.StatusHalted); err != nil {
+				return fmt.Errorf("set status halted: %w", err)
+			}
+			if a.Mode == agent.ModePaper {
+				fmt.Printf("agent %s halted (paper mode — no venue side-effects)\n", a.ID)
+				return nil
+			}
+
+			// Live: rebuild the same Deps stack `agent run` uses so Trip
+			// can talk to the venues. Keystore is required (Hyperliquid
+			// reads/writes need the address); a nil InfReg is OK because
+			// Trip never calls inference.
+			ks, err := openKeystore(c)
+			if err != nil {
+				return fmt.Errorf("kill: live mode requires keystore: %w", err)
+			}
+			reg, err := assets.LoadEmbedded()
+			if err != nil {
+				return err
+			}
+			infReg, _ := inference.NewRegistry(g.Config.Inference, openai.NewProvider)
+			deps, err := agent.BuildDeps(a, reg, st, ks, infReg, g.Log, agent.BuildOptions{
+				HyperliquidNetwork: "",
+				HyperliquidAddress: "",
+				Solana:             solanaSpotFromConfig(g.Config.Solana),
+				EVM:                evmSpotsFromConfig(g.Config.EVM, os.Getenv),
+			})
+			if err != nil {
+				return fmt.Errorf("kill: build deps: %w", err)
+			}
+			rt := agent.NewRuntime(a, deps)
+			opts := agent.DefaultKillSwitchOptions(reason)
+			opts.LiquidateSpot = liquidateSpot
+			opts.SpotSlippageBps = slippageBps
+			fmt.Printf("agent %s killswitch firing (live, liquidate_spot=%t)\n", a.ID, liquidateSpot)
+			if err := rt.Trip(c.Context(), opts); err != nil {
+				// Trip is best-effort: the per-step log lines have the
+				// detail; surface the first error so the caller's exit
+				// code reflects "something went wrong" while the rest
+				// of the steps still ran.
+				return fmt.Errorf("kill: %w", err)
+			}
+			fmt.Printf("agent %s killswitch complete\n", a.ID)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&liquidateSpot, "liquidate-spot", false,
+		"in addition to cancelling orders + flattening shorts, swap every open spot leg back to USDC via the configured SwapVenue (best-effort; does not WaitConfirm)")
+	cmd.Flags().IntVar(&slippageBps, "slippage-bps", 0,
+		"slippage cap on liquidation swaps (0 = use the agent's MaxSpotSlippageBps risk limit, or 100bps if unset)")
+	cmd.Flags().StringVar(&reason, "reason", "manual_cli",
+		"freeform reason recorded on the agent run")
+	return cmd
 }
 
 // newAgentRunCmd runs the full Runtime tick loop for ONE agent in the
