@@ -15,6 +15,7 @@ import (
 	"github.com/teslashibe/permafrost/internal/exchange/hyperliquid"
 	"github.com/teslashibe/permafrost/internal/risk"
 	"github.com/teslashibe/permafrost/internal/swap"
+	btswap "github.com/teslashibe/permafrost/internal/swap/bittensor"
 	"github.com/teslashibe/permafrost/internal/swap/jupiter"
 	"github.com/teslashibe/permafrost/internal/swap/oneinch"
 	"github.com/teslashibe/permafrost/internal/wallet"
@@ -96,6 +97,19 @@ func BuildDeps(
 				"agent_id", a.ID)
 		default:
 			return Deps{}, fmt.Errorf("solana swap venue: %w", err)
+		}
+	}
+
+	if opts.Bittensor.IsEnabled() {
+		v, err := BuildBittensorSwapVenue(opts.Bittensor, keystore)
+		switch {
+		case err == nil:
+			swaps[types.ChainBittensor] = v
+		case errors.Is(err, ErrNoBittensorSigner):
+			log.Warn("bittensor swap disabled: no Bittensor signer in keystore",
+				"agent_id", a.ID)
+		default:
+			return Deps{}, fmt.Errorf("bittensor swap venue: %w", err)
 		}
 	}
 
@@ -282,6 +296,7 @@ type BuildOptions struct {
 	HyperliquidAddress string // empty → derive from keystore (or no address)
 	Solana             SolanaSpot
 	EVM                map[types.ChainID]EVMSpot
+	Bittensor          BittensorSpot
 }
 
 // SolanaSpot captures everything the Jupiter SwapVenue needs to settle
@@ -334,6 +349,37 @@ func BuildEVMSwapVenue(chain types.ChainID, cfg EVMSpot, keystore wallet.Keystor
 		Chain:           chain,
 		DefaultSlippage: cfg.DefaultSlippageBps,
 		PollTimeout:     time.Duration(cfg.ConfirmationTimeoutSecs) * time.Second,
+	}, signer)
+}
+
+// BittensorSpot captures the Subtensor RPC config needed by the
+// Bittensor SwapVenue.
+type BittensorSpot struct {
+	RPCURL string
+}
+
+// IsEnabled reports whether the operator has provided enough config for
+// the Bittensor SwapVenue.
+func (b BittensorSpot) IsEnabled() bool { return b.RPCURL != "" }
+
+// ErrNoBittensorSigner is returned when the keystore has no Bittensor key.
+var ErrNoBittensorSigner = errors.New("agent: no Bittensor signer in keystore")
+
+// BuildBittensorSwapVenue constructs a Bittensor SwapVenue backed by the
+// on-chain AMM. Requires a Bittensor signer in the keystore.
+func BuildBittensorSwapVenue(cfg BittensorSpot, keystore wallet.Keystore) (swap.SwapVenue, error) {
+	if !cfg.IsEnabled() {
+		return nil, errors.New("agent: BittensorSpot is not configured")
+	}
+	if keystore == nil {
+		return nil, ErrNoBittensorSigner
+	}
+	signer, err := keystore.Signer(types.ChainBittensor)
+	if err != nil {
+		return nil, ErrNoBittensorSigner
+	}
+	return btswap.New(btswap.Config{
+		RPCURL: cfg.RPCURL,
 	}, signer)
 }
 

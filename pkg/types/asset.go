@@ -17,6 +17,7 @@ type ChainID string
 const (
 	ChainHyperliquid ChainID = "hyperliquid"
 	ChainSolana      ChainID = "solana"
+	ChainBittensor   ChainID = "bittensor"
 
 	// EVM chains supported for spot legs via DEX aggregators.
 	ChainEthereum  ChainID = "ethereum"
@@ -38,7 +39,7 @@ func (c ChainID) IsEVM() bool {
 // IsSpotChain reports whether the chain hosts spot tokens that the
 // strategy can route through (i.e. has a SwapVenue adapter).
 func (c ChainID) IsSpotChain() bool {
-	return c == ChainSolana || c.IsEVM()
+	return c == ChainSolana || c == ChainBittensor || c.IsEVM()
 }
 
 // Asset is a chain-bound token. For perpetual symbols traded on Hyperliquid,

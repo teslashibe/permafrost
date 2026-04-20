@@ -826,6 +826,14 @@ func evmSpotsFromConfig(cfg config.EVMConfig, getenv func(string) string) map[ty
 	return out
 }
 
+// bittensorSpotFromConfig translates the CLI config view into the agent
+// builder's view.
+func bittensorSpotFromConfig(cfg config.BittensorConfig) agent.BittensorSpot {
+	return agent.BittensorSpot{
+		RPCURL: cfg.ResolvedRPCURL(),
+	}
+}
+
 func splitCSV(s string) []string {
 	if s == "" {
 		return nil

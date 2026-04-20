@@ -109,6 +109,7 @@ func runDoctor(ctx context.Context, c *cobra.Command, _ bool) []CheckResult {
 	// ── chain RPCs ────────────────────────────────────────────────
 	checks = append(checks, checkSolanaRPC(ctx, g))
 	checks = append(checks, checkEVMRPCs(ctx, g)...)
+	checks = append(checks, checkBittensorRPC(ctx, g))
 
 	// ── strategies ────────────────────────────────────────────────
 	checks = append(checks, checkStrategiesRegistered())
@@ -426,6 +427,72 @@ func checkEVMRPCs(ctx context.Context, g *Globals) []CheckResult {
 		out = append(out, r)
 	}
 	return out
+}
+
+func checkBittensorRPC(ctx context.Context, g *Globals) CheckResult {
+	r := CheckResult{Name: "bittensor RPC"}
+	rpcURL := g.Config.Bittensor.ResolvedRPCURL()
+	if rpcURL == "" {
+		r.Status = StatusSkip
+		r.Detail = "not configured"
+		return r
+	}
+	// Convert wss:// to https:// for the HTTP health check.
+	httpURL := strings.Replace(rpcURL, "wss://", "https://", 1)
+	httpURL = strings.Replace(httpURL, "ws://", "http://", 1)
+
+	body := strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"system_chain","params":[]}`)
+	rpcCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(rpcCtx, http.MethodPost, httpURL, body)
+	if err != nil {
+		r.Status = StatusFail
+		r.Detail = redactURL(rpcURL)
+		r.Err = err
+		return r
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		r.Status = StatusFail
+		r.Detail = redactURL(rpcURL) + " (network error)"
+		r.Err = err
+		return r
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if resp.StatusCode == http.StatusTooManyRequests {
+		r.Status = StatusWarn
+		r.Detail = redactURL(rpcURL) + " (rate-limited; try a paid provider like Dwellir or self-host)"
+		return r
+	}
+	if resp.StatusCode != http.StatusOK {
+		r.Status = StatusFail
+		r.Detail = fmt.Sprintf("%s (HTTP %d)", redactURL(rpcURL), resp.StatusCode)
+		r.Err = fmt.Errorf("http %d: %s", resp.StatusCode, truncate(string(respBody), 200))
+		return r
+	}
+	var rpcResp struct {
+		Result string `json:"result"`
+		Error  *struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(respBody, &rpcResp); err != nil {
+		r.Status = StatusFail
+		r.Detail = redactURL(rpcURL) + " (unparseable response)"
+		r.Err = err
+		return r
+	}
+	if rpcResp.Error != nil {
+		r.Status = StatusFail
+		r.Detail = redactURL(rpcURL) + " (rpc error: " + rpcResp.Error.Message + ")"
+		r.Err = errors.New(rpcResp.Error.Message)
+		return r
+	}
+	r.Status = StatusOK
+	r.Detail = fmt.Sprintf("%s (%s)", redactURL(rpcURL), rpcResp.Result)
+	return r
 }
 
 func checkStrategiesRegistered() CheckResult {

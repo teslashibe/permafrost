@@ -22,14 +22,15 @@ const (
 )
 
 type Config struct {
-	Env       Env             `mapstructure:"env"`
-	Server    ServerConfig    `mapstructure:"server"`
-	Logging   LoggingConfig   `mapstructure:"logging"`
-	Database  DatabaseConfig  `mapstructure:"database"`
-	Inference InferenceConfig `mapstructure:"inference"`
-	Wallet    WalletConfig    `mapstructure:"wallet"`
-	Solana    SolanaConfig    `mapstructure:"solana"`
-	EVM       EVMConfig       `mapstructure:"evm"`
+	Env        Env              `mapstructure:"env"`
+	Server     ServerConfig     `mapstructure:"server"`
+	Logging    LoggingConfig    `mapstructure:"logging"`
+	Database   DatabaseConfig   `mapstructure:"database"`
+	Inference  InferenceConfig  `mapstructure:"inference"`
+	Wallet     WalletConfig     `mapstructure:"wallet"`
+	Solana     SolanaConfig     `mapstructure:"solana"`
+	EVM        EVMConfig        `mapstructure:"evm"`
+	Bittensor  BittensorConfig  `mapstructure:"bittensor"`
 }
 
 type ServerConfig struct {
@@ -111,6 +112,52 @@ type EVMChainConfig struct {
 	RPCURL string `mapstructure:"rpc_url"`
 }
 
+// BittensorConfig configures the Subtensor RPC connection used for alpha
+// token trading on Bittensor subnets.
+//
+// Operators can point at the free public endpoint, a paid provider (Dwellir),
+// or their own self-hosted subtensor node. Switch providers by changing
+// rpc_url — no code changes, no rebuild.
+//
+// Example:
+//
+//	bittensor:
+//	  rpc_url: wss://entrypoint-finney.opentensor.ai:443  # public (default)
+//	  network: finney                                       # finney | test | local
+//
+// Known endpoints:
+//   - Public:      wss://entrypoint-finney.opentensor.ai:443
+//   - Testnet:     wss://test.finney.opentensor.ai:443
+//   - Dwellir:     wss://bittensor-mainnet.dwellir.com:443
+//   - Self-hosted: wss://localhost:9944
+type BittensorConfig struct {
+	RPCURL  string `mapstructure:"rpc_url"`
+	Network string `mapstructure:"network"` // finney (default) | test | local
+}
+
+// ResolvedRPCURL returns the RPC URL to use, falling back to the network
+// preset when rpc_url is not explicitly set.
+func (b BittensorConfig) ResolvedRPCURL() string {
+	if b.RPCURL != "" {
+		return b.RPCURL
+	}
+	switch b.Network {
+	case "test":
+		return "wss://test.finney.opentensor.ai:443"
+	case "local":
+		return "ws://localhost:9944"
+	default:
+		return "wss://entrypoint-finney.opentensor.ai:443"
+	}
+}
+
+// IsEnabled reports whether bittensor integration is configured. The
+// chain client can always connect to the default public endpoint, so
+// this returns true whenever the operator hasn't explicitly cleared it.
+func (b BittensorConfig) IsEnabled() bool {
+	return b.ResolvedRPCURL() != ""
+}
+
 // Load reads configuration from the given path (optional) and environment.
 // If path is empty, it looks for config.yaml in the current directory.
 func Load(path string) (*Config, error) {
@@ -127,6 +174,7 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("evm.oneinch_api_key_env", "ONEINCH_API_KEY")
 	v.SetDefault("evm.default_slippage_bps", 50)
 	v.SetDefault("evm.confirmation_timeout_secs", 90)
+	v.SetDefault("bittensor.network", "finney")
 
 	if path != "" {
 		v.SetConfigFile(path)

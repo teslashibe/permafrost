@@ -15,6 +15,9 @@ package main
 // full extension flow.
 
 import (
+	_ "github.com/teslashibe/permafrost/strategies/alpha_dca"
+	_ "github.com/teslashibe/permafrost/strategies/alpha_momentum"
+	_ "github.com/teslashibe/permafrost/strategies/alpha_yield"
 	_ "github.com/teslashibe/permafrost/strategies/dca_buy"
 	_ "github.com/teslashibe/permafrost/strategies/market_maker_basic"
 	_ "github.com/teslashibe/permafrost/strategies/noop"

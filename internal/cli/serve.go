@@ -104,6 +104,7 @@ func Serve(ctx context.Context, g *Globals, opts ServeOptions) error {
 					HyperliquidNetwork: opts.HyperliquidNetworkOverride,
 					Solana:             solanaSpotFromConfig(g.Config.Solana),
 					EVM:                evmSpotsFromConfig(g.Config.EVM, os.Getenv),
+					Bittensor:          bittensorSpotFromConfig(g.Config.Bittensor),
 				},
 				Supervisor: sup,
 			}

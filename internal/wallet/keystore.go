@@ -61,6 +61,7 @@ type addressEntry struct {
 type secretsBlob struct {
 	Solana      []byte `json:"solana,omitempty"`
 	Hyperliquid []byte `json:"hyperliquid,omitempty"`
+	Bittensor   []byte `json:"bittensor,omitempty"`
 }
 
 // LocalKeystore is an encrypted-on-disk Keystore implementation suited to
@@ -132,6 +133,14 @@ func (k *LocalKeystore) SetHyperliquid(s *HyperliquidSigner) {
 	k.upsertAddrLocked(addressEntry{Chain: types.ChainHyperliquid, Address: s.Address()})
 }
 
+// SetBittensor installs (or replaces) the Bittensor key.
+func (k *LocalKeystore) SetBittensor(s *BittensorSigner) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.signers[types.ChainBittensor] = s
+	k.upsertAddrLocked(addressEntry{Chain: types.ChainBittensor, Address: s.Address()})
+}
+
 // Signer returns the signer for chain or an error if none is configured.
 func (k *LocalKeystore) Signer(chain types.ChainID) (Signer, error) {
 	k.mu.Lock()
@@ -168,6 +177,9 @@ func (k *LocalKeystore) Save() error {
 	if s, ok := k.signers[types.ChainHyperliquid].(*HyperliquidSigner); ok {
 		raw := s.priv.Serialize()
 		blob.Hyperliquid = raw
+	}
+	if s, ok := k.signers[types.ChainBittensor].(*BittensorSigner); ok {
+		blob.Bittensor = s.SecretKey()
 	}
 	plain, err := json.Marshal(blob)
 	if err != nil {
@@ -276,6 +288,13 @@ func (k *LocalKeystore) load() error {
 			return fmt.Errorf("keystore: load hyperliquid: %w", err)
 		}
 		k.signers[types.ChainHyperliquid] = s
+	}
+	if blob.Bittensor != nil {
+		s, err := NewBittensorSignerFromPrivate(blob.Bittensor)
+		if err != nil {
+			return fmt.Errorf("keystore: load bittensor: %w", err)
+		}
+		k.signers[types.ChainBittensor] = s
 	}
 	// Ensure addresses recorded match the loaded keys; refresh if stale.
 	for chain, s := range k.signers {
