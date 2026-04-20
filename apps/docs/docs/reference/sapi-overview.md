@@ -60,13 +60,13 @@ GoDoc: [pkg.go.dev/github.com/teslashibe/permafrost/pkg/inference](https://pkg.g
 
 Strategies in this single-module repo *can* import `internal/*` packages directly (Go's `internal` rule allows it within the same module), but doing so accepts that those internals may change without notice. The packages most commonly reached for:
 
-- `internal/assets` — the curated asset registry plus USDC helpers (`assets.LoadEmbedded()`, `assets.USDCMintFor(chain)`, `assets.USDCAsset(chain)`). Reasonable to import; the schema is stable.
-- `internal/wallet` — the keystore + signer abstractions. Avoid; strategies should not be touching keys.
-- `internal/agent` — the runtime itself. Avoid; you're a guest of this package, not its user.
+- `internal/assets` -- the curated asset registry plus USDC helpers (`assets.LoadEmbedded()`, `assets.USDCMintFor(chain)`, `assets.USDCAsset(chain)`). Reasonable to import; the schema is stable.
+- `internal/wallet` -- the keystore + signer abstractions. Avoid; strategies should not be touching keys.
+- `internal/agent` -- the runtime itself. Avoid; you're a guest of this package, not its user.
 
 ## Stability
 
-`pkg/strategy`, `pkg/types`, and `pkg/inference` are committed public APIs. Breaking changes follow semantic versioning — major-version bump or nothing. Anything outside `pkg/` is fair game to change between releases.
+`pkg/strategy`, `pkg/types`, and `pkg/inference` are committed public APIs. Breaking changes follow semantic versioning -- major-version bump or nothing. Anything outside `pkg/` is fair game to change between releases.
 
 ## Next steps
 

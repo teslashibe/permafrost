@@ -29,9 +29,9 @@ Per-agent limits live on the agent record (set via `agent create --config-json '
 
 Beyond pre-trade limits, the framework runs a small set of circuit breakers continuously. Each breaker, when tripped, halts the agent and (depending on configuration) escalates to the killswitch:
 
-- **MaxDrawdownBreaker** — fraction of equity below NAV high-water mark.
-- **DailyLossBreaker** — absolute USDC loss within a UTC day.
-- **FundingFlipBreaker** — perp funding flips sign while a basis is open (the trade thesis just inverted).
+- **MaxDrawdownBreaker** -- fraction of equity below NAV high-water mark.
+- **DailyLossBreaker** -- absolute USDC loss within a UTC day.
+- **FundingFlipBreaker** -- perp funding flips sign while a basis is open (the trade thesis just inverted).
 - *Pluggable.* `risk.Breaker` is an interface; new breakers are added by implementing it and wiring into `BuildRiskEngine`.
 
 ## Killswitch

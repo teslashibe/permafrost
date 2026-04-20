@@ -21,7 +21,7 @@ Walks an operator through:
    (default `~/.permafrost/env`).
 5. **Optional inference provider** (openrouter / openai / groq /
    ollama / skip).
-6. **EVM RPC nudge** — points you at [chainlist.org](https://chainlist.org/)
+6. **EVM RPC nudge** -- points you at [chainlist.org](https://chainlist.org/)
    when you're ready to trade EVM spot legs.
 
 End state:
@@ -29,7 +29,7 @@ End state:
 - A starter `config.yaml` (copied from `config.example.yaml` if
   available; minimal stub otherwise).
 - A 64-hex-character keystore passphrase, written 0600 to a sourceable
-  env file. The wizard prints it once on stdout — back it up.
+  env file. The wizard prints it once on stdout -- back it up.
 - A clear next-steps block telling you exactly the next 5 commands to
   type.
 
@@ -74,7 +74,7 @@ Permafrost preflight ───────────────────�
   ✓  config loaded              env=dev
   ✓  database reachable         postgres://REDACTED@localhost:5432/permafrost?sslmode=disable
   ✓  keystore passphrase env    PERMAFROST_KEYSTORE_PASSPHRASE set
-  ⚠  keystore file              ~/.permafrost/keystore.json (not yet created — run `permafrost wallet generate` or `wallet import`)
+  ⚠  keystore file              ~/.permafrost/keystore.json (not yet created -- run `permafrost wallet generate` or `wallet import`)
   ⚠  inference: groq            base_url=https://api.groq.com/openai/v1 but GROQ_API_KEY not set (provider may reject auth)
   ✓  inference: ollama          base_url=http://localhost:11434/v1
   ✓  solana RPC                 https://api.mainnet-beta.solana.com (slot 414335213)
@@ -102,12 +102,12 @@ Permafrost preflight ───────────────────�
 
 ### Severity model
 
-- **`✓` (green)** — passing.
-- **`⚠` (yellow)** — degraded but won't block agent start. Common cases:
+- **`✓` (green)** -- passing.
+- **`⚠` (yellow)** -- degraded but won't block agent start. Common cases:
   rate-limited RPC, missing optional inference key, keystore not yet
   populated.
-- **`✗` (red)** — hard failure. Doctor exits 1.
-- **`─` (grey)** — intentionally skipped (e.g. Solana RPC check when
+- **`✗` (red)** -- hard failure. Doctor exits 1.
+- **`─` (grey)** -- intentionally skipped (e.g. Solana RPC check when
   no Solana RPC is configured).
 
 ### Flags
@@ -120,7 +120,7 @@ permafrost doctor --verbose    # show underlying error details for failures
 
 Doctor uses an explicit 5-second HTTP timeout per check (TLS-handshake
 hang protection). The Solana check uses `getSlot` rather than `getHealth`
-— commercial providers (Helius, Triton) restrict `getHealth`. RPC URLs
+- commercial providers (Helius, Triton) restrict `getHealth`. RPC URLs
 are redacted (API keys stripped) before being printed.
 
 ## Where they fit in your workflow

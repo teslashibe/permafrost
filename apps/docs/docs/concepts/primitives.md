@@ -12,7 +12,7 @@ The "permafrost." Holds locked capital and realized gains. Tracks deposits, lock
 
 ## Wallet
 
-A self-custodied keypair on a chain. v1 ships with one Solana keypair plus one Hyperliquid signer per operator. The wallet's address is the spot custody endpoint — the long leg of every basis trade lives here.
+A self-custodied keypair on a chain. v1 ships with one Solana keypair plus one Hyperliquid signer per operator. The wallet's address is the spot custody endpoint -- the long leg of every basis trade lives here.
 
 ## Strategy
 

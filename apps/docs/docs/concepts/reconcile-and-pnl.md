@@ -21,11 +21,11 @@ The strategy never sees stale data. By the time `Decide` is called for the next 
 
 `internal/pnl` computes per-agent PnL from:
 
-- **Realized funding** — accumulated funding payments across the holding period.
-- **Realized basis P&L** — the profit/loss from opening at one basis and closing at another.
-- **Unrealized basis P&L** — mark-to-market of the open spot/perp pair.
-- **Fees** — perp taker/maker fees + DEX swap fees.
-- **Gas costs** — included for EVM swaps; trivial for Solana.
+- **Realized funding** -- accumulated funding payments across the holding period.
+- **Realized basis P&L** -- the profit/loss from opening at one basis and closing at another.
+- **Unrealized basis P&L** -- mark-to-market of the open spot/perp pair.
+- **Fees** -- perp taker/maker fees + DEX swap fees.
+- **Gas costs** -- included for EVM swaps; trivial for Solana.
 
 NAV is exposed via the API and CLI:
 
@@ -38,10 +38,10 @@ permafrost vault nav
 
 ## Where it lives
 
-- `internal/reconcile/` — the reconciliation loop.
-- `internal/pnl/` — PnL accounting.
-- `internal/agent/runtime.go` — schedules reconcile after each tick.
-- TimescaleDB hypertables — the underlying storage for time-series PnL data.
+- `internal/reconcile/` -- the reconciliation loop.
+- `internal/pnl/` -- PnL accounting.
+- `internal/agent/runtime.go` -- schedules reconcile after each tick.
+- TimescaleDB hypertables -- the underlying storage for time-series PnL data.
 
 ## Next steps
 

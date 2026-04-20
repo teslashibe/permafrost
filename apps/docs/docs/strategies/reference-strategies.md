@@ -9,15 +9,15 @@ The OSS build ships three strategies as reference implementations. Together they
 
 | Strategy | SwapIntent | OrderIntent | Cancels | LLM veto | Lives at |
 |---|---|---|---|---|---|
-| `noop` | — | — | — | — | `strategies/noop/` |
-| `dca_buy` | ✓ | — | — | — | `strategies/dca_buy/` |
-| `market_maker_basic` | — | ✓ | ✓ | ✓ | `strategies/market_maker_basic/` |
+| `noop` | -- | -- | -- | -- | `strategies/noop/` |
+| `dca_buy` | ✓ | -- | -- | -- | `strategies/dca_buy/` |
+| `market_maker_basic` | -- | ✓ | ✓ | ✓ | `strategies/market_maker_basic/` |
 
 ## `noop`
 
 The smallest strategy that satisfies the SAPI. ~20 lines of Go that
 return `Decision{}` every tick. Use it as a copy-paste starting point
-or as the smoke-test target for verifying your install — see
+or as the smoke-test target for verifying your install -- see
 [running noop](/getting-started/running-noop).
 
 ## `dca_buy`
@@ -145,7 +145,7 @@ tick → tickCount++
 ```
 
 `Warmup` fails fast if `use_llm_veto: true` but no inference provider
-is wired on the agent — the operator notices at startup, not on the
+is wired on the agent -- the operator notices at startup, not on the
 first decision tick.
 
 ### LLM veto
@@ -172,7 +172,7 @@ The response must match:
 ```
 
 A provider that returns `ErrUnsupportedFeature` (e.g. base Ollama
-model without JSON-Schema mode) is treated as `veto: false` — the
+model without JSON-Schema mode) is treated as `veto: false` -- the
 strategy quotes normally rather than blocking on a feature the model
 can't enforce.
 
@@ -191,9 +191,9 @@ permafrost agent start <id>
 
 ## v2 plans for the references
 
-- `dca_buy` — read prior buy times from `BasisPositions` so cooldown
+- `dca_buy` -- read prior buy times from `BasisPositions` so cooldown
   is restart-resilient.
-- `market_maker_basic` — explicit cancel emission for stale quotes
+- `market_maker_basic` -- explicit cancel emission for stale quotes
   (today the runtime's reduce-only handling drops them naturally as
   new quotes replace them).
 - A third reference (`grid_trader` or similar) demonstrating
@@ -201,6 +201,6 @@ permafrost agent start <id>
 
 ## Next steps
 
-- [Scaffolding a new strategy](/strategies/scaffolding) — `permafrost strategy-new`
+- [Scaffolding a new strategy](/strategies/scaffolding) -- `permafrost strategy-new`
 - [Decision contract](/strategies/decision-contract)
 - [Services](/strategies/services)

@@ -27,7 +27,7 @@ Permafrost is a self-custodied, locally-runnable trading framework built around 
 
 Strategies are first-class extensions, not patches. Each one lives as its own subdirectory under `strategies/`, calls `strategy.Register` in `init()`, and is enabled by adding one blank-import line to each binary's `strategies.go`. See the [strategy authors guide](https://teslashibe.github.io/permafrost/strategies/sapi).
 
-The OSS build ships three reference strategies (`noop`, `dca_buy`, `market_maker_basic`). Real strategies — basis trades, market makers, anything you can express as Go — are yours to build, share, or [keep private](https://teslashibe.github.io/permafrost/strategies/private-strategies).
+The OSS build ships three reference strategies (`noop`, `dca_buy`, `market_maker_basic`). Real strategies -- basis trades, market makers, anything you can express as Go -- are yours to build, share, or [keep private](https://teslashibe.github.io/permafrost/strategies/private-strategies).
 
 ---
 
@@ -130,7 +130,7 @@ Full architecture page: [docs/introduction/architecture](https://teslashibe.gith
 
 ## Going live
 
-Paper mode is the default — real market data, no real orders. To trade real money:
+Paper mode is the default -- real market data, no real orders. To trade real money:
 
 ```bash
 # Import your spot signer (Solana keypair, Phantom-style JSON / base58 / hex)
@@ -156,15 +156,15 @@ permafrost agent run     <id> --confirm-live   # explicit foreground gate
 
 A leveraged AI agent will absolutely try to nuke a vault if you let it. Permafrost ships with non-negotiable guardrails:
 
-- **Spot-first execution** — DEX swap must confirm before the perp short is sent
-- **Idempotent intents** — every order and swap carries a deterministic client ID
-- **Decision provenance** — every order links back to the exact prompt + model response
-- **Paper mode by default** — real orders require explicit `--confirm-live`
-- **Per-agent circuit breakers** — drawdown, daily loss, funding flip
-- **Real killswitch** — cancels open orders, flattens shorts via reduce-only market orders, opt-in spot liquidation to USDC via the configured `SwapVenue`. Documented at [killswitch tuning](https://teslashibe.github.io/permafrost/operations/killswitch-tuning).
-- **Mainnet gating** — Hyperliquid live mode behind explicit per-agent flags
+- **Spot-first execution** -- DEX swap must confirm before the perp short is sent
+- **Idempotent intents** -- every order and swap carries a deterministic client ID
+- **Decision provenance** -- every order links back to the exact prompt + model response
+- **Paper mode by default** -- real orders require explicit `--confirm-live`
+- **Per-agent circuit breakers** -- drawdown, daily loss, funding flip
+- **Real killswitch** -- cancels open orders, flattens shorts via reduce-only market orders, opt-in spot liquidation to USDC via the configured `SwapVenue`. Documented at [killswitch tuning](https://teslashibe.github.io/permafrost/operations/killswitch-tuning).
+- **Mainnet gating** -- Hyperliquid live mode behind explicit per-agent flags
 
-When something does go wrong, **Frostbite the Whale** surfaces — that's the killswitch character on the dashboard.
+When something does go wrong, **Frostbite the Whale** surfaces -- that's the killswitch character on the dashboard.
 
 ---
 

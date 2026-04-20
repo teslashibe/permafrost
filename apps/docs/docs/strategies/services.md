@@ -4,7 +4,7 @@ sidebar_position: 3
 
 # Services
 
-`Services` is the bag of framework-provided dependencies that strategies receive in `WarmupInput`. It's the canonical extension point for new framework features that strategies may depend on — add fields here rather than expanding `WarmupInput` or `DecisionInput`.
+`Services` is the bag of framework-provided dependencies that strategies receive in `WarmupInput`. It's the canonical extension point for new framework features that strategies may depend on -- add fields here rather than expanding `WarmupInput` or `DecisionInput`.
 
 ## The struct
 
@@ -56,7 +56,7 @@ func (s *Strategy) Warmup(_ context.Context, in strategy.WarmupInput) error {
 }
 ```
 
-`Warmup` is once-guarded by the runtime — even if a foreground CLI drives ticks via `TickOnce` instead of `Start`, the framework calls `Warmup` exactly once before the first decision. Authors can rely on Warmup having completed.
+`Warmup` is once-guarded by the runtime -- even if a foreground CLI drives ticks via `TickOnce` instead of `Start`, the framework calls `Warmup` exactly once before the first decision. Authors can rely on Warmup having completed.
 
 The `Warmup` error path matters: validation failures here surface as agent-launch errors, so the operator notices immediately. Without this, the strategy would launch and fail on the first decision tick.
 
@@ -83,9 +83,9 @@ Add to `Services`:
 
 Don't add to `Services`:
 
-- Strategy-specific config — that goes on the typed `Config` struct your `Constructor` parses.
-- Per-tick state — that's `DecisionInput`.
-- Things the strategy can build for itself (e.g. an asset registry — `assets.LoadEmbedded()` is one line).
+- Strategy-specific config -- that goes on the typed `Config` struct your `Constructor` parses.
+- Per-tick state -- that's `DecisionInput`.
+- Things the strategy can build for itself (e.g. an asset registry -- `assets.LoadEmbedded()` is one line).
 
 ## Next steps
 

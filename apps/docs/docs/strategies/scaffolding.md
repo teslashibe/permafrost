@@ -39,7 +39,7 @@ For `permafrost strategy-new my_strategy`:
 
 ```
 strategies/my_strategy/
-├── README.md         # template — fill in your strategy's purpose + run instructions
+├── README.md         # template -- fill in your strategy's purpose + run instructions
 ├── strategy.go       # Strategy struct, init(), New(), Name(), Warmup(), Decide() stubs
 └── strategy_test.go  # Two starter tests: TestNew_ReturnsStrategy + TestDecide_NoOp
 ```
@@ -70,7 +70,7 @@ The command refuses three things up-front, before touching the filesystem:
 
 ## Idempotency
 
-`appendImport` is idempotent: re-running with the same name (after the first attempt failed mid-way) does not duplicate the import line. The directory check and the registry check stay strict — you'll get a clear error rather than a half-finished tree.
+`appendImport` is idempotent: re-running with the same name (after the first attempt failed mid-way) does not duplicate the import line. The directory check and the registry check stay strict -- you'll get a clear error rather than a half-finished tree.
 
 ## Templates
 
@@ -81,7 +81,7 @@ The command refuses three things up-front, before touching the filesystem:
 | `maker` | planned | Perp-only OrderIntent skeleton with optional LLM veto |
 | `dca` | planned | SwapIntent-only DCA skeleton |
 
-For now, `dca_buy`, `market_maker_basic`, and (for maintainers) `funding_arb_basic` are the working examples to copy from while the templates land — see [reference strategies](/strategies/reference-strategies).
+For now, `dca_buy`, `market_maker_basic`, and (for maintainers) `funding_arb_basic` are the working examples to copy from while the templates land -- see [reference strategies](/strategies/reference-strategies).
 
 ## Top-level command name
 
@@ -96,12 +96,12 @@ This is purely an internal-organisation quirk of how the command was wired into 
 
 ## Where it lives
 
-- `internal/cli/strategy_new.go` — the command body and `appendImport` helper.
-- `internal/cli/templates/strategy/noop/*.tmpl` — the embedded template files (`go:embed`).
-- `internal/cli/strategy_new_test.go` — 7 tests covering name validation, scaffolding, `--private`, registry-collision refusal, existing-dir refusal, unshipped-template refusal, `appendImport` idempotency.
+- `internal/cli/strategy_new.go` -- the command body and `appendImport` helper.
+- `internal/cli/templates/strategy/noop/*.tmpl` -- the embedded template files (`go:embed`).
+- `internal/cli/strategy_new_test.go` -- 7 tests covering name validation, scaffolding, `--private`, registry-collision refusal, existing-dir refusal, unshipped-template refusal, `appendImport` idempotency.
 
 ## Next steps
 
 - [The Strategy SAPI](/strategies/sapi)
-- [Reference strategies](/strategies/reference-strategies) — copy from `dca_buy` or `market_maker_basic` for the `basis` / `maker` / `dca` shapes
-- [Private strategies](/strategies/private-strategies) — backups, sharing across machines, leak prevention
+- [Reference strategies](/strategies/reference-strategies) -- copy from `dca_buy` or `market_maker_basic` for the `basis` / `maker` / `dca` shapes
+- [Private strategies](/strategies/private-strategies) -- backups, sharing across machines, leak prevention

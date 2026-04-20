@@ -10,9 +10,9 @@ Permafrost holds private keys directly. This page covers what's stored, where, h
 
 `internal/wallet` manages an encrypted JSON keystore (default path `~/.permafrost/keystore.json`; override via `wallet.keystore_path` in `config.yaml`). It contains, per chain:
 
-- **Solana** — an ed25519 private key.
-- **Hyperliquid** — an ECDSA private key used to sign Hyperliquid orders. (HL itself has no on-chain wallet to fund; this key authenticates API requests.)
-- **EVM chains** — an ECDSA private key (one for all EVM chains; addresses are derived per chain).
+- **Solana** -- an ed25519 private key.
+- **Hyperliquid** -- an ECDSA private key used to sign Hyperliquid orders. (HL itself has no on-chain wallet to fund; this key authenticates API requests.)
+- **EVM chains** -- an ECDSA private key (one for all EVM chains; addresses are derived per chain).
 
 `internal/wallet` is the **only** package that touches private key bytes. Everything else uses a `Signer` abstraction. If a key ever leaks via a log or panic, that's a bug.
 
@@ -29,13 +29,13 @@ In Docker / systemd deployments, supply `PERMAFROST_KEYSTORE_PASSPHRASE` via:
 ## Importing keys
 
 ```bash
-# Solana — from a Solana CLI keypair file
+# Solana -- from a Solana CLI keypair file
 permafrost wallet import --chain solana --from ~/.config/solana/id.json
 
-# EVM — from a hex-encoded private key
+# EVM -- from a hex-encoded private key
 permafrost wallet import --chain ethereum --hex 0x...
 
-# Hyperliquid — same flow, hex private key
+# Hyperliquid -- same flow, hex private key
 permafrost wallet import --chain hyperliquid --hex 0x...
 ```
 
@@ -59,8 +59,8 @@ The keystore + the passphrase together are the keys to the funds. **Lose either 
 
 Minimum:
 
-1. **Encrypted keystore** — backed up to two physically separate locations (e.g. Time Machine + a USB key in a safe).
-2. **Passphrase** — written down, stored separately from the keystore. A password manager works; a piece of paper in a safe works. Memorising it is not a backup.
+1. **Encrypted keystore** -- backed up to two physically separate locations (e.g. Time Machine + a USB key in a safe).
+2. **Passphrase** -- written down, stored separately from the keystore. A password manager works; a piece of paper in a safe works. Memorising it is not a backup.
 
 Better:
 

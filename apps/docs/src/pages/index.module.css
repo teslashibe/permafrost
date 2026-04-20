@@ -118,13 +118,6 @@
   letter-spacing: -0.02em;
   color: var(--ice-bright);
 }
-.heroTitle .gradient {
-  background: linear-gradient(120deg, var(--aurora-c) 0%, var(--aurora-p) 60%, var(--aurora-g) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-}
 
 .heroSubtitle {
   font-size: clamp(1rem, 2vw, 1.25rem);

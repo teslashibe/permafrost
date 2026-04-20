@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # Private strategies
 
-You don't have to publish a strategy to run it. The repo is laid out so you can drop a private strategy into your local clone, build, and run — without forking, without managing a second repo, and without leaking it to upstream.
+You don't have to publish a strategy to run it. The repo is laid out so you can drop a private strategy into your local clone, build, and run -- without forking, without managing a second repo, and without leaking it to upstream.
 
 ## The convention
 
@@ -21,7 +21,7 @@ strategies/
 
 ## Enabling private strategies in your build
 
-Permafrost ships **two** binaries — the daemon (`permafrostd`) and the CLI (`permafrost`) — and a strategy must be linked into *both* to be both runnable and backtest-able. Each binary has a symmetric pair of files:
+Permafrost ships **two** binaries -- the daemon (`permafrostd`) and the CLI (`permafrost`) -- and a strategy must be linked into *both* to be both runnable and backtest-able. Each binary has a symmetric pair of files:
 
 | File | Tracking | Purpose |
 |---|---|---|
@@ -70,7 +70,7 @@ For trading code, plan **at least two** of the above. Strategies that lose money
 
 Three failure modes:
 
-1. **`git add -f`** — bypasses `.gitignore`. Easy to do by accident with a wildcard. A pre-commit hook is good insurance:
+1. **`git add -f`** -- bypasses `.gitignore`. Easy to do by accident with a wildcard. A pre-commit hook is good insurance:
 
    ```bash title=".git/hooks/pre-commit"
    #!/bin/sh
@@ -85,7 +85,7 @@ Three failure modes:
 
 3. **Branch pushes.** A branch that includes a stash apply may carry private files. `git status` before every push.
 
-The `agent run` foreground iteration command lives on the CLI binary; the daemon `permafrostd` is the production-grade supervisor. Both need the same set of strategy registrations — that's why the four-file pattern exists. If you only ever run the daemon, you can skip the two `cmd/permafrost/strategies*.go` files, but `strategy backtest` will then refuse to load your private strategy by name.
+The `agent run` foreground iteration command lives on the CLI binary; the daemon `permafrostd` is the production-grade supervisor. Both need the same set of strategy registrations -- that's why the four-file pattern exists. If you only ever run the daemon, you can skip the two `cmd/permafrost/strategies*.go` files, but `strategy backtest` will then refuse to load your private strategy by name.
 
 ## Sharing a private strategy across machines
 

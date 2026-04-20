@@ -65,7 +65,7 @@ evm:
       one_inch_api_key_env: ONEINCH_API_KEY
 ```
 
-Configured chains downgrade to paper-spot bookkeeping if either the API key or the chain signer is missing — the runtime logs a warning rather than failing.
+Configured chains downgrade to paper-spot bookkeeping if either the API key or the chain signer is missing -- the runtime logs a warning rather than failing.
 
 ## Inference
 
@@ -86,7 +86,7 @@ Multiple providers can coexist; agents pick by name in the `--inference provider
 
 ## Risk
 
-Per-agent risk lives on the agent record (set via `agent create --config-json '{"risk":{...}}'`). The framework also has installation-wide killswitch tuning — see [killswitch tuning](/operations/killswitch-tuning).
+Per-agent risk lives on the agent record (set via `agent create --config-json '{"risk":{...}}'`). The framework also has installation-wide killswitch tuning -- see [killswitch tuning](/operations/killswitch-tuning).
 
 ## Environment overrides
 
@@ -94,9 +94,9 @@ Any nested config field is overridable via environment variable using `_` separa
 
 A few first-class env variables:
 
-- `PERMAFROST_CONFIG` — path to the config file (default `./config.yaml`).
-- `PERMAFROST_HYPERLIQUID_NETWORK` — daemon-wide override of every agent's stored network. Useful for "panic switch all agents to testnet" scenarios.
-- `PERMAFROST_KEYSTORE_PASSPHRASE` — passphrase to decrypt the keystore at startup.
+- `PERMAFROST_CONFIG` -- path to the config file (default `./config.yaml`).
+- `PERMAFROST_HYPERLIQUID_NETWORK` -- daemon-wide override of every agent's stored network. Useful for "panic switch all agents to testnet" scenarios.
+- `PERMAFROST_KEYSTORE_PASSPHRASE` -- passphrase to decrypt the keystore at startup.
 
 ## Next steps
 

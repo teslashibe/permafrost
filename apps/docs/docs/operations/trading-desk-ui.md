@@ -19,7 +19,7 @@ npm run dev          # http://127.0.0.1:5173
 
 The Vite dev server proxies `/v1/*` to `http://127.0.0.1:8080` (the permafrostd default), so the UI works against `make up` without you having to configure CORS.
 
-If the daemon isn't reachable, the UI falls back to **demo mode** — a small canned dataset (Pip + Boulder example agents) so you can preview the experience without `make up`. A yellow "demo mode (daemon unreachable)" banner makes the state unambiguous.
+If the daemon isn't reachable, the UI falls back to **demo mode** -- a small canned dataset (Pip + Boulder example agents) so you can preview the experience without `make up`. A yellow "demo mode (daemon unreachable)" banner makes the state unambiguous.
 
 ## Build
 
@@ -74,7 +74,7 @@ The UI never blank-screens. If the daemon is offline you still see a working das
 - NAV history chart (currently only the current value)
 - Trade-history view
 - Whiteout overlay when killswitch fires (Frostbite the Whale breaching)
-- Mobile breakpoints (desktop-first by design — this is an operator tool)
+- Mobile breakpoints (desktop-first by design -- this is an operator tool)
 - Light theme
 
 ## Dependencies (v1)
@@ -91,15 +91,15 @@ That's it. **No UI framework**, no state library, no router. Just React + tightl
 
 ## Where it lives
 
-- `apps/desk/src/characters/*.svg` — 8 hand-authored sprites + coin
-- `apps/desk/src/components/` — `Sprite`, `AgentCard`, `DecisionRow`, `DashboardChrome`, `Vault`, `CastShowcase`
-- `apps/desk/src/api/client.ts` — REST client + demo-mode fallback
-- `apps/desk/src/styles/global.css` — palette + animations
-- `apps/desk/vite.config.ts` — dev-proxy
-- `.github/workflows/ci.yml` `desk-ui` job — typecheck + build on every PR
+- `apps/desk/src/characters/*.svg` -- 8 hand-authored sprites + coin
+- `apps/desk/src/components/` -- `Sprite`, `AgentCard`, `DecisionRow`, `DashboardChrome`, `Vault`, `CastShowcase`
+- `apps/desk/src/api/client.ts` -- REST client + demo-mode fallback
+- `apps/desk/src/styles/global.css` -- palette + animations
+- `apps/desk/vite.config.ts` -- dev-proxy
+- `.github/workflows/ci.yml` `desk-ui` job -- typecheck + build on every PR
 
 ## Next steps
 
-- [The cast](/brand/cast) — who each sprite represents
-- [LLM-as-agent](/brand/llm-as-agent) — the thesis behind the narwhals
-- [Operations: deployment](/operations/deployment) — production deploys
+- [The cast](/brand/cast) -- who each sprite represents
+- [LLM-as-agent](/brand/llm-as-agent) -- the thesis behind the narwhals
+- [Operations: deployment](/operations/deployment) -- production deploys

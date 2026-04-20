@@ -28,24 +28,24 @@ stateDiagram-v2
 For a `Decision{Swaps: [s], Orders: [o], Cancels: [c]}`:
 
 1. **Cancels** are sent to the perp venue first.
-2. **Swaps** execute and are awaited until confirmation. If a swap fails, the matching `Order` (same `BasisKey`) is dropped — no half-filled basis.
+2. **Swaps** execute and are awaited until confirmation. If a swap fails, the matching `Order` (same `BasisKey`) is dropped -- no half-filled basis.
 3. **Orders** are sent only after every swap with a matching `BasisKey` confirms.
 4. The decision (with its prompt + LLM response if any) is persisted along with resulting tx hashes / venue order IDs.
 5. Reconciliation reads venue + on-chain state and updates `BasisPosition` rows.
 6. PnL is recomputed.
 
-This order is the **spot-first invariant** that makes delta-neutral strategies safe. Strategies do not have to enforce it themselves — the runtime guarantees it.
+This order is the **spot-first invariant** that makes delta-neutral strategies safe. Strategies do not have to enforce it themselves -- the runtime guarantees it.
 
 ## Concurrency
 
-One supervisor goroutine per running agent. Strategy `Decide` calls within an agent are strictly sequential — each tick waits for the previous to complete (or hit the tick deadline). Across agents, ticks happen in parallel; the runtime is goroutine-safe.
+One supervisor goroutine per running agent. Strategy `Decide` calls within an agent are strictly sequential -- each tick waits for the previous to complete (or hit the tick deadline). Across agents, ticks happen in parallel; the runtime is goroutine-safe.
 
 ## Where it lives
 
-- `internal/agent/runtime.go` — the `Runtime` itself.
-- `internal/agent/builder.go` — `BuildDeps`, `BuildStrategy`, `BuildHyperliquidVenue`.
-- `internal/agent/supervisor.go` — keeps a `Runtime` per running agent on daemon boot.
-- `internal/agent/killswitch.go` — the global stop everything switch.
+- `internal/agent/runtime.go` -- the `Runtime` itself.
+- `internal/agent/builder.go` -- `BuildDeps`, `BuildStrategy`, `BuildHyperliquidVenue`.
+- `internal/agent/supervisor.go` -- keeps a `Runtime` per running agent on daemon boot.
+- `internal/agent/killswitch.go` -- the global stop everything switch.
 
 ## Next steps
 

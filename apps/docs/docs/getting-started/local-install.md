@@ -4,7 +4,7 @@ sidebar_position: 3
 
 # Local install (manual)
 
-The fast path is [`make demo`](/getting-started/make-demo) — one command, ~60 seconds. This page is the manual walk-through if you want to drive each step yourself, or to understand what `make demo` does under the hood.
+The fast path is [`make demo`](/getting-started/make-demo) -- one command, ~60 seconds. This page is the manual walk-through if you want to drive each step yourself, or to understand what `make demo` does under the hood.
 
 ## The four commands
 
@@ -30,7 +30,7 @@ permafrost agent create \
 permafrost agent start <id>                # supervisor picks it up
 ```
 
-Default mode is `paper` — no real orders are placed until the agent is explicitly promoted to `live` (and you pass `--confirm-live` to `agent run`). See [running noop](/getting-started/running-noop) for the full smoke-test flow and [the init wizard + doctor](/getting-started/init-and-doctor) for what `init` and `doctor` do.
+Default mode is `paper` -- no real orders are placed until the agent is explicitly promoted to `live` (and you pass `--confirm-live` to `agent run`). See [running noop](/getting-started/running-noop) for the full smoke-test flow and [the init wizard + doctor](/getting-started/init-and-doctor) for what `init` and `doctor` do.
 
 ## What `make up` does
 

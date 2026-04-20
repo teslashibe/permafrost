@@ -80,7 +80,7 @@ permafrost wallet import   --chain hyperliquid --from /tmp/hl-key   # file with 
 permafrost wallet path
 ```
 
-`--chain` accepts `solana` or `hyperliquid`. Both use `--from <file>` — the Solana importer accepts Phantom-style JSON arrays, base58 secrets, or hex; the Hyperliquid importer accepts hex (with or without `0x` prefix) in a file. (There is no `--hex` flag — write the key to a tempfile and `shred -u` it after.)
+`--chain` accepts `solana` or `hyperliquid`. Both use `--from <file>` -- the Solana importer accepts Phantom-style JSON arrays, base58 secrets, or hex; the Hyperliquid importer accepts hex (with or without `0x` prefix) in a file. (There is no `--hex` flag -- write the key to a tempfile and `shred -u` it after.)
 
 Keystore unlock uses the env var named in `wallet.passphrase_env` (defaults to `PERMAFROST_KEYSTORE_PASSPHRASE`). The [init wizard](/getting-started/init-and-doctor) generates this env file for you. See [keystore + backups](/operations/keystore-and-backups).
 
@@ -148,11 +148,11 @@ permafrost agent stop --all           # halt every agent
 `set-mode` is positional and just changes the persisted mode:
 
 ```bash
-permafrost agent set-mode <id> live      # state change only — does NOT prompt
+permafrost agent set-mode <id> live      # state change only -- does NOT prompt
 permafrost agent run     <id> --confirm-live    # explicit gate fires here
 ```
 
-The `--confirm-live` flag is currently only enforced by `agent run` (foreground). The daemon supervisor does not re-prompt — once an agent is `mode=live, status=running`, `permafrost serve` will start it. Tracked for hardening.
+The `--confirm-live` flag is currently only enforced by `agent run` (foreground). The daemon supervisor does not re-prompt -- once an agent is `mode=live, status=running`, `permafrost serve` will start it. Tracked for hardening.
 
 ### One-shot integration tick
 
@@ -169,13 +169,13 @@ permafrost strategy list
 permafrost strategy backtest <name> --csv funding.csv [--config-json '{...}']
 ```
 
-`backtest` looks the strategy name up in the registry — the same registry the daemon uses — so private strategies registered via `cmd/permafrost/strategies_local.go` are backtest-able too. See [private strategies](/strategies/private-strategies).
+`backtest` looks the strategy name up in the registry -- the same registry the daemon uses -- so private strategies registered via `cmd/permafrost/strategies_local.go` are backtest-able too. See [private strategies](/strategies/private-strategies).
 
 Reference strategies shipped in the OSS build:
 
-- `noop` — empty decision every tick; smoke-test only.
-- `dca_buy` — fixed USDC → spot every N hours. See [reference strategies](/strategies/reference-strategies).
-- `market_maker_basic` — paired bid/ask quoting on Hyperliquid with optional LLM veto.
+- `noop` -- empty decision every tick; smoke-test only.
+- `dca_buy` -- fixed USDC → spot every N hours. See [reference strategies](/strategies/reference-strategies).
+- `market_maker_basic` -- paired bid/ask quoting on Hyperliquid with optional LLM veto.
 
 To scaffold a new one: `permafrost strategy-new <name>`.
 
@@ -194,7 +194,7 @@ permafrost inference test --provider openrouter --model anthropic/claude-sonnet-
 permafrost swap quote --chain solana --in USDC --out WIF --amount 100
 ```
 
-Quotes only — does not broadcast. Useful for sanity-checking what an `OrderIntent` paired with a `SwapIntent` would experience.
+Quotes only -- does not broadcast. Useful for sanity-checking what an `OrderIntent` paired with a `SwapIntent` would experience.
 
 ## Risk
 
@@ -238,8 +238,8 @@ Equivalent to running the dedicated `permafrostd` binary. Loads every agent with
 
 ## Environment variables
 
-- `PERMAFROST_CONFIG` — config file path (default `./config.yaml`).
-- `PERMAFROST_HYPERLIQUID_NETWORK` — daemon-wide override of every agent's stored Hyperliquid network. Useful for "panic switch all agents to testnet" scenarios.
-- `PERMAFROST_KEYSTORE_PASSPHRASE` — passphrase to decrypt the keystore. Configurable via `wallet.passphrase_env` in `config.yaml` if you want a different env var name.
+- `PERMAFROST_CONFIG` -- config file path (default `./config.yaml`).
+- `PERMAFROST_HYPERLIQUID_NETWORK` -- daemon-wide override of every agent's stored Hyperliquid network. Useful for "panic switch all agents to testnet" scenarios.
+- `PERMAFROST_KEYSTORE_PASSPHRASE` -- passphrase to decrypt the keystore. Configurable via `wallet.passphrase_env` in `config.yaml` if you want a different env var name.
 - Per-provider inference API keys via the env vars referenced by `inference.providers.<name>.api_key_env` (e.g. `OPENROUTER_API_KEY`).
-- `ONEINCH_API_KEY` — for EVM swaps via 1inch.
+- `ONEINCH_API_KEY` -- for EVM swaps via 1inch.
