@@ -1,4 +1,4 @@
-# Permafrost — Trading Desk
+# Permafrost -- Trading Desk
 
 The arctic-themed operator dashboard. React + Vite, no UI framework
 dependency. Hand-authored SVG sprites for every character (see
@@ -34,7 +34,7 @@ daemon and serve under `/ui`.
 
 | Character                 | Role                                      |
 |---------------------------|-------------------------------------------|
-| 🐻 Pole the polar bear    | Camp Director — the operator's avatar.    |
+| 🐻 Pole the polar bear    | Camp Director -- the operator's avatar.    |
 | 🐧 Penguin trader         | One per running agent.                    |
 | 🦄 Narwhal advisor        | Floats beside an agent that uses the LLM. |
 | 🦉 Aurora the snowy owl   | Risk monitor; eye blinks red on a trip.   |

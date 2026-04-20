@@ -13,7 +13,7 @@ cd permafrost
 make demo
 ```
 
-That's the whole quickstart. Idempotent — re-running attaches to the
+That's the whole quickstart. Idempotent -- re-running attaches to the
 existing demo agent rather than duplicating it. SIGINT to stop the tail;
 the daemon keeps running until `make demo-clean`.
 
@@ -32,19 +32,19 @@ The script (`scripts/demo.sh`) is short and readable. In order:
    `.permafrost-demo/` (gitignored, isolated from your real
    `~/.permafrost/`).
 5. **Source the env file** to load the passphrase into the shell.
-6. **Doctor preflight** — bails out with a clear message if any check
+6. **Doctor preflight** -- bails out with a clear message if any check
    fails hard. Warnings (no inference key, etc.) don't fail the run.
-7. **Recruit Pip** — paper-mode `noop` agent, `--alloc 1000`,
+7. **Recruit Pip** -- paper-mode `noop` agent, `--alloc 1000`,
    `--tick-secs 5`. Reused on re-run via name lookup so you don't get
    duplicate agents.
 8. **Mark Pip runnable** and tail decisions every 2s until SIGINT.
 
-Output is themed for the project — see the [cast](/brand/cast).
+Output is themed for the project -- see the [cast](/brand/cast).
 
 ## Sample output
 
 ```
-❄  Permafrost demo — launching expedition…
+❄  Permafrost demo -- launching expedition…
   ✓ preflight: docker + go present
   ✓ binaries built (./bin/{permafrost,permafrostd})
   ✓ stack up (Postgres + permafrostd)
@@ -62,7 +62,7 @@ Permafrost preflight ───────────────────�
 ─────────────────────────────────────────────────────────────────
   ✓ Pip is on the ice
 
-❄  🐧  The Floe — funding rates
+❄  🐧  The Floe -- funding rates
 
 [tick 1] confidence=0.00 swaps=0 orders=0 notes="noop"
 [tick 2] confidence=0.00 swaps=0 orders=0 notes="noop"
@@ -90,8 +90,8 @@ Stops the docker stack and removes `.permafrost-demo/`. Your real
 
 ## Next steps
 
-- [The init wizard + doctor](/getting-started/init-and-doctor) — for
+- [The init wizard + doctor](/getting-started/init-and-doctor) -- for
   driving the same setup steps interactively without `make demo`.
-- [Running noop](/getting-started/running-noop) — manual end-to-end
+- [Running noop](/getting-started/running-noop) -- manual end-to-end
   walkthrough.
 - [Configuration reference](/getting-started/configuration).

@@ -44,10 +44,10 @@ type Decision struct {
 What the runtime does with each field:
 
 - **`Cancels`** are sent to the perp venue first.
-- **`Swaps`** execute and are awaited until confirmation. `BasisKey` is the join key — a swap and an order with the same `BasisKey` are treated as one paired action.
+- **`Swaps`** execute and are awaited until confirmation. `BasisKey` is the join key -- a swap and an order with the same `BasisKey` are treated as one paired action.
 - **`Orders`** are sent only after every swap with a matching `BasisKey` confirms. If a swap fails, the matching order is dropped.
 - **`Notes`** is persisted with the decision row. LLM rationales, debug strings, anything that helps you read your own decisions later.
-- **`Confidence`** is advisory — surfaced in the API and CLI for monitoring but does not influence execution.
+- **`Confidence`** is advisory -- surfaced in the API and CLI for monitoring but does not influence execution.
 
 ## `OrderIntent`
 
@@ -91,7 +91,7 @@ Same `DecisionInput` → same `Decision`. Period.
 What "same" means:
 
 - Same agent ID, same `Now`, same `Market` snapshot, same positions, same cash, same `Signals`, same `Limits` → byte-for-byte identical `Decision`.
-- Random number generators, current wall-clock time, network calls outside `Services` — all forbidden inside `Decide`.
+- Random number generators, current wall-clock time, network calls outside `Services` -- all forbidden inside `Decide`.
 - Caches that depend on previous tick output are fine but they *must* be derivable from prior `DecisionInput`s alone.
 
 This is what makes the backtester and the decision-replay machinery work. Break determinism and you break audit.

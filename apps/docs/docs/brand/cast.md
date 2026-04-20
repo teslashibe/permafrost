@@ -10,7 +10,7 @@ Each character represents one piece of the architecture; the visual
 language is consistent across the [Trading Desk UI](https://github.com/teslashibe/permafrost/tree/main/apps/desk),
 the docs, and the CLI's flavour text.
 
-The visual style is deliberately playful — hand-authored pixel art,
+The visual style is deliberately playful -- hand-authored pixel art,
 MarioKart-inspired but Nintendo-IP-free. Cute, distinct, immediately
 readable.
 
@@ -18,7 +18,7 @@ readable.
 
 ### <img src="/img/brand/pole.svg" alt="Pole the polar bear" width="64" height="64" style={{verticalAlign: 'middle'}} /> Pole the polar bear (Captain)
 
-The **Camp Director** — your avatar. Pole presides over the trading
+The **Camp Director** -- your avatar. Pole presides over the trading
 desk, holds the keystore, sets allocations, picks strategies, and
 calls the killswitch. Top of the hierarchy.
 
@@ -28,8 +28,8 @@ permanently. He's the one constant on every screen.
 ### <img src="/img/brand/owl.svg" alt="Aurora the snowy owl" width="64" height="64" style={{verticalAlign: 'middle'}} /> Aurora the snowy owl (Risk Monitor)
 
 Aurora perches in the top-right of the dashboard chrome and watches
-the circuit breakers. When a breaker trips — drawdown, daily loss,
-funding flip, RPC degradation — her eyes blink red and the operator
+the circuit breakers. When a breaker trips -- drawdown, daily loss,
+funding flip, RPC degradation -- her eyes blink red and the operator
 knows something is wrong before they read the breaker name.
 
 She doesn't *fix* anything; she just sees everything.
@@ -60,7 +60,7 @@ standalone module bolted on the side.
 
 ### <img src="/img/brand/husky.svg" alt="Skipper the husky" width="64" height="64" style={{verticalAlign: 'middle'}} /> Skipper the husky (Reconciliation)
 
-Runs between camps delivering reconcile passes — comparing the
+Runs between camps delivering reconcile passes -- comparing the
 framework's view of positions and balances against what the venues
 actually report. Catches drift, missed fills, partial swaps.
 
@@ -76,7 +76,7 @@ Hauls tokens between chains via the configured DEX aggregators
 A killer whale. Literal: a "killer whale" is the killswitch.
 
 Frostbite spends most of his life out of sight, somewhere under the
-ice. When he surfaces, the expedition is over — he cancels every open
+ice. When he surfaces, the expedition is over -- he cancels every open
 order, flattens every short, and (if configured) liquidates every
 spot leg back to USDC.
 
@@ -89,7 +89,7 @@ The full-screen "Whiteout" overlay (UI v2) is Frostbite breaching.
 ### <img src="/img/brand/mammoth.svg" alt="Tusk the mammoth" width="64" height="64" style={{verticalAlign: 'middle'}} /> Tusk the mammoth (Private Strategies)
 
 Tusk is *extinct from public view*. The maintainer's gitignored
-strategies under `strategies/private/` are mammoths — present in
+strategies under `strategies/private/` are mammoths -- present in
 the local build, invisible to the upstream. The visual is a
 permanent reminder that the open-source repo intentionally doesn't
 ship every strategy in production.
@@ -105,14 +105,14 @@ maintainer's local build, you might.
 One coin ≈ $100 of accumulated NAV. The vault panel renders coins
 stacked at the bottom; they shimmer when added.
 
-The coin metaphor predates the rest of the cast — it was always
+The coin metaphor predates the rest of the cast -- it was always
 going to be there. The arctic theme just gave it a more concrete
 home.
 
 ## Why this matters
 
 Trading is dense, fast, and unforgiving. The mental load on the
-operator is enormous — there are dozens of breakers, every venue
+operator is enormous -- there are dozens of breakers, every venue
 has a different latency profile, the LLM is sometimes saying
 something useful and sometimes filling air. Names and faces compress
 that load.

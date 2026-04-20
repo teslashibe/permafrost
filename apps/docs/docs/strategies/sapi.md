@@ -30,7 +30,7 @@ That's it. `Name` returns the snake_case identifier; `Warmup` runs once after co
 type Constructor func(cfg map[string]any) (Strategy, error)
 ```
 
-`cfg` is the per-agent JSONB blob from the database — whatever the operator passed to `agent create --config-json`. Parse it into your typed config inside the constructor, apply defaults, validate, and return the strategy.
+`cfg` is the per-agent JSONB blob from the database -- whatever the operator passed to `agent create --config-json`. Parse it into your typed config inside the constructor, apply defaults, validate, and return the strategy.
 
 **Don't** take framework dependencies as constructor arguments. Pull them from `WarmupInput.Services` later. See [Services](/strategies/services).
 
@@ -50,11 +50,11 @@ func init() { strategy.Register(Name, New) }
 func New(cfg map[string]any) (strategy.Strategy, error) { /* ... */ }
 ```
 
-Registration is name-keyed (snake_case, must match what gets stored in `agents.strategy`). Double registration panics — that's intentional, so a typo surfaces at process start.
+Registration is name-keyed (snake_case, must match what gets stored in `agents.strategy`). Double registration panics -- that's intentional, so a typo surfaces at process start.
 
 ## End-to-end: writing your first strategy
 
-The fast path is the scaffolder — see [`strategy-new` scaffolding](/strategies/scaffolding):
+The fast path is the scaffolder -- see [`strategy-new` scaffolding](/strategies/scaffolding):
 
 ```bash
 permafrost strategy-new my_first_strategy
@@ -96,7 +96,7 @@ func (Strategy) Decide(_ context.Context, _ strategy.DecisionInput) (strategy.De
 }
 ```
 
-Enable it in both binaries (one line each — the daemon for runtime, the CLI for `strategy backtest`):
+Enable it in both binaries (one line each -- the daemon for runtime, the CLI for `strategy backtest`):
 
 ```go title="cmd/permafrostd/strategies.go"
 import _ "github.com/teslashibe/permafrost/strategies/my_first_strategy"

@@ -61,7 +61,7 @@ const PROPS: PropEntry[] = [
     body: (
       <>
         Strategies are deterministic Go. The LLM can veto entries, score candidates,
-        and tune thresholds &mdash; but never produces orders directly.
+        and tune thresholds -- but never produces orders directly.
       </>
     ),
   },
@@ -107,7 +107,7 @@ function HeroBanner() {
           v0.1.0 &middot; the camp is open
         </div>
         <h1 className={styles.heroTitle}>
-          Permafrost &mdash; <span className={styles.gradient}>your AI trading desk</span>,<br />
+          Permafrost. Your AI trading desk,<br />
           locked in the ice.
         </h1>
         <p className={styles.heroSubtitle}>
@@ -259,7 +259,7 @@ function CTA() {
 export default function Home(): ReactNode {
   return (
     <Layout
-      title="Permafrost &mdash; your AI trading desk, locked in the ice"
+      title="Permafrost -- your AI trading desk, locked in the ice"
       description="Open-source Go framework for self-custodied algorithmic trading with optional LLM augmentation. Hummingbot-style strategies, real killswitch, arctic-themed operator UI.">
       <HeroBanner />
       <QuickStart />

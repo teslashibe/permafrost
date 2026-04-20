@@ -4,14 +4,14 @@ sidebar_position: 6
 
 # Running noop
 
-`noop` is the smallest strategy that satisfies the `Strategy` interface. It returns an empty `Decision` every tick — no orders, no swaps. It exists for two reasons:
+`noop` is the smallest strategy that satisfies the `Strategy` interface. It returns an empty `Decision` every tick -- no orders, no swaps. It exists for two reasons:
 
 1. **Reference implementation.** Twenty lines of Go that demonstrate the SAPI surface.
 2. **End-to-end smoke test.** All of the framework's loops (scheduler, runtime, reconcile, killswitch, PnL) execute even with `noop` selected, so a successful `noop` run proves your install, database, keystore, and venue connections are all working.
 
 ## The fast path
 
-Just run `make demo` — it does all the steps below for you. See [run the demo](/getting-started/make-demo).
+Just run `make demo` -- it does all the steps below for you. See [run the demo](/getting-started/make-demo).
 
 ## Smoke test (manual)
 
@@ -44,7 +44,7 @@ permafrost agent decisions ag-...
 
 If you see decisions appearing every 30 seconds, the daemon is healthy: the scheduler is firing, the runtime is calling `Strategy.Decide`, results are being persisted to TimescaleDB, and the kill-switch is monitoring without tripping.
 
-For one-shot foreground iteration in a single shell (no daemon), use `permafrost agent run ag-...` instead — that runs the tick loop in the foreground and exits on SIGINT.
+For one-shot foreground iteration in a single shell (no daemon), use `permafrost agent run ag-...` instead -- that runs the tick loop in the foreground and exits on SIGINT.
 
 ## Inspecting agent state
 

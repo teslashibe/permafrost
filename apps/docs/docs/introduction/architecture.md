@@ -82,7 +82,7 @@ permafrost/
 ## Layering rules
 
 - Strategies depend on `pkg/strategy` and `pkg/types`. They MAY import `internal/*` packages directly (single-module repo) but doing so couples them to internals that may change without notice.
-- `internal/agent.BuildStrategy` is a pure registry lookup — no per-strategy special-casing. Strategies own their own typed config parsing inside their `Constructor` and pull framework services from `WarmupInput.Services`.
+- `internal/agent.BuildStrategy` is a pure registry lookup -- no per-strategy special-casing. Strategies own their own typed config parsing inside their `Constructor` and pull framework services from `WarmupInput.Services`.
 - `internal/store` is the only package that imports `pgx`.
 - `internal/wallet` is the only package that touches private key bytes.
 

@@ -11,7 +11,7 @@ Permafrost wraps an OpenAI-compatible chat-completion client (`pkg/inference.Pro
 - **Does:** veto entries based on event/news context, score candidates, classify sentiment, summarize on-chain context for the operator.
 - **Does NOT:** invent orders. Strategies are deterministic Go code; the LLM's output is consumed as a `bool` (veto / not), a number (score), or structured JSON via JSON-Schema mode. Never as raw `OrderIntent`s.
 
-This is enforced at the framework layer: the `Strategy.Decide` return value carries `Orders`, `Swaps`, and `Cancels` — typed Go structs. There is no path for an LLM response to be parsed directly into an order intent.
+This is enforced at the framework layer: the `Strategy.Decide` return value carries `Orders`, `Swaps`, and `Cancels` -- typed Go structs. There is no path for an LLM response to be parsed directly into an order intent.
 
 ## Configuring providers
 
@@ -69,16 +69,16 @@ Every inference request and response is persisted alongside the resulting `Decis
 permafrost agent decisions <id> --with-prompts
 ```
 
-This is what "auditable AI" means in practice — you can see exactly what the model saw, how it responded, and which on-chain actions followed.
+This is what "auditable AI" means in practice -- you can see exactly what the model saw, how it responded, and which on-chain actions followed.
 
 ## Errors and graceful degradation
 
 `pkg/inference` exposes two sentinel errors strategies should handle:
 
-- `ErrUnsupportedFeature` — provider/model can't do something the request asked for (e.g. JSON Schema on a base Ollama model). Strategies should fall back to a simpler prompt or skip the LLM hop.
-- `ErrRateLimited` — provider returned 429. Strategies should default to safe behaviour (e.g. don't open new positions this tick).
+- `ErrUnsupportedFeature` -- provider/model can't do something the request asked for (e.g. JSON Schema on a base Ollama model). Strategies should fall back to a simpler prompt or skip the LLM hop.
+- `ErrRateLimited` -- provider returned 429. Strategies should default to safe behaviour (e.g. don't open new positions this tick).
 
-A `Provider` that returns errors does **not** crash the runtime — `Strategy.Decide` returns whatever decision it made (often an empty one, with the error in `Notes`).
+A `Provider` that returns errors does **not** crash the runtime -- `Strategy.Decide` returns whatever decision it made (often an empty one, with the error in `Notes`).
 
 ## Next steps
 
