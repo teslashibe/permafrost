@@ -127,11 +127,41 @@ NETUID  SYMBOL  ALPHA PRICE (TAO)
 
 Each row is a tradeable alpha token. Subnet 8 (Vanta/Taoshi, formerly known by its $TAOSHI ticker) and subnet 19 (Inference) are popular for trading.
 
-## Step 6 — Run a strategy on testnet first
+## Step 6a — Validate against a local devnet (recommended for community testers)
 
-Before enabling real trading on mainnet, validate end-to-end on testnet.
+The fastest, no-permissions path to verify Permafrost talks to a real Subtensor runtime: run the official `subtensor-localnet` Docker image. Alice comes pre-funded with 1 million TAO, so you can test the full signed-extrinsic pipeline without waiting on a faucet.
 
-In `config.yaml`:
+```bash
+docker run -d --rm --name local_subtensor \
+    -p 9944:9944 -p 9945:9945 \
+    ghcr.io/opentensor/subtensor-localnet:devnet-ready
+```
+
+Wait ~5 seconds for the chain to boot, then point Permafrost at it:
+
+```yaml
+bittensor:
+  rpc_url: ws://localhost:9944
+  allow_submit: true
+```
+
+Run the devnet test suite:
+
+```bash
+go test -tags=devnet -v ./internal/chain/bittensor/...
+```
+
+The `TestDevnet_BalancesTransfer` test signs and submits a real `Balances.transfer` from Alice → Bob and verifies Bob's balance increases on-chain. This proves the full signing + signed-extension + submission pipeline works against the same Subtensor runtime that powers finney mainnet.
+
+Tear down when done:
+
+```bash
+docker rm -f local_subtensor
+```
+
+## Step 6b — Run a strategy on testnet
+
+For testing against real network conditions:
 
 ```yaml
 bittensor:

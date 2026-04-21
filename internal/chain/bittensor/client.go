@@ -138,32 +138,43 @@ func (c *Client) GetBlockNumber(ctx context.Context) (uint64, error) {
 // ─── account / balance reads ────────────────────────────────────────────────
 
 // GetTAOBalance returns the free TAO balance (in RAO) for the given
-// SS58 address. Reads System.Account storage.
+// SS58 address. Reads System.Account storage and decodes against
+// SubtensorAccountInfo (Subtensor uses u64 balances, not u128).
 func (c *Client) GetTAOBalance(ctx context.Context, ss58 string) (uint64, error) {
-	api, meta, err := c.connect()
+	info, ok, err := c.GetAccount(ctx, ss58)
 	if err != nil {
 		return 0, err
+	}
+	if !ok {
+		return 0, nil
+	}
+	return uint64(info.Data.Free), nil
+}
+
+// GetAccount returns the full SubtensorAccountInfo for an SS58 address.
+// Used by the extrinsic submitter to fetch the current nonce.
+func (c *Client) GetAccount(ctx context.Context, ss58 string) (SubtensorAccountInfo, bool, error) {
+	api, meta, err := c.connect()
+	if err != nil {
+		return SubtensorAccountInfo{}, false, err
 	}
 
 	pubKey, err := decodeSS58(ss58)
 	if err != nil {
-		return 0, fmt.Errorf("subtensor: decode ss58 %q: %w", ss58, err)
+		return SubtensorAccountInfo{}, false, fmt.Errorf("subtensor: decode ss58 %q: %w", ss58, err)
 	}
 
 	key, err := gsrpctypes.CreateStorageKey(meta, palletSystem, "Account", pubKey)
 	if err != nil {
-		return 0, fmt.Errorf("subtensor: create storage key: %w", err)
+		return SubtensorAccountInfo{}, false, fmt.Errorf("subtensor: create storage key: %w", err)
 	}
 
-	var info gsrpctypes.AccountInfo
+	var info SubtensorAccountInfo
 	ok, err := api.RPC.State.GetStorageLatest(key, &info)
 	if err != nil {
-		return 0, fmt.Errorf("subtensor: get account: %w", err)
+		return SubtensorAccountInfo{}, false, fmt.Errorf("subtensor: get account: %w", err)
 	}
-	if !ok {
-		return 0, nil // account does not exist on-chain ⇒ zero balance
-	}
-	return info.Data.Free.Uint64(), nil
+	return info, ok, nil
 }
 
 // GetAlphaStake returns the alpha stake (in RAO) held by (coldkey, hotkey)

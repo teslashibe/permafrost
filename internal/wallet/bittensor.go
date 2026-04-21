@@ -79,6 +79,24 @@ func NewBittensorSignerFromPhrase(phrase, password string) (*BittensorSigner, er
 	}, nil
 }
 
+// NewBittensorSignerFromURI constructs a signer from a Substrate URI like
+// "//Alice", "//Bob", or "<phrase>//hard/soft//hard". Used for devnet
+// testing against the well-known dev accounts that come pre-funded on
+// the subtensor-localnet image.
+//
+// Production agents should use seeds or mnemonics, not URIs.
+func NewBittensorSignerFromURI(uri string) (*BittensorSigner, error) {
+	scheme := subscale.Scheme{}
+	kp, err := subkey.DeriveKeyPair(scheme, uri)
+	if err != nil {
+		return nil, fmt.Errorf("bittensor: derive from URI %q: %w", uri, err)
+	}
+	return &BittensorSigner{
+		kp:   kp,
+		addr: kp.SS58Address(bittensorSS58Prefix),
+	}, nil
+}
+
 // SecretKey returns a copy of the 32-byte seed (mini-secret).
 func (s *BittensorSigner) SecretKey() []byte {
 	out := make([]byte, len(s.kp.Seed()))

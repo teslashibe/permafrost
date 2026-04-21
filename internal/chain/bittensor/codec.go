@@ -5,8 +5,45 @@ import (
 	"errors"
 	"fmt"
 
+	gsrpctypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/vedhavyas/go-subkey/v2"
 )
+
+// SubtensorAccountInfo mirrors the on-chain System.Account storage value
+// for Subtensor. Subtensor diverges from the vanilla Substrate AccountInfo
+// shape: AccountData balance fields are u64 (since TAO supply ~21M fits
+// in u64) rather than u128. gsrpc's built-in types.AccountInfo assumes
+// u128 and fails to decode against Subtensor.
+//
+// Field order MUST match the runtime AccountInfo struct exactly:
+//
+//	struct AccountInfo {
+//	    nonce: u32,
+//	    consumers: u32,
+//	    providers: u32,
+//	    sufficients: u32,
+//	    data: AccountData {
+//	        free: u64,
+//	        reserved: u64,
+//	        misc_frozen: u64,
+//	        fee_frozen: u64,
+//	    }
+//	}
+type SubtensorAccountInfo struct {
+	Nonce       gsrpctypes.U32
+	Consumers   gsrpctypes.U32
+	Providers   gsrpctypes.U32
+	Sufficients gsrpctypes.U32
+	Data        SubtensorAccountData
+}
+
+// SubtensorAccountData is the per-account balance shape on Subtensor.
+type SubtensorAccountData struct {
+	Free       gsrpctypes.U64
+	Reserved   gsrpctypes.U64
+	MiscFrozen gsrpctypes.U64
+	FeeFrozen  gsrpctypes.U64
+}
 
 // decodeSS58 decodes an SS58-encoded address into the 32-byte raw account
 // id. We delegate to vedhavyas/go-subkey/v2 which is the canonical Go
