@@ -37,12 +37,20 @@ type SubmitResult struct {
 	Finalized bool
 }
 
-// AddStake submits SubtensorModule.add_stake, buying alpha for the given
-// hotkey on the given subnet with taoAmountRao TAO (in RAO units).
+// AddStake submits SubtensorModule.add_stake_limit with allow_partial=true,
+// buying alpha for the given hotkey on the given subnet with taoAmountRao
+// TAO (in RAO units).
 //
-// For the typical "self-stake" trading-agent case, hotkey = signer's
-// public key. The signer's coldkey (signer.KeyPair) holds the TAO that
-// is consumed.
+// We use add_stake_limit (call index 88) rather than the bare add_stake
+// (call index 2) because the limit variant matches what btcli + the
+// Bittensor SDK use post-dTAO and includes the maybe_become_delegate
+// promotion required when the staking coldkey doesn't own the hotkey.
+// Setting limit_price = u64::MAX + allow_partial=true makes the call
+// behave as "stake whatever the AMM gives me at any price".
+//
+// For the typical delegate-stake case (mainnet pattern), hotkey is an
+// existing registered validator's hotkey and the signer's coldkey is
+// the user's wallet. For self-stake, hotkey = signer's public key.
 //
 // Returns the extrinsic hash and waits for inclusion (not finalization)
 // — callers wanting finalization should pass a generous WaitTimeout.
@@ -70,15 +78,19 @@ func (c *Client) AddStake(
 	if err != nil {
 		return SubmitResult{}, fmt.Errorf("subtensor: hotkey accountID: %w", err)
 	}
+	// limit_price = u64::MAX → effectively "no limit"
+	// allow_partial = true → fill what's possible at any price
 	call, err := gsrpctypes.NewCall(
 		meta,
-		"SubtensorModule.add_stake",
+		"SubtensorModule.add_stake_limit",
 		hotkeyAcc,
 		gsrpctypes.NewU16(netuid),
 		gsrpctypes.NewU64(taoAmountRao),
+		gsrpctypes.NewU64(^uint64(0)),
+		gsrpctypes.NewBool(true),
 	)
 	if err != nil {
-		return SubmitResult{}, fmt.Errorf("subtensor: build add_stake call: %w", err)
+		return SubmitResult{}, fmt.Errorf("subtensor: build add_stake_limit call: %w", err)
 	}
 
 	return c.signAndSubmit(ctx, api, meta, signer, call, opts)
@@ -110,17 +122,55 @@ func (c *Client) RemoveStake(
 	if err != nil {
 		return SubmitResult{}, fmt.Errorf("subtensor: hotkey accountID: %w", err)
 	}
+	// remove_stake_limit symmetric counterpart of add_stake_limit:
+	// limit_price=0 → "any price"; allow_partial=true → fill what we can.
 	call, err := gsrpctypes.NewCall(
 		meta,
-		"SubtensorModule.remove_stake",
+		"SubtensorModule.remove_stake_limit",
 		hotkeyAcc,
 		gsrpctypes.NewU16(netuid),
 		gsrpctypes.NewU64(alphaAmountRao),
+		gsrpctypes.NewU64(0),
+		gsrpctypes.NewBool(true),
 	)
 	if err != nil {
-		return SubmitResult{}, fmt.Errorf("subtensor: build remove_stake call: %w", err)
+		return SubmitResult{}, fmt.Errorf("subtensor: build remove_stake_limit call: %w", err)
 	}
 
+	return c.signAndSubmit(ctx, api, meta, signer, call, opts)
+}
+
+// RegisterNetwork submits SubtensorModule.register_network, creating a
+// new subnet owned by the signer's coldkey with `hotkey` as the
+// designated owner-hotkey. Burns the network registration lock cost
+// (refunded to the AMM pool as initial liquidity).
+//
+// Devnet helper: chains a `register_network → SudoStartCall →
+// SudoEnableSubtoken` for a fully tradeable subnet in three calls.
+func (c *Client) RegisterNetwork(
+	ctx context.Context,
+	signer Signer,
+	hotkeyPub []byte,
+	opts SubmitOptions,
+) (SubmitResult, error) {
+	if signer == nil {
+		return SubmitResult{}, errors.New("subtensor: signer required")
+	}
+	if len(hotkeyPub) != 32 {
+		return SubmitResult{}, fmt.Errorf("subtensor: hotkey must be 32 bytes, got %d", len(hotkeyPub))
+	}
+	api, meta, err := c.connect()
+	if err != nil {
+		return SubmitResult{}, err
+	}
+	hotkeyAcc, err := gsrpctypes.NewAccountID(hotkeyPub)
+	if err != nil {
+		return SubmitResult{}, fmt.Errorf("subtensor: hotkey accountID: %w", err)
+	}
+	call, err := gsrpctypes.NewCall(meta, "SubtensorModule.register_network", hotkeyAcc)
+	if err != nil {
+		return SubmitResult{}, fmt.Errorf("subtensor: build register_network: %w", err)
+	}
 	return c.signAndSubmit(ctx, api, meta, signer, call, opts)
 }
 

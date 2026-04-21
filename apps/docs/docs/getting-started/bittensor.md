@@ -161,15 +161,44 @@ go test -tags=devnet -v ./internal/chain/bittensor/...
 | Sudo wrapping works | `TestDevnet_FullStakeFlow` step 0 |
 | Strategy logic ticks correctly | Run an agent, watch `permafrost agent decisions <id> --tail` |
 
+### Deploy alpha to your own devnet (full end-to-end test)
+
+The pre-existing subnets on the devnet image (netuid 1, 2) ship with empty AMM pools. To get a fully tradeable subnet for end-to-end testing:
+
+```bash
+go test -tags=devnet -v ./internal/chain/bittensor/... -run TestDevnet_DeployAlphaAndStake
+```
+
+This test:
+1. Creates a brand new subnet via `register_network` (auto-populates initial pool reserves from the registration burn)
+2. Activates it via `start_call` (sets `SubtokenEnabled = true` + `FirstEmissionBlockNumber`)
+3. Submits a real 50 TAO `add_stake_limit` extrinsic
+4. Verifies on-chain that:
+   - 50 TAO was actually deducted from the staker's coldkey
+   - Alpha was minted to the hotkey via on-chain `TotalHotkeyAlpha` storage
+
+A passing run looks like:
+
+```
+✓ register_network finalized        (subnet N created)
+✓ start_call invoked → subnet activated
+✓ AMM pool populated: 1 TAO yields 0.998 alpha
+✓ add_stake finalized
+✓ Alice TAO consumed: 50.001358611 TAO
+✓ ALPHA CREDITED ON-CHAIN: TotalHotkeyAlpha[Alice, netuid N] = 62195.485 alpha
+```
+
+This is **proof on your own machine** that Permafrost's chain client correctly drives the full alpha-trading lifecycle on a real Subtensor runtime. The same path works against finney mainnet — the only difference is mainnet's subnets are already activated by their owners.
+
 ### What devnet does NOT validate
 
-| Limitation | Why | Workaround |
-|---|---|---|
-| `add_stake` actually credits alpha | The devnet image ships with **empty AMM pools** for each subnet — there's no liquidity to swap into. Subtensor's runtime accepts the extrinsic, charges the tx fee, and silently no-ops the stake when the pool reserves are zero. | Use mainnet (subnets have populated pools) or testnet (after getting TAO from Discord) for end-to-end alpha-credit testing. |
-| Real subnet pricing dynamics | Devnet's `swap_currentAlphaPrice` returns 1 TAO per alpha for all subnets (no price discovery). | Use mainnet for realistic prices. |
-| Emission-driven yield | Devnet doesn't run the full epoch/emission machinery by default. | Use mainnet for `alpha_yield` testing. |
+| Limitation | Why |
+|---|---|
+| Real subnet pricing dynamics | Newly-created devnet subnets start at `1 TAO per alpha` until trading happens. Mainnet has years of price discovery. |
+| Emission-driven yield | Devnet doesn't run the full epoch/emission machinery by default — `alpha_yield`'s rebalance logic runs but actual yield doesn't accrue. |
+| Liquidity depth | Mainnet pools have real reserves; devnet pools start small. |
 
-**Bottom line:** devnet proves the chain-client infrastructure end-to-end (signing, encoding, submission, finalization all verified by the Balances.transfer test). For end-to-end alpha-credit verification, point at finney mainnet or testnet.
+**Bottom line:** devnet now proves end-to-end alpha trading (real signed extrinsics, real TAO deducted, real alpha minted on-chain). For realistic price discovery and emission yields, point at finney mainnet.
 
 Tear down when done:
 

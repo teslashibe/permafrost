@@ -177,18 +177,15 @@ func (c *Client) GetAccount(ctx context.Context, ss58 string) (SubtensorAccountI
 	return info, ok, nil
 }
 
-// GetAlphaStake returns the alpha stake (in RAO) held by (coldkey, hotkey)
-// for a specific subnet. Reads SubtensorModule.Alpha storage.
-//
-// Per Subtensor source, the storage map key is (hotkey_account_id,
-// coldkey_account_id, netuid). For the simple "self-stake" case used by
-// trading agents, hotkey == coldkey == the trading wallet.
+// GetAlphaStake returns the alpha stake (in RAO) held by (hotkey, coldkey)
+// for a specific subnet via SubtensorModule.Alpha storage. The storage
+// map key is the 3-tuple (hotkey, coldkey, netuid) hashed with
+// (Blake2_128Concat, Blake2_128Concat, Identity).
 func (c *Client) GetAlphaStake(ctx context.Context, hotkeySS58, coldkeySS58 string, netuid uint16) (uint64, error) {
 	api, meta, err := c.connect()
 	if err != nil {
 		return 0, err
 	}
-
 	hotkey, err := decodeSS58(hotkeySS58)
 	if err != nil {
 		return 0, fmt.Errorf("subtensor: decode hotkey: %w", err)
@@ -197,24 +194,49 @@ func (c *Client) GetAlphaStake(ctx context.Context, hotkeySS58, coldkeySS58 stri
 	if err != nil {
 		return 0, fmt.Errorf("subtensor: decode coldkey: %w", err)
 	}
-
-	netuidEncoded, err := encodeU16Compact(netuid)
+	// Identity hasher for u16 = raw little-endian bytes.
+	netuidLE := []byte{byte(netuid), byte(netuid >> 8)}
+	key, err := gsrpctypes.CreateStorageKey(meta, palletSubtensor, "Alpha", hotkey, coldkey, netuidLE)
 	if err != nil {
-		return 0, err
-	}
-
-	key, err := gsrpctypes.CreateStorageKey(meta, palletSubtensor, "Alpha", hotkey, coldkey, netuidEncoded)
-	if err != nil {
-		// Storage layout has shifted across runtime versions; surface a
-		// clear error so the caller can fall back gracefully rather than
-		// returning a misleading zero.
 		return 0, fmt.Errorf("subtensor: alpha storage key (netuid=%d): %w", netuid, err)
 	}
-
 	var raw gsrpctypes.U64
 	ok, err := api.RPC.State.GetStorageLatest(key, &raw)
 	if err != nil {
 		return 0, fmt.Errorf("subtensor: get alpha: %w", err)
+	}
+	if !ok {
+		return 0, nil
+	}
+	return uint64(raw), nil
+}
+
+// GetTotalHotkeyAlpha returns the total alpha (in RAO) staked to a
+// hotkey on a subnet, summed across all coldkey delegators. Reads
+// SubtensorModule.TotalHotkeyAlpha storage (Blake2_128Concat over
+// hotkey, Identity over netuid).
+//
+// This is the storage map that gets credited when add_stake succeeds
+// regardless of which coldkey is staking — it's the single source of
+// truth for "did the stake actually land on-chain".
+func (c *Client) GetTotalHotkeyAlpha(ctx context.Context, hotkeySS58 string, netuid uint16) (uint64, error) {
+	api, meta, err := c.connect()
+	if err != nil {
+		return 0, err
+	}
+	hotkey, err := decodeSS58(hotkeySS58)
+	if err != nil {
+		return 0, fmt.Errorf("subtensor: decode hotkey: %w", err)
+	}
+	netuidLE := []byte{byte(netuid), byte(netuid >> 8)}
+	key, err := gsrpctypes.CreateStorageKey(meta, palletSubtensor, "TotalHotkeyAlpha", hotkey, netuidLE)
+	if err != nil {
+		return 0, fmt.Errorf("subtensor: TotalHotkeyAlpha key: %w", err)
+	}
+	var raw gsrpctypes.U64
+	ok, err := api.RPC.State.GetStorageLatest(key, &raw)
+	if err != nil {
+		return 0, fmt.Errorf("subtensor: TotalHotkeyAlpha: %w", err)
 	}
 	if !ok {
 		return 0, nil
