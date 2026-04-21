@@ -128,49 +128,18 @@ func (s *Server) listDecisionsHandler(c *fiber.Ctx) error {
 	}
 	out := make([]DecisionLite, 0, len(rows))
 	for _, r := range rows {
-		num := parseDecisionCounters(r.Rationale)
 		out = append(out, DecisionLite{
-			ID:        r.DecisionID,
-			AgentID:   id,
-			TS:        r.Time.UTC(),
+			ID:         r.DecisionID,
+			AgentID:    id,
+			TS:         r.Time.UTC(),
 			Confidence: 0, // not persisted in agent_decisions today
-			Notes:     r.Rationale,
-			NumOrders: num.orders,
-			NumSwaps:  num.swaps,
-			LLMUsed:   r.Provider != "",
+			Notes:      r.Rationale,
+			NumOrders:  r.NumOrders,
+			NumSwaps:   r.NumSwaps,
+			LLMUsed:    r.Provider != "",
 		})
 	}
 	return c.JSON(out)
-}
-
-type decisionCounters struct{ orders, swaps int }
-
-// parseDecisionCounters extracts swap/order counts from the rationale
-// string. Runtime.tick logs "swaps=N orders=N cancels=N" tails on every
-// tick; we look for those literals as a cheap proxy until the schema
-// gains explicit columns. Absent counters → zero.
-func parseDecisionCounters(rationale string) decisionCounters {
-	var d decisionCounters
-	d.orders = parseAfter(rationale, "orders=")
-	d.swaps = parseAfter(rationale, "swaps=")
-	return d
-}
-
-func parseAfter(s, marker string) int {
-	i := strings.Index(s, marker)
-	if i < 0 {
-		return 0
-	}
-	rest := s[i+len(marker):]
-	end := 0
-	for end < len(rest) && rest[end] >= '0' && rest[end] <= '9' {
-		end++
-	}
-	if end == 0 {
-		return 0
-	}
-	n, _ := strconv.Atoi(rest[:end])
-	return n
 }
 
 // _ ensures the agent package import is not optimised out when the

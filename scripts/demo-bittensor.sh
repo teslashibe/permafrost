@@ -236,24 +236,29 @@ else
   ok "bittensor key already in keystore"
 fi
 
-# ─── 7b. bootstrap a tradeable subnet on the local subtensor ─────────────
-step "Bootstrapping a tradeable subnet on the local subtensor…"
-NETUID_FILE="$DEMO_DIR/netuid"
-if [[ ! -f "$NETUID_FILE" ]]; then
-  bootstrap_out=$(permafrost --config "$DEMO_CONFIG" bittensor bootstrap --from-uri "//Alice" 2>&1) \
+# ─── 7b. bootstrap THREE tradeable subnets on the local subtensor ────────
+# Three subnets give the momentum + yield strategies a real universe to
+# choose from. Without multiple subnets they have no signal: there's
+# nothing to rotate INTO and nothing to compare stability ACROSS.
+step "Bootstrapping 3 tradeable subnets on the local subtensor…"
+NETUIDS_FILE="$DEMO_DIR/netuids"
+if [[ ! -f "$NETUIDS_FILE" ]]; then
+  bootstrap_out=$(permafrost --config "$DEMO_CONFIG" bittensor bootstrap --from-uri "//Alice" --count 3 2>&1) \
     || { fail "bootstrap failed: $bootstrap_out"; exit 3; }
   echo "$bootstrap_out"
-  NETUID=$(echo "$bootstrap_out" | grep -oE 'subnets: \[[0-9]+\]' | grep -oE '[0-9]+')
-  if [[ -z "$NETUID" ]]; then
-    fail "could not parse netuid from bootstrap output"
+  NETUIDS_CSV=$(echo "$bootstrap_out" | grep -oE 'subnets: \[[0-9,]+\]' | grep -oE '[0-9,]+')
+  if [[ -z "$NETUIDS_CSV" ]]; then
+    fail "could not parse netuids from bootstrap output"
     exit 3
   fi
-  echo "$NETUID" > "$NETUID_FILE"
+  echo "$NETUIDS_CSV" > "$NETUIDS_FILE"
 else
-  NETUID=$(cat "$NETUID_FILE")
-  ok "re-using existing tradeable subnet: SN$NETUID"
+  NETUIDS_CSV=$(cat "$NETUIDS_FILE")
+  ok "re-using existing tradeable subnets: $NETUIDS_CSV"
 fi
-ok "tradeable netuid: SN$NETUID"
+ok "tradeable netuids: [$NETUIDS_CSV]"
+# Use the first netuid for any single-subnet legacy paths (none today).
+NETUID=$(echo "$NETUIDS_CSV" | cut -d, -f1)
 
 # ─── 8. recruit Tao, Mo, and Yumi ────────────────────────────────────────
 step "Recruiting alpha-trading expedition…"
@@ -278,7 +283,7 @@ recruit() {
     --mode live \
     --alloc "$alloc" \
     --tick-secs "$tick" \
-    --universe "SN${NETUID}" \
+    --universe "$UNIVERSE_FLAG" \
     --config-json "$cfg_json" 2>&1) \
     || { fail "agent create $name: $out"; exit 3; }
   local id
@@ -288,9 +293,31 @@ recruit() {
   echo "$id"
 }
 
-TAO_CFG=$(printf '{"subnets":[%s],"tao_per_buy":1.0,"interval_ticks":2,"slippage_bps":100}' "$NETUID")
-MO_CFG=$(printf  '{"universe":[%s],"window_ticks":5,"top_k":1,"exit_threshold":-0.05,"tao_per_position":2.0,"slippage_bps":100}' "$NETUID")
-YUMI_CFG=$(printf '{"universe":[%s],"top_k":1,"rebalance_ticks":5,"volatility_window":5,"tao_per_position":2.0,"slippage_bps":100}' "$NETUID")
+# Build a JSON int array literal from the NETUIDS_CSV. Each strategy
+# config takes a list of subnet IDs.
+NETUIDS_JSON="[$NETUIDS_CSV]"
+# Universe is comma-separated full symbol form. The Bittensor swap
+# venue's MarketSnapshot extension parses these as "SN{n}/TAO" so the
+# strategies see real on-chain prices keyed by symbol.
+UNIVERSE_FLAG=$(echo "$NETUIDS_CSV" | tr ',' '\n' | sed 's|^|SN|;s|$|/TAO|' | tr '\n' ',' | sed 's/,$//')
+
+# Tao: DCAs into ALL three subnets every 2 ticks. Each buy moves the
+# AMM price upward, creating real on-chain price action that Mo's
+# momentum and Yumi's volatility readings respond to. The AMM's
+# non-linear bonding curve makes the per-subnet price trajectories
+# diverge as Tao keeps buying — that divergence is the signal Mo and
+# Yumi rotate on.
+TAO_CFG=$(printf '{"subnets":%s,"tao_per_buy":0.5,"interval_ticks":2,"slippage_bps":150}' "$NETUIDS_JSON")
+# Mo: top_k=1 so it always picks the SINGLE highest-momentum subnet.
+# Combined with the short window, this means Mo actively rotates as
+# the leader changes — visible in the decision log every couple of
+# ticks. exit_threshold=0 means any flat-or-down subnet gets dropped.
+MO_CFG=$(printf  '{"universe":%s,"window_ticks":3,"top_k":1,"exit_threshold":0,"tao_per_position":1.0,"slippage_bps":150}' "$NETUIDS_JSON")
+# Yumi: top_k=1 so it picks the single most-stable subnet. Rebalance
+# every 3 ticks (~90s) for visible cadence in the demo. volatility
+# window of 4 ticks is now safe (the strategy was hard-coded to need
+# ≥5 prior to today's fix).
+YUMI_CFG=$(printf '{"universe":%s,"top_k":1,"rebalance_ticks":3,"volatility_window":4,"tao_per_position":1.0,"slippage_bps":150}' "$NETUIDS_JSON")
 
 TAO_ID=$(recruit "Tao"  "alpha_dca"      "$TAO_CFG"  "500"  "30")
 MO_ID=$(recruit  "Mo"   "alpha_momentum" "$MO_CFG"   "750"  "30")

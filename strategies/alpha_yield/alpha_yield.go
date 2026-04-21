@@ -159,7 +159,12 @@ func (s *Strategy) Decide(_ context.Context, in strategy.DecisionInput) (strateg
 	var scores []scored
 	for _, netuid := range s.cfg.Universe {
 		hist := s.history[netuid]
-		if len(hist) < 5 {
+		// relativeStdDev needs ≥ 2 prices to compute a return series. We
+		// previously gated on ≥ 5 here, but that conflicted with operator
+		// configs that set volatility_window < 5: history would never grow
+		// long enough to score, so the strategy entered nothing forever.
+		// Use the actual lower bound of the math instead.
+		if len(hist) < 2 {
 			continue
 		}
 		vol := relativeStdDev(hist)
