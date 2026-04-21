@@ -9,28 +9,6 @@ import (
 	"github.com/teslashibe/permafrost/internal/telemetry"
 )
 
-func TestParseDecisionCounters(t *testing.T) {
-	cases := []struct {
-		in     string
-		orders int
-		swaps  int
-	}{
-		{"alpha_dca: buying 1 TAO each of [SN8] swaps=3 orders=0 cancels=0", 0, 3},
-		{"swaps=1", 0, 1},
-		{"orders=42 swaps=7", 42, 7},
-		{"no counters here", 0, 0},
-		{"swaps=", 0, 0},
-		{"swaps=abc", 0, 0},
-	}
-	for _, tc := range cases {
-		got := parseDecisionCounters(tc.in)
-		if got.orders != tc.orders || got.swaps != tc.swaps {
-			t.Errorf("parseDecisionCounters(%q): got orders=%d swaps=%d, want orders=%d swaps=%d",
-				tc.in, got.orders, got.swaps, tc.orders, tc.swaps)
-		}
-	}
-}
-
 // TestListAgents_NoStore proves the handler returns 503 (not crash, not
 // leaking nil) when the daemon was started without a database.
 func TestListAgents_NoStore(t *testing.T) {

@@ -552,11 +552,21 @@ ORDER BY opened_at`, agentID)
 	return out, rows.Err()
 }
 
-// RecentDecisions returns the most recent decisions for an agent, oldest first.
+// RecentDecisions returns the most recent decisions for an agent, newest first.
+// NumOrders + NumSwaps are computed at read time from the JSONB
+// `decision` column so callers don't have to re-parse the rationale.
 func (s *Store) RecentDecisions(ctx context.Context, agentID string, since time.Time, limit int) ([]DecisionRow, error) {
 	rows, err := s.pool.Query(ctx, `
-SELECT time, decision_id, COALESCE(rationale,''), COALESCE(provider,''), COALESCE(model,''), tokens_in, tokens_out, cost_usd
-FROM agent_decisions WHERE agent_id = $1 AND time >= $2 ORDER BY time DESC LIMIT $3`,
+SELECT time, decision_id, COALESCE(rationale,''),
+       COALESCE(provider,''), COALESCE(model,''),
+       tokens_in, tokens_out, cost_usd,
+       CASE WHEN jsonb_typeof(decision->'Orders') = 'array'
+            THEN jsonb_array_length(decision->'Orders') ELSE 0 END AS num_orders,
+       CASE WHEN jsonb_typeof(decision->'Swaps') = 'array'
+            THEN jsonb_array_length(decision->'Swaps') ELSE 0 END AS num_swaps
+FROM agent_decisions
+WHERE agent_id = $1 AND time >= $2
+ORDER BY time DESC LIMIT $3`,
 		agentID, since, limit)
 	if err != nil {
 		return nil, err
@@ -565,7 +575,12 @@ FROM agent_decisions WHERE agent_id = $1 AND time >= $2 ORDER BY time DESC LIMIT
 	out := make([]DecisionRow, 0)
 	for rows.Next() {
 		var r DecisionRow
-		if err := rows.Scan(&r.Time, &r.DecisionID, &r.Rationale, &r.Provider, &r.Model, &r.TokensIn, &r.TokensOut, &r.CostUSD); err != nil {
+		if err := rows.Scan(
+			&r.Time, &r.DecisionID, &r.Rationale,
+			&r.Provider, &r.Model,
+			&r.TokensIn, &r.TokensOut, &r.CostUSD,
+			&r.NumOrders, &r.NumSwaps,
+		); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -573,7 +588,8 @@ FROM agent_decisions WHERE agent_id = $1 AND time >= $2 ORDER BY time DESC LIMIT
 	return out, rows.Err()
 }
 
-// DecisionRow is a row-shaped subset of agent_decisions used by the CLI.
+// DecisionRow is a row-shaped subset of agent_decisions used by the CLI
+// and HTTP API.
 type DecisionRow struct {
 	Time       time.Time
 	DecisionID string
@@ -583,6 +599,8 @@ type DecisionRow struct {
 	TokensIn   int
 	TokensOut  int
 	CostUSD    float64
+	NumOrders  int
+	NumSwaps   int
 }
 
 func orZero(m map[string]any) map[string]any {
