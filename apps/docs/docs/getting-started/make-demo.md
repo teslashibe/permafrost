@@ -25,6 +25,12 @@ Want to see real on-chain trades against a local Bittensor chain instead of a pa
 make demo-bittensor
 ```
 
+<div align="center">
+
+![Permafrost Bittensor demo](../../assets/permafrost-animation.gif)
+
+</div>
+
 This spins up everything `make demo` does PLUS a [`subtensor-localnet`](https://github.com/opentensor/subtensor) container, bootstraps a fresh tradeable subnet, and recruits **three live-mode trading agents**:
 
 - 🐧 **Tao** — `alpha_dca` (DCA into the bootstrapped subnet)

@@ -69,6 +69,10 @@ That's it. `make demo` builds the binaries, brings up Postgres + `permafrostd` i
 make demo-bittensor
 ```
 
+<div align="center">
+<img src="apps/docs/assets/permafrost-animation.gif" width="720" alt="Permafrost Trading Desk — three Bittensor alpha agents (Tao, Mo, Yumi) trading live against a local subtensor devnet" />
+</div>
+
 Spins up the same stack PLUS a local Subtensor chain in Docker, bootstraps a tradeable subnet, and recruits **three live-mode trading agents** that execute real on-chain `add_stake_limit` extrinsics:
 
 - 🐧 **Tao** — `alpha_dca` (DCA into bootstrapped subnet)
