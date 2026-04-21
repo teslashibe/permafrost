@@ -121,19 +121,39 @@ func newWalletImportCmd() *cobra.Command {
 	var (
 		chain string
 		from  string
+		uri   string
 	)
 	cmd := &cobra.Command{
 		Use:   "import",
-		Short: "Import a key from a file into the keystore",
-		Long: `Import a key from a file:
+		Short: "Import a key from a file or Substrate URI into the keystore",
+		Long: `Import a key from a file or, for Bittensor, from a Substrate URI:
   - solana:      a Phantom-style JSON array of 64 numbers, OR a base58
                   ed25519 secret key, OR raw 32/64-byte hex.
   - hyperliquid: a 32-byte hex private key (with or without 0x prefix).
+  - bittensor:   either --from <file> (32-byte hex seed or BIP-39 mnemonic)
+                  OR --from-uri "//Alice" (Substrate derivation URI; useful
+                  for devnet testing with the well-known Alice/Bob/etc.
+                  dev accounts).
 `,
 		RunE: func(c *cobra.Command, _ []string) error {
 			ks, err := openKeystore(c)
 			if err != nil {
 				return err
+			}
+
+			// Bittensor URI path — no file needed.
+			if chain == string(types.ChainBittensor) && uri != "" {
+				s, err := wallet.NewBittensorSignerFromURI(uri)
+				if err != nil {
+					return err
+				}
+				ks.SetBittensor(s)
+				fmt.Println("bittensor    " + s.Address())
+				return ks.Save()
+			}
+
+			if from == "" {
+				return fmt.Errorf("--from <file> is required (or --from-uri for bittensor)")
 			}
 			body, err := os.ReadFile(from)
 			if err != nil {
@@ -170,9 +190,9 @@ func newWalletImportCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&chain, "chain", "", "chain (solana | hyperliquid | bittensor)")
-	cmd.Flags().StringVar(&from, "from", "", "path to key file")
+	cmd.Flags().StringVar(&from, "from", "", "path to key file (or --from-uri for bittensor)")
+	cmd.Flags().StringVar(&uri, "from-uri", "", "Substrate URI like //Alice (bittensor only)")
 	_ = cmd.MarkFlagRequired("chain")
-	_ = cmd.MarkFlagRequired("from")
 	return cmd
 }
 

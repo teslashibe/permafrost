@@ -3,11 +3,14 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	btchain "github.com/teslashibe/permafrost/internal/chain/bittensor"
+	"github.com/teslashibe/permafrost/internal/wallet"
 	"github.com/teslashibe/permafrost/pkg/types"
 )
 
@@ -31,7 +34,97 @@ endpoint.`,
 		newBittensorSubnetsCmd(),
 		newBittensorBalanceCmd(),
 		newBittensorPriceCmd(),
+		newBittensorBootstrapCmd(),
 	)
+	return cmd
+}
+
+// newBittensorBootstrapCmd creates a brand-new tradeable subnet on the
+// configured Subtensor endpoint. Mainly a devnet helper — community
+// testers running their own subtensor docker image can use this to get
+// an alpha-stakeable subnet without manually invoking 3+ extrinsics.
+//
+// Flow: register_network → start_call. The subnet's owner is the
+// signer (default //Alice for devnet). Prints the new netuid so the
+// caller can pipe it into agent configs.
+func newBittensorBootstrapCmd() *cobra.Command {
+	var fromURI string
+	cmd := &cobra.Command{
+		Use:   "bootstrap",
+		Short: "Create + activate a fresh tradeable subnet (devnet helper)",
+		Long: `Bootstrap creates a new subnet via SubtensorModule.register_network and
+activates it via start_call. The new subnet has a populated AMM pool
+and accepts add_stake immediately.
+
+Use against a local subtensor-localnet docker image. The default signer
+is //Alice (the well-known devnet sudo account).
+
+Mainnet usage: don't. The registration burn cost on mainnet is several
+hundred TAO; if you really want to do this, use btcli or call
+SubtensorModule.register_network from a real wallet.`,
+		RunE: func(c *cobra.Command, _ []string) error {
+			g := FromContext(c.Context())
+			if g == nil {
+				return fmt.Errorf("globals not initialised")
+			}
+			rpcURL := g.Config.Bittensor.ResolvedRPCURL()
+			if !strings.Contains(rpcURL, "localhost") && !strings.Contains(rpcURL, "127.0.0.1") {
+				fmt.Fprintf(os.Stderr, "WARNING: bootstrap is a devnet helper. RPC %q does not look local.\n", rpcURL)
+				fmt.Fprintf(os.Stderr, "         Press Ctrl-C in 5s to abort, or wait to continue.\n\n")
+				time.Sleep(5 * time.Second)
+			}
+
+			signer, err := wallet.NewBittensorSignerFromURI(fromURI)
+			if err != nil {
+				return fmt.Errorf("derive signer from URI %q: %w", fromURI, err)
+			}
+			fmt.Fprintf(os.Stdout, "Bootstrapping subnet as %s (URI %s)\n", signer.Address(), fromURI)
+
+			client := btchain.NewClient(rpcURL)
+			defer client.Close()
+
+			countBefore, err := client.SubnetCount(c.Context())
+			if err != nil {
+				return fmt.Errorf("subnet count: %w", err)
+			}
+
+			fmt.Fprintln(os.Stdout, "  → register_network …")
+			if _, err := client.RegisterNetwork(c.Context(), signer, signer.PublicKey(), btchain.SubmitOptions{
+				WaitTimeout: 30 * time.Second,
+			}); err != nil {
+				return fmt.Errorf("register_network: %w", err)
+			}
+			time.Sleep(2 * time.Second)
+
+			countAfter, err := client.SubnetCount(c.Context())
+			if err != nil {
+				return fmt.Errorf("subnet count after: %w", err)
+			}
+			if countAfter <= countBefore {
+				return fmt.Errorf("subnet count did not grow: %d → %d", countBefore, countAfter)
+			}
+			netuid := countAfter - 1
+			fmt.Fprintf(os.Stdout, "  ✓ new subnet netuid = %d\n", netuid)
+
+			fmt.Fprintln(os.Stdout, "  → start_call …")
+			if _, err := client.StartCall(c.Context(), signer, netuid, btchain.SubmitOptions{
+				WaitTimeout: 30 * time.Second,
+			}); err != nil {
+				return fmt.Errorf("start_call: %w", err)
+			}
+			time.Sleep(2 * time.Second)
+
+			price, err := client.CurrentAlphaPrice(c.Context(), netuid)
+			if err == nil {
+				fmt.Fprintf(os.Stdout, "  ✓ AMM live: SN%d alpha price = %s TAO\n", netuid, price.StringFixed(9))
+			}
+
+			fmt.Fprintln(os.Stdout, "")
+			fmt.Fprintf(os.Stdout, "Subnet %d ready. Configure strategies with subnets: [%d]\n", netuid, netuid)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&fromURI, "from-uri", "//Alice", "Substrate URI for the bootstrap signer")
 	return cmd
 }
 
