@@ -28,6 +28,8 @@ var buildVersion = "dev"
 func (s *Server) registerRoutes() {
 	v1 := s.app.Group("/v1")
 	v1.Get("/health", s.healthHandler)
+	v1.Get("/agents", s.listAgentsHandler)
+	v1.Get("/agents/:id/decisions", s.listDecisionsHandler)
 }
 
 func (s *Server) healthHandler(c *fiber.Ctx) error {

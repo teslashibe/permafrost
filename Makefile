@@ -72,4 +72,6 @@ demo-bittensor-clean: ## Tear down the bittensor demo (incl. subtensor container
 	@docker compose -f deploy/compose/docker-compose.yml --profile bittensor down -v 2>/dev/null || true
 	@echo "==> removing .permafrost-demo-bittensor/"
 	@rm -rf .permafrost-demo-bittensor
+	@echo "==> clearing apps/desk/.env.local"
+	@rm -f apps/desk/.env.local
 	@echo "bittensor demo cleaned. Run \`make demo-bittensor\` to start fresh."

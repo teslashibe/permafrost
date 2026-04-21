@@ -43,7 +43,12 @@ export interface DemoData {
 }
 
 export class APIClient {
-  constructor(private base = '') {}
+  // token is the bearer token sent on every non-public request. Empty
+  // string disables the header (loopback dev / public read paths).
+  // Read from import.meta.env.VITE_API_TOKEN at construction time so
+  // the build can bake a token in for the demo flow without rebuilding
+  // the client per environment.
+  constructor(private base = '', private token: string = readToken()) {}
 
   async health(): Promise<{ ok: boolean; version?: string }> {
     return this.get('/v1/health');
@@ -59,11 +64,32 @@ export class APIClient {
   }
 
   private async get<T>(path: string): Promise<T> {
-    const res = await fetch(`${this.base}${path}`);
+    const headers: Record<string, string> = {};
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+    const res = await fetch(`${this.base}${path}`, { headers });
     if (!res.ok) {
       throw new APIError(res.status, await res.text());
     }
     return res.json();
+  }
+}
+
+// readToken pulls the bearer token from Vite's compile-time env. Returns
+// empty string when unset (loopback dev mode against an unauthenticated
+// daemon). The token is injected by `make demo-bittensor` via the
+// generated apps/desk/.env.local; operators running the UI by hand can
+// also export VITE_API_TOKEN before `npm run dev`.
+function readToken(): string {
+  // Vite replaces import.meta.env.VITE_* at build time. Wrapped in a
+  // try/catch so test environments without import.meta still work.
+  try {
+    const t = (import.meta as ImportMeta & { env?: { VITE_API_TOKEN?: string } })
+      .env?.VITE_API_TOKEN;
+    return typeof t === 'string' ? t : '';
+  } catch {
+    return '';
   }
 }
 

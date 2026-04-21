@@ -173,6 +173,11 @@ func Load(path string) (*Config, error) {
 
 	v.SetDefault("env", string(EnvDev))
 	v.SetDefault("server.bind", "127.0.0.1:8080")
+	// Empty default registers the key with viper so AutomaticEnv()
+	// picks up PERMAFROST_SERVER__AUTH_TOKEN at startup. Without a
+	// default (or explicit BindEnv) viper ignores env vars for unknown
+	// keys.
+	v.SetDefault("server.auth_token", "")
 	v.SetDefault("logging.level", "info")
 	v.SetDefault("logging.format", "")
 	v.SetDefault("database.url", "postgres://permafrost:permafrost@localhost:5432/permafrost?sslmode=disable")
@@ -195,6 +200,20 @@ func Load(path string) (*Config, error) {
 	v.SetEnvPrefix("PERMAFROST")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "__"))
 	v.AutomaticEnv()
+
+	// Explicit BindEnv for nested keys that operators commonly set via
+	// env in containers (compose / kubernetes). AutomaticEnv works for
+	// flat keys but the nested-key ↔ env-name mapping is fragile, so
+	// we pin the ones we care about.
+	for _, key := range []string{
+		"server.auth_token",
+		"wallet.keystore_path",
+		"bittensor.rpc_url",
+		"bittensor.network",
+		"bittensor.allow_submit",
+	} {
+		_ = v.BindEnv(key)
+	}
 
 	if err := v.ReadInConfig(); err != nil {
 		var notFound viper.ConfigFileNotFoundError
