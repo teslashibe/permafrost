@@ -2,7 +2,9 @@ package cli
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -35,8 +37,181 @@ endpoint.`,
 		newBittensorBalanceCmd(),
 		newBittensorPriceCmd(),
 		newBittensorBootstrapCmd(),
+		newBittensorNoiseTraderCmd(),
 	)
 	return cmd
+}
+
+// newBittensorNoiseTraderCmd runs a small loop that periodically submits
+// random buy/sell extrinsics across a configured subnet universe.
+//
+// Purpose: create realistic volatility in the AMM pools of a local
+// devnet so momentum + yield strategies have a meaningful signal to
+// react to. Without this, the only price pressure on devnet comes
+// from agents themselves — which on a fresh chain is a single DCA
+// strategy buying uniformly across subnets, producing little
+// per-subnet divergence.
+//
+// Behaviour per cycle:
+//  1. Pick a random subnet from --subnets.
+//  2. Pick a random direction (BUY weighted heavier than SELL because
+//     fresh wallets start with TAO not alpha).
+//  3. Pick a random TAO amount in [--min-tao .. --max-tao].
+//  4. Submit add_stake_limit (BUY) or remove_stake_limit (SELL).
+//  5. Sleep --interval-secs (jittered ±50%).
+//  6. Loop until SIGINT.
+//
+// Devnet helper. Refuses to run against non-localhost RPCs.
+func newBittensorNoiseTraderCmd() *cobra.Command {
+	var (
+		fromURI       string
+		subnetsCSV    string
+		intervalSecs  int
+		minTAOFloat   float64
+		maxTAOFloat   float64
+		buyWeight     int
+	)
+	cmd := &cobra.Command{
+		Use:   "noise-trader",
+		Short: "Random buy/sell loop to create volatility on devnet AMM pools (devnet only)",
+		Long: `noise-trader runs a loop that submits random buy/sell extrinsics
+across a chosen subnet universe. It exists to give momentum + yield
+strategies a realistic price signal to trade against on a local devnet.
+
+Refuses to run against non-localhost RPCs. Stop with SIGINT.`,
+		RunE: func(c *cobra.Command, _ []string) error {
+			g := FromContext(c.Context())
+			if g == nil {
+				return fmt.Errorf("globals not initialised")
+			}
+			rpcURL := g.Config.Bittensor.ResolvedRPCURL()
+			if !strings.Contains(rpcURL, "localhost") && !strings.Contains(rpcURL, "127.0.0.1") {
+				return fmt.Errorf("noise-trader is a devnet helper; refusing to run against %q", rpcURL)
+			}
+			if subnetsCSV == "" {
+				return fmt.Errorf("--subnets is required (e.g. --subnets 2,3,4)")
+			}
+			subnets, err := parseSubnetsCSV(subnetsCSV)
+			if err != nil {
+				return err
+			}
+			if intervalSecs < 1 {
+				return fmt.Errorf("--interval-secs must be >= 1")
+			}
+			if minTAOFloat <= 0 || maxTAOFloat < minTAOFloat {
+				return fmt.Errorf("--min-tao must be > 0 and --max-tao must be >= --min-tao")
+			}
+			if buyWeight < 0 || buyWeight > 100 {
+				return fmt.Errorf("--buy-weight must be in [0..100]")
+			}
+
+			signer, err := wallet.NewBittensorSignerFromURI(fromURI)
+			if err != nil {
+				return fmt.Errorf("derive signer from URI %q: %w", fromURI, err)
+			}
+			fmt.Fprintf(os.Stdout, "noise-trader starting as %s (URI %s)\n", signer.Address(), fromURI)
+			fmt.Fprintf(os.Stdout, "  subnets:       %v\n", subnets)
+			fmt.Fprintf(os.Stdout, "  interval:      %ds (±50%% jitter)\n", intervalSecs)
+			fmt.Fprintf(os.Stdout, "  amount range:  %.3f .. %.3f TAO\n", minTAOFloat, maxTAOFloat)
+			fmt.Fprintf(os.Stdout, "  buy weight:    %d%% (rest sells)\n\n", buyWeight)
+
+			client := btchain.NewClient(rpcURL)
+			defer client.Close()
+
+			rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+			cycle := 0
+			for {
+				if c.Context().Err() != nil {
+					return nil
+				}
+				cycle++
+				netuid := subnets[rng.Intn(len(subnets))]
+				isBuy := rng.Intn(100) < buyWeight
+				amtRange := maxTAOFloat - minTAOFloat
+				amt := minTAOFloat + rng.Float64()*amtRange
+				rao := uint64(amt * 1e9)
+				if rao == 0 {
+					rao = 1
+				}
+
+				start := time.Now()
+				var (
+					action string
+					err    error
+				)
+				if isBuy {
+					action = "BUY "
+					_, err = client.AddStake(c.Context(), signer, netuid, signer.PublicKey(), rao, btchain.SubmitOptions{
+						WaitTimeout: 20 * time.Second,
+					})
+				} else {
+					action = "SELL"
+					_, err = client.RemoveStake(c.Context(), signer, netuid, signer.PublicKey(), rao, btchain.SubmitOptions{
+						WaitTimeout: 20 * time.Second,
+					})
+				}
+				dur := time.Since(start).Truncate(time.Millisecond)
+				if err != nil {
+					// Sells will commonly fail on a hotkey with zero
+					// alpha. That's fine — log and keep going.
+					fmt.Fprintf(os.Stdout, "[%04d] %s SN%d %.4f TAO  err=%v (%s)\n",
+						cycle, action, netuid, amt, truncErr(err), dur)
+				} else {
+					fmt.Fprintf(os.Stdout, "[%04d] %s SN%d %.4f TAO  ok (%s)\n",
+						cycle, action, netuid, amt, dur)
+				}
+
+				// Jitter sleep ±50%.
+				base := time.Duration(intervalSecs) * time.Second
+				jitter := time.Duration(rng.Int63n(int64(base)) - int64(base/2))
+				select {
+				case <-c.Context().Done():
+					return nil
+				case <-time.After(base + jitter):
+				}
+			}
+		},
+	}
+	cmd.Flags().StringVar(&fromURI, "from-uri", "//Alice", "Substrate URI for the noise-trader signer")
+	cmd.Flags().StringVar(&subnetsCSV, "subnets", "", "comma-separated netuids to trade across (e.g. 2,3,4)")
+	cmd.Flags().IntVar(&intervalSecs, "interval-secs", 5, "base seconds between submissions (jittered ±50%)")
+	cmd.Flags().Float64Var(&minTAOFloat, "min-tao", 0.05, "minimum TAO amount per submission")
+	cmd.Flags().Float64Var(&maxTAOFloat, "max-tao", 0.4, "maximum TAO amount per submission")
+	cmd.Flags().IntVar(&buyWeight, "buy-weight", 65, "percentage chance of BUY (rest is SELL)")
+	return cmd
+}
+
+// parseSubnetsCSV parses "2,3,4" into []uint16{2,3,4}.
+func parseSubnetsCSV(s string) ([]uint16, error) {
+	parts := strings.Split(s, ",")
+	out := make([]uint16, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		n, err := strconv.ParseUint(p, 10, 16)
+		if err != nil {
+			return nil, fmt.Errorf("subnets: %q is not a valid u16: %w", p, err)
+		}
+		out = append(out, uint16(n))
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("subnets: at least one netuid required")
+	}
+	return out, nil
+}
+
+// truncErr collapses the gsrpc/Substrate error spam to one line.
+func truncErr(err error) string {
+	s := err.Error()
+	if i := strings.Index(s, "\n"); i > 0 {
+		s = s[:i]
+	}
+	if len(s) > 80 {
+		s = s[:80] + "…"
+	}
+	return s
 }
 
 // newBittensorBootstrapCmd creates a brand-new tradeable subnet on the

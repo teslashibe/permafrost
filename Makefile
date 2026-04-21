@@ -68,6 +68,10 @@ demo-bittensor: ## Bittensor demo: stack + subtensor + 3 alpha agents (Tao, Mo, 
 	@./scripts/demo-bittensor.sh
 
 demo-bittensor-clean: ## Tear down the bittensor demo (incl. subtensor container)
+	@echo "==> stopping noise trader (if running)"
+	@if [ -f .permafrost-demo-bittensor/noise-trader.pid ]; then \
+		kill `cat .permafrost-demo-bittensor/noise-trader.pid` 2>/dev/null || true; \
+	fi
 	@echo "==> stopping stack + subtensor"
 	@docker compose -f deploy/compose/docker-compose.yml --profile bittensor down -v 2>/dev/null || true
 	@echo "==> removing .permafrost-demo-bittensor/"
