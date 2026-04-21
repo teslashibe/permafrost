@@ -12,6 +12,9 @@ The OSS build ships three strategies as reference implementations. Together they
 | `noop` | -- | -- | -- | -- | `strategies/noop/` |
 | `dca_buy` | ✓ | -- | -- | -- | `strategies/dca_buy/` |
 | `market_maker_basic` | -- | ✓ | ✓ | ✓ | `strategies/market_maker_basic/` |
+| `alpha_dca` | ✓ | -- | -- | -- | `strategies/alpha_dca/` |
+| `alpha_momentum` | ✓ | -- | -- | -- | `strategies/alpha_momentum/` |
+| `alpha_yield` | ✓ | -- | -- | -- | `strategies/alpha_yield/` |
 
 ## `noop`
 
@@ -186,6 +189,140 @@ permafrost agent create \
     --alloc 500 \
     --tick-secs 30 \
     --config-json '{"symbol":"WIF","order_size":"10","spread_bps":25,"use_llm_veto":true}'
+permafrost agent start <id>
+```
+
+## `alpha_dca`
+
+Dollar-cost-average into a fixed set of Bittensor subnet alpha tokens. Every N ticks, buys `tao_per_buy` TAO of each listed subnet's alpha. Pure on-chain — no LLM, no third-party data.
+
+### Configuration
+
+```json
+{
+  "subnets":        [8, 3, 19],
+  "tao_per_buy":    1.0,
+  "interval_ticks": 10,
+  "slippage_bps":   100
+}
+```
+
+| Key | Default | Notes |
+|---|---|---|
+| `subnets` | `[8, 3, 19]` | Netuids to buy. SN8 = Vanta/Taoshi, SN3 = Templar, SN19 = Inference. |
+| `tao_per_buy` | `1.0` | TAO amount per subnet per buy tick. |
+| `interval_ticks` | `10` | Minimum ticks between buys. With 30s ticks → buy every 5min. |
+| `slippage_bps` | `100` | Per-swap slippage cap (1.00%). AMM slippage on alpha pools can be material. |
+
+### Run it
+
+```bash
+permafrost agent create \
+    --strategy alpha_dca \
+    --spot bittensor \
+    --tick-secs 30 \
+    --config-json '{"subnets":[8,3,19],"tao_per_buy":1.0,"interval_ticks":10}'
+permafrost agent start <id>
+```
+
+Requires:
+- A funded Bittensor wallet in the keystore (`permafrost wallet generate --chain bittensor`)
+- `bittensor.allow_submit: true` in `config.yaml` to enable real on-chain trading
+
+## `alpha_momentum`
+
+Tracks rolling price changes across all subnets in `universe`, rotates into the top-K by momentum, exits when momentum flips below `exit_threshold`. Pure price-action — no external signals.
+
+### Configuration
+
+```json
+{
+  "universe":         [1, 3, 8, 19, 64],
+  "window_ticks":     30,
+  "top_k":            5,
+  "exit_threshold":   -0.02,
+  "tao_per_position": 5.0,
+  "slippage_bps":     100
+}
+```
+
+| Key | Default | Notes |
+|---|---|---|
+| `universe` | `[1..64]` | Netuids tracked for momentum. |
+| `window_ticks` | `30` | Rolling window length for momentum (last - first) / first. |
+| `top_k` | `5` | Maximum number of subnets held simultaneously. |
+| `exit_threshold` | `-0.02` | Momentum below which positions are exited (e.g. -2%). |
+| `tao_per_position` | `5.0` | TAO notional allocated to each new position. |
+| `slippage_bps` | `100` | Per-swap slippage cap. |
+
+### Behaviour per tick
+
+```
+tick → ingest current price for every universe symbol
+       compute momentum = (last - first) / first over window_ticks
+       sort subnets by momentum desc
+       │
+       ▼
+       held positions with momentum < exit_threshold → emit sell (alpha → TAO)
+       │
+       ▼
+       top-K subnets with momentum > 0 not yet held → emit buy (TAO → alpha)
+       │
+       ▼
+       Decision{Confidence: 0.7, Notes: "holding N subnets, M entries, K exits"}
+```
+
+Position sizing: entries use `tao_per_position` TAO; exits sell the alpha amount estimated at entry (`tao_per_position / entry_price`). When the framework surfaces actual venue alpha balances via `Services`, the strategy will pick those up automatically.
+
+### Run it
+
+```bash
+permafrost agent create \
+    --strategy alpha_momentum \
+    --spot bittensor \
+    --tick-secs 30 \
+    --config-json '{"universe":[1,3,8,19,64],"top_k":3,"tao_per_position":2.0}'
+permafrost agent start <id>
+```
+
+## `alpha_yield`
+
+Ranks subnets by **price-stability proxy** for emission yield: subnets whose alpha price is stable over the rolling window are ranked higher, the assumption being that emissions accumulate value rather than being eroded by churn. Stakes into the top-K, rebalances every `rebalance_ticks` ticks.
+
+This is a deliberately conservative stand-in for on-chain `Emission` storage reads (which require runtime-version-specific storage layout work). The strategy still aims at the same goal — yield-stable subnets — and is the cleanest fork target for a real emission-aware variant.
+
+### Configuration
+
+```json
+{
+  "universe":          [1, 3, 8, 19, 64],
+  "top_k":             3,
+  "rebalance_ticks":   50,
+  "min_yield_delta":   0.05,
+  "volatility_window": 30,
+  "tao_per_position":  10.0,
+  "slippage_bps":      100
+}
+```
+
+| Key | Default | Notes |
+|---|---|---|
+| `universe` | `[1..64]` | Subnets evaluated. |
+| `top_k` | `3` | Subnets held at any time. |
+| `rebalance_ticks` | `50` | Re-evaluation cadence. With 30s ticks → rebalance every 25min. |
+| `min_yield_delta` | `0.05` | Minimum rank-improvement to trigger a rotation (anti-churn). |
+| `volatility_window` | `30` | Lookback for stability score. |
+| `tao_per_position` | `10.0` | TAO notional per position. |
+| `slippage_bps` | `100` | Per-swap slippage cap. |
+
+### Run it
+
+```bash
+permafrost agent create \
+    --strategy alpha_yield \
+    --spot bittensor \
+    --tick-secs 30 \
+    --config-json '{"universe":[1,3,8,19,64,52],"top_k":2,"tao_per_position":5.0}'
 permafrost agent start <id>
 ```
 

@@ -14,8 +14,9 @@ A Go framework for self-custodied algorithmic trading with optional LLM augmenta
 [![Docs](https://img.shields.io/badge/docs-live-50D2C2)](https://teslashibe.github.io/permafrost/)
 [![Hyperliquid](https://img.shields.io/badge/perp-Hyperliquid-50D2C2)](https://hyperliquid.xyz/)
 [![Solana](https://img.shields.io/badge/spot-Solana-9945FF?logo=solana)](https://solana.com/)
+[![Bittensor](https://img.shields.io/badge/spot-Bittensor%20(alpha)-FF6B35)](https://bittensor.com/)
 
-📚 **[Read the docs](https://teslashibe.github.io/permafrost/)** &middot; 🐧 **[Run the demo](https://teslashibe.github.io/permafrost/getting-started/make-demo)** &middot; 🐳 **[The Cast](https://teslashibe.github.io/permafrost/brand/cast)**
+📚 **[Read the docs](https://teslashibe.github.io/permafrost/)** &middot; 🐧 **[Run the demo](https://teslashibe.github.io/permafrost/getting-started/make-demo)** &middot; 🦊 **[Bittensor alpha demo](https://teslashibe.github.io/permafrost/getting-started/bittensor)** &middot; 🐳 **[The Cast](https://teslashibe.github.io/permafrost/brand/cast)**
 
 </div>
 
@@ -27,7 +28,7 @@ Permafrost is a self-custodied, locally-runnable trading framework built around 
 
 Strategies are first-class extensions, not patches. Each one lives as its own subdirectory under `strategies/`, calls `strategy.Register` in `init()`, and is enabled by adding one blank-import line to each binary's `strategies.go`. See the [strategy authors guide](https://teslashibe.github.io/permafrost/strategies/sapi).
 
-The OSS build ships three reference strategies (`noop`, `dca_buy`, `market_maker_basic`). Real strategies -- basis trades, market makers, anything you can express as Go -- are yours to build, share, or [keep private](https://teslashibe.github.io/permafrost/strategies/private-strategies).
+The OSS build ships six reference strategies: three classics (`noop`, `dca_buy`, `market_maker_basic`) plus three Bittensor alpha-token strategies (`alpha_dca`, `alpha_momentum`, `alpha_yield`). Real strategies -- basis trades, market makers, anything you can express as Go -- are yours to build, share, or [keep private](https://teslashibe.github.io/permafrost/strategies/private-strategies).
 
 ---
 
@@ -62,6 +63,20 @@ make demo
 
 That's it. `make demo` builds the binaries, brings up Postgres + `permafrostd` in Docker, runs the [`init` wizard](https://teslashibe.github.io/permafrost/getting-started/init-and-doctor), recruits a paper-mode `noop` agent named **Pip**, and tails decisions in your terminal. Tear down with `make demo-clean`.
 
+### Bittensor alpha-trading demo
+
+```bash
+make demo-bittensor
+```
+
+Spins up the same stack PLUS a local Subtensor chain in Docker, bootstraps a tradeable subnet, and recruits **three live-mode trading agents** that execute real on-chain `add_stake_limit` extrinsics:
+
+- 🐧 **Tao** — `alpha_dca` (DCA into bootstrapped subnet)
+- 🐧 **Mo** — `alpha_momentum` (rotation across subnets by momentum)
+- 🐧 **Yumi** — `alpha_yield` (volatility-stability rebalance)
+
+Verified end-to-end: ~1,000 TAO → ~595 alpha tokens minted on-chain in a single demo run. See the [Bittensor walkthrough](https://teslashibe.github.io/permafrost/getting-started/bittensor) for full details.
+
 For the manual walk-through (one command at a time), see [local install](https://teslashibe.github.io/permafrost/getting-started/local-install).
 
 ### Trading Desk UI
@@ -82,12 +97,12 @@ The arctic-themed operator dashboard. Drag the HUDs, drag the characters, watch 
 |---|---|
 | **Framework** | Generic Strategy SAPI · Hummingbot-style `strategies/` tree · `pkg/strategy`, `pkg/types`, `pkg/inference` |
 | **Perp venues** | Hyperliquid (EIP-712 action signing, OpenOrders, idempotent place/cancel) |
-| **Spot venues** | Solana via Jupiter (Jito bundles) · EVM via 1inch v6 (Ethereum, Base, Avalanche, BSC) |
+| **Spot venues** | Solana via Jupiter (Jito bundles) · EVM via 1inch v6 (Ethereum, Base, Avalanche, BSC) · **Bittensor subnet alpha tokens via on-chain Subtensor RPC (sr25519 signing, `add_stake_limit` / `remove_stake_limit`)** |
 | **Custody** | Self-custodied keystore; private key bytes never leave `internal/wallet` |
 | **Risk** | Pre-trade limits, circuit breakers (drawdown, daily loss, funding flip) |
 | **Killswitch** | Real: cancels open orders, flattens shorts, opt-in spot liquidation to USDC via SwapVenue |
 | **AI** | OpenAI-compatible LLM-veto (OpenAI, OpenRouter, Groq, vLLM, Ollama) · decision provenance to the prompt |
-| **Strategies** | `noop`, `dca_buy`, `market_maker_basic` · `permafrost strategy-new` scaffolds your own |
+| **Strategies** | `noop`, `dca_buy`, `market_maker_basic`, `alpha_dca`, `alpha_momentum`, `alpha_yield` · `permafrost strategy-new` scaffolds your own |
 | **Tooling** | `permafrost init`, `doctor`, `agent`, `vault`, `wallet`, `serve`, `backtest` |
 | **Distribution** | Multi-arch Docker on GHCR (amd64 + arm64) · `cli` compose service · `make demo` one-shot |
 | **UI** | React + Vite arctic-themed Trading Desk with hand-authored pixel-art sprites |
@@ -120,6 +135,7 @@ flowchart LR
     AGENT -->|writes| TS[(TimescaleDB)]
     AGENT -->|orders| HL[Hyperliquid]
     AGENT -->|swaps| JUP[Jupiter / 1inch]
+    AGENT -->|stake/unstake| BT[Bittensor / Subtensor]
     INF -->|HTTPS| LLM[OpenAI-compatible LLM]
     WAL --> KS[Encrypted local keystore]
 ```
@@ -188,6 +204,7 @@ permafrost agent      create | list | status | decisions | set-mode | set-networ
 permafrost strategy   list | backtest <name>
 permafrost inference  test | list
 permafrost swap       quote
+permafrost bittensor  subnets | balance | price | bootstrap
 permafrost risk       show
 permafrost pnl        summary | positions | history
 permafrost reconcile
@@ -213,7 +230,7 @@ Full reference: [`/reference/cli`](https://teslashibe.github.io/permafrost/refer
 | Config | [`viper`](https://github.com/spf13/viper) |
 | Logging | [`log/slog`](https://pkg.go.dev/log/slog) |
 | Perp | [Hyperliquid](https://hyperliquid.xyz/) |
-| Spot | [Jupiter](https://jup.ag/) (Solana) · [1inch v6](https://1inch.io/) (EVM) |
+| Spot | [Jupiter](https://jup.ag/) (Solana) · [1inch v6](https://1inch.io/) (EVM) · [Subtensor](https://github.com/opentensor/subtensor) (Bittensor alpha tokens) |
 | MEV | [Jito](https://www.jito.wtf/) bundles |
 | Inference | OpenAI-compatible (OpenAI, OpenRouter, Groq, vLLM, Ollama, …) |
 | UI | React 18 + Vite 5, no framework, hand-authored SVG sprites |

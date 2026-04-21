@@ -1,4 +1,4 @@
-.PHONY: help build test lint fmt vet tidy clean up down logs migrate sqlc tools demo demo-clean
+.PHONY: help build test lint fmt vet tidy clean up down logs migrate sqlc tools demo demo-clean demo-bittensor demo-bittensor-clean
 
 GO ?= go
 BIN_DIR := bin
@@ -63,3 +63,13 @@ demo-clean: ## Tear down the demo: stop stack + remove the demo config dir
 	@echo "==> removing .permafrost-demo/"
 	@rm -rf .permafrost-demo
 	@echo "demo cleaned. Run \`make demo\` to start fresh."
+
+demo-bittensor: ## Bittensor demo: stack + subtensor + 3 alpha agents (Tao, Mo, Yumi)
+	@./scripts/demo-bittensor.sh
+
+demo-bittensor-clean: ## Tear down the bittensor demo (incl. subtensor container)
+	@echo "==> stopping stack + subtensor"
+	@docker compose -f deploy/compose/docker-compose.yml --profile bittensor down -v 2>/dev/null || true
+	@echo "==> removing .permafrost-demo-bittensor/"
+	@rm -rf .permafrost-demo-bittensor
+	@echo "bittensor demo cleaned. Run \`make demo-bittensor\` to start fresh."

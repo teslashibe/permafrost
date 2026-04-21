@@ -17,6 +17,22 @@ That's the whole quickstart. Idempotent -- re-running attaches to the
 existing demo agent rather than duplicating it. SIGINT to stop the tail;
 the daemon keeps running until `make demo-clean`.
 
+## Bittensor flavour: `make demo-bittensor`
+
+Want to see real on-chain trades against a local Bittensor chain instead of a paper-mode noop agent? Run:
+
+```bash
+make demo-bittensor
+```
+
+This spins up everything `make demo` does PLUS a [`subtensor-localnet`](https://github.com/opentensor/subtensor) container, bootstraps a fresh tradeable subnet, and recruits **three live-mode trading agents**:
+
+- 🐧 **Tao** — `alpha_dca` (DCA into the bootstrapped subnet)
+- 🐧 **Mo** — `alpha_momentum` (rotation across subnets by momentum)
+- 🐧 **Yumi** — `alpha_yield` (volatility-stability rebalance)
+
+Within a couple of minutes, the agents have submitted real `add_stake_limit` extrinsics and the on-chain `TotalHotkeyAlpha` storage shows alpha credited to the trader's hotkey. Tear down with `make demo-bittensor-clean`. Full walkthrough: [Bittensor alpha tokens](/getting-started/bittensor).
+
 ## What `make demo` does
 
 The script (`scripts/demo.sh`) is short and readable. In order:

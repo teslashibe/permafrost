@@ -53,12 +53,52 @@ services:
       PERMAFROST_DATABASE__URL: postgres://permafrost:permafrost@timescale:5432/permafrost?sslmode=disable
       PERMAFROST_LOGGING__LEVEL: info
       PERMAFROST_LOGGING__FORMAT: json
+      # Bittensor: when the optional `subtensor` profile is up, point
+      # the daemon at the in-network service name (port 9944). The host
+      # CLI uses ws://localhost:9944 instead — the daemon can't reach
+      # localhost since it's in its own network namespace.
+      PERMAFROST_BITTENSOR__RPC_URL: ${PERMAFROST_BITTENSOR__RPC_URL:-ws://subtensor:9944}
+      PERMAFROST_BITTENSOR__ALLOW_SUBMIT: ${PERMAFROST_BITTENSOR__ALLOW_SUBMIT:-false}
+      # Keystore: mounted from the demo dir (or any host-side path).
+      # Empty PERMAFROST_KEYSTORE_PASSPHRASE → daemon runs without a
+      # signer (paper-mode-only). Set via .env file or shell export.
+      PERMAFROST_WALLET__KEYSTORE_PATH: /etc/permafrost/keystore.json
+      PERMAFROST_KEYSTORE_PASSPHRASE: ${PERMAFROST_KEYSTORE_PASSPHRASE:-}
+    volumes:
+      # Read-only mount of the operator's (or demo's) keystore. Defaults
+      # to ./.permafrost-demo-bittensor for the make-demo-bittensor flow;
+      # override via PERMAFROST_KEYSTORE_DIR for other setups.
+      - ${PERMAFROST_KEYSTORE_DIR:-./.permafrost-demo-bittensor}:/etc/permafrost:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/v1/health || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 5
     restart: unless-stopped
+
+  # Local Bittensor subtensor (Substrate-based) chain for the
+  # `make demo-bittensor` flow. Pre-funded with Alice (1M TAO) and
+  # supports register_network + start_call + add_stake_limit.
+  #
+  # Started under the `bittensor` profile so the default `make up`
+  # doesn't pull a 200MB image when not needed.
+  #
+  # Usage:
+  #   docker compose -f deploy/compose/docker-compose.yml \
+  #     --profile bittensor up -d subtensor
+  subtensor:
+    image: ghcr.io/opentensor/subtensor-localnet:devnet-ready
+    container_name: permafrost-subtensor
+    profiles: [bittensor]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9944:9944"
+      - "127.0.0.1:9945:9945"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- --post-data='{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"system_chain\",\"params\":[]}' --header='Content-Type: application/json' http://127.0.0.1:9944 | grep -q Bittensor || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   # CLI convenience service. Not started by default (profile: cli).
   # Usage:

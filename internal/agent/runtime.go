@@ -345,6 +345,28 @@ func (r *Runtime) buildDecisionInput(ctx context.Context, now time.Time) (strate
 			in.Market = snap
 		}
 	}
+
+	// Enrich with prices from any swap venue that exposes a
+	// MarketSnapshot extension (e.g. the Bittensor venue, which
+	// has no orderbook so the perp venue can't provide its prices).
+	if in.Market.Symbols == nil {
+		in.Market = types.MarketSnapshot{Time: now, Symbols: map[string]types.SymbolSnap{}}
+	}
+	for _, v := range r.deps.Swaps {
+		ms, ok := v.(interface {
+			MarketSnapshot(ctx context.Context, symbols []string) (map[string]types.SymbolSnap, error)
+		})
+		if !ok {
+			continue
+		}
+		extra, err := ms.MarketSnapshot(ctx, r.agent.Universe)
+		if err != nil {
+			continue
+		}
+		for sym, snap := range extra {
+			in.Market.Symbols[sym] = snap
+		}
+	}
 	return in, nil
 }
 

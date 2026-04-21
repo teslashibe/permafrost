@@ -22,7 +22,14 @@ import { AuroraBand, IceFloes, SnowFlurry } from './Scenery';
 // under strategies/private/, registered via *_local.go), which the
 // world treats as a maintainer/operator surface -- the mammoth lurks
 // at the back-right when one is configured.
-const PUBLIC_STRATEGIES = new Set(['noop', 'dca_buy', 'market_maker_basic']);
+const PUBLIC_STRATEGIES = new Set([
+  'noop',
+  'dca_buy',
+  'market_maker_basic',
+  'alpha_dca',
+  'alpha_momentum',
+  'alpha_yield',
+]);
 
 // Strategies known to consult an LLM via the inference Provider. Used
 // to decide whether to render the narwhal sidekick. Public OSS today:

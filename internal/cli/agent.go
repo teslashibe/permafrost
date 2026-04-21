@@ -554,15 +554,21 @@ Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 				if err != nil {
 					return fmt.Errorf("live mode requires keystore: %w", err)
 				}
-				if _, err := ks.Signer(types.ChainHyperliquid); err != nil {
-					return fmt.Errorf("live mode requires a hyperliquid signer in the keystore: %w", err)
+				// Hyperliquid signer is required for any agent that touches
+				// the perp venue. Bittensor-only agents (no perp venue)
+				// don't need it.
+				if a.PerpVenue != "" {
+					if _, err := ks.Signer(types.ChainHyperliquid); err != nil {
+						return fmt.Errorf("live mode requires a hyperliquid signer in the keystore: %w", err)
+					}
 				}
-				// Basis-style strategies (those that need a spot leg) are
-				// identified by the agent's stored SpotVenue. If set, the
-				// runtime expects a Solana signer + RPC for the spot side.
-				// This is a property of the agent's wiring, not the strategy
-				// code, so the framework no longer special-cases by name.
-				if a.SpotVenue != "" {
+				// Per-spot-venue checks: each chain needs the right signer
+				// + endpoint. Strategies declare their spot venue when the
+				// agent is created.
+				switch a.SpotVenue {
+				case "":
+					// no spot leg — nothing to validate
+				case "jupiter", "solana":
 					if _, err := ks.Signer(types.ChainSolana); err != nil {
 						return fmt.Errorf("live mode for agent %q (spot_venue=%s) requires a Solana signer: %w",
 							a.ID, a.SpotVenue, err)
@@ -570,6 +576,15 @@ Stops on SIGINT/SIGTERM or after --ticks N (whichever comes first).`,
 					if g.Config.Solana.RPCURL == "" {
 						return fmt.Errorf("live mode for agent %q (spot_venue=%s) requires solana.rpc_url in config",
 							a.ID, a.SpotVenue)
+					}
+				case "bittensor":
+					if _, err := ks.Signer(types.ChainBittensor); err != nil {
+						return fmt.Errorf("live mode for agent %q (spot_venue=bittensor) requires a Bittensor signer: %w",
+							a.ID, err)
+					}
+					if !g.Config.Bittensor.AllowSubmit {
+						return fmt.Errorf("live mode for agent %q (spot_venue=bittensor) requires bittensor.allow_submit: true in config",
+							a.ID)
 					}
 				}
 			}
@@ -824,6 +839,15 @@ func evmSpotsFromConfig(cfg config.EVMConfig, getenv func(string) string) map[ty
 		}
 	}
 	return out
+}
+
+// bittensorSpotFromConfig translates the CLI config view into the agent
+// builder's view.
+func bittensorSpotFromConfig(cfg config.BittensorConfig) agent.BittensorSpot {
+	return agent.BittensorSpot{
+		RPCURL:      cfg.ResolvedRPCURL(),
+		AllowSubmit: cfg.AllowSubmit,
+	}
 }
 
 func splitCSV(s string) []string {
