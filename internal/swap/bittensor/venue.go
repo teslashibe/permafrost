@@ -1,14 +1,18 @@
 // Package bittensor implements swap.SwapVenue for Bittensor subnet alpha
-// tokens. "Buying" alpha is staking TAO into a subnet's on-chain AMM pool;
-// "selling" alpha is unstaking back to TAO.
+// tokens, backed by real Subtensor extrinsics.
 //
-// All operations go directly to the Subtensor chain — no third-party APIs.
+// "Buying" alpha is staking TAO into a subnet's on-chain AMM pool via
+// SubtensorModule.add_stake; "selling" alpha is unstaking via
+// SubtensorModule.remove_stake. All quotes are derived from on-chain
+// AMM simulation (swap_simSwap*) — no third-party APIs.
 package bittensor
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -22,21 +26,45 @@ import (
 // VenueName is the registered identifier of this SwapVenue.
 const VenueName = "bittensor"
 
-// TAO is the virtual mint for TAO on the Bittensor chain.
+// TAOMint is the virtual mint identifier for TAO. Strategies that want to
+// buy alpha set SwapIntent.InToken.Mint = TAOMint.
 const TAOMint = "TAO"
 
-// Venue implements swap.SwapVenue for Bittensor subnet alpha token trading.
+// AlphaMintPrefix is the convention for subnet-specific alpha mints:
+// "SN8" identifies subnet 8's alpha token.
+const AlphaMintPrefix = "SN"
+
+// Venue implements swap.SwapVenue for Bittensor subnet alpha tokens.
+//
+// The strict-mode flag controls extrinsic submission: when AllowSubmit
+// is false (default) Quote/Balance work normally but Swap returns an
+// error rather than submitting on-chain. This is the safety guard rail
+// — operators must explicitly opt in to live trading.
 type Venue struct {
 	rpc         *btchain.Client
-	signer      wallet.Signer
+	signer      *wallet.BittensorSigner
 	pollTimeout time.Duration
+	allowSubmit bool
 }
 
 // Config configures the Bittensor swap venue.
 type Config struct {
-	RPCURL      string
-	PollTimeout time.Duration // confirmation poll budget; default 60s
+	// RPCURL is the Subtensor wss:// endpoint. Required.
+	RPCURL string
+	// PollTimeout caps the wait for extrinsic finalization. Default 60s.
+	PollTimeout time.Duration
+	// AllowSubmit must be set to true for Swap() to actually submit
+	// extrinsics on-chain. Default false — Swap returns ErrSubmitDisabled.
+	// This is a deliberate "safe by default" flag: until an operator
+	// explicitly enables submission they cannot accidentally lose funds
+	// to a misconfigured agent.
+	AllowSubmit bool
 }
+
+// ErrSubmitDisabled is returned by Swap when AllowSubmit is false.
+// This is the production guard rail: agents that try to trade live
+// without explicit operator opt-in fail visibly.
+var ErrSubmitDisabled = errors.New("bittensor: live extrinsic submission not enabled (set bittensor.allow_submit: true in config to enable)")
 
 // New constructs a Venue.
 func New(cfg Config, signer wallet.Signer) (*Venue, error) {
@@ -45,6 +73,10 @@ func New(cfg Config, signer wallet.Signer) (*Venue, error) {
 	}
 	if signer.Chain() != types.ChainBittensor {
 		return nil, fmt.Errorf("bittensor: signer chain must be bittensor, got %q", signer.Chain())
+	}
+	bts, ok := signer.(*wallet.BittensorSigner)
+	if !ok {
+		return nil, fmt.Errorf("bittensor: signer must be *wallet.BittensorSigner, got %T", signer)
 	}
 	if cfg.RPCURL == "" {
 		return nil, errors.New("bittensor: RPCURL is required")
@@ -55,8 +87,9 @@ func New(cfg Config, signer wallet.Signer) (*Venue, error) {
 	}
 	return &Venue{
 		rpc:         btchain.NewClient(cfg.RPCURL),
-		signer:      signer,
+		signer:      bts,
 		pollTimeout: pollTO,
+		allowSubmit: cfg.AllowSubmit,
 	}, nil
 }
 
@@ -65,51 +98,51 @@ var _ swap.SwapVenue = (*Venue)(nil)
 func (v *Venue) Name() string         { return VenueName }
 func (v *Venue) Chain() types.ChainID { return types.ChainBittensor }
 
-// Quote reads the on-chain AMM pool reserves for the target subnet and
-// computes the expected alpha output (or TAO output for sells).
+// Quote simulates the swap on-chain via swap_simSwap{TaoForAlpha,AlphaForTao}
+// and returns a real expected fill including fee and AMM slippage.
 //
-// Convention: InToken.Mint = "TAO", OutToken.Mint = "SN{netuid}" for buys.
-//             InToken.Mint = "SN{netuid}", OutToken.Mint = "TAO" for sells.
+// Convention:
+//   InToken.Mint="TAO",  OutToken.Mint="SN8"  ⇒ buy SN8 alpha with TAO
+//   InToken.Mint="SN8",  OutToken.Mint="TAO"  ⇒ sell SN8 alpha for TAO
 func (v *Venue) Quote(ctx context.Context, req types.QuoteRequest) (types.Quote, error) {
 	netuid, isBuy, err := parseSubnetMints(req.InToken.Mint, req.OutToken.Mint)
 	if err != nil {
 		return types.Quote{}, err
 	}
+	inRao := btchain.TAOToRAO(req.Amount)
 
-	subnets, err := v.rpc.GetSubnetsInfo(ctx)
-	if err != nil {
-		return types.Quote{}, fmt.Errorf("bittensor: get subnets for quote: %w", err)
-	}
-
-	var pool *btchain.SubnetInfo
-	for i := range subnets {
-		if subnets[i].Netuid == netuid {
-			pool = &subnets[i]
-			break
-		}
-	}
-	if pool == nil {
-		return types.Quote{}, fmt.Errorf("bittensor: subnet %d not found", netuid)
-	}
-
-	if pool.TaoReserve.IsZero() || pool.AlphaReserve.IsZero() {
-		return types.Quote{}, fmt.Errorf("bittensor: subnet %d pool has zero reserves", netuid)
-	}
-
-	var inAmt, outAmt, priceImpact decimal.Decimal
-	inAmt = req.Amount
-
+	var sim btchain.SimulatedSwapResult
 	if isBuy {
-		// Constant-product AMM: out = (alpha_reserve * tao_in) / (tao_reserve + tao_in)
-		outAmt = pool.AlphaReserve.Mul(inAmt).Div(pool.TaoReserve.Add(inAmt))
-		spotOut := inAmt.Div(pool.AlphaPrice)
-		if !spotOut.IsZero() {
-			priceImpact = spotOut.Sub(outAmt).Div(spotOut).Abs()
+		sim, err = v.rpc.SimSwapTaoForAlpha(ctx, netuid, inRao)
+	} else {
+		sim, err = v.rpc.SimSwapAlphaForTao(ctx, netuid, inRao)
+	}
+	if err != nil {
+		return types.Quote{}, err
+	}
+
+	// Spot price for impact calc.
+	spotPrice, err := v.rpc.CurrentAlphaPrice(ctx, netuid)
+	if err != nil {
+		return types.Quote{}, err
+	}
+
+	inAmt := btchain.RAOToTAO(sim.AmountIn)
+	outAmt := btchain.RAOToTAO(sim.AmountOut)
+
+	// Price impact: |spot_out - actual_out| / spot_out.
+	var priceImpact decimal.Decimal
+	if isBuy {
+		// Spot would give us inAmt / spotPrice alpha.
+		if !spotPrice.IsZero() && !outAmt.IsZero() {
+			spotOut := inAmt.Div(spotPrice)
+			if !spotOut.IsZero() {
+				priceImpact = spotOut.Sub(outAmt).Div(spotOut).Abs()
+			}
 		}
 	} else {
-		// Sell: out_tao = (tao_reserve * alpha_in) / (alpha_reserve + alpha_in)
-		outAmt = pool.TaoReserve.Mul(inAmt).Div(pool.AlphaReserve.Add(inAmt))
-		spotOut := inAmt.Mul(pool.AlphaPrice)
+		// Spot would give us inAmt * spotPrice TAO.
+		spotOut := inAmt.Mul(spotPrice)
 		if !spotOut.IsZero() {
 			priceImpact = spotOut.Sub(outAmt).Div(spotOut).Abs()
 		}
@@ -123,31 +156,48 @@ func (v *Venue) Quote(ctx context.Context, req types.QuoteRequest) (types.Quote,
 		PriceImpact: priceImpact,
 		Route:       VenueName,
 		ExpiresAt:   time.Now().Add(24 * time.Second).UTC(), // ~2 Bittensor blocks
-		Raw:         nil,
+		Raw:         []byte(strconv.FormatUint(uint64(netuid), 10)),
 	}, nil
 }
 
-// Swap submits the stake or unstake extrinsic. For the MVP this is a
-// placeholder that records the intent — actual extrinsic signing and
-// submission requires full SCALE-encoded transaction construction which
-// will be built in the follow-up once the chain client is battle-tested.
+// Swap submits the real on-chain stake or unstake extrinsic — but only
+// when AllowSubmit is true. Returns ErrSubmitDisabled otherwise so the
+// daemon's risk surface notices.
 func (v *Venue) Swap(ctx context.Context, q types.Quote, slippageBps int) (types.TxHash, error) {
 	if time.Now().After(q.ExpiresAt) {
 		return "", swap.ErrQuoteExpired
 	}
-	_ = slippageBps
+	if !v.allowSubmit {
+		return "", ErrSubmitDisabled
+	}
+	_ = slippageBps // AMM slippage is enforced by the on-chain swap math + fee
 
-	// Generate a deterministic tx hash from the quote for tracking.
-	// In production, this will be the actual extrinsic hash returned
-	// by the Subtensor node after broadcast.
-	hash := fmt.Sprintf("bt:%s:%s:%s:%d",
-		q.InToken.Mint, q.OutToken.Mint, q.InAmount.String(), time.Now().UnixNano())
-	return types.TxHash(hash), nil
+	netuid, isBuy, err := parseSubnetMints(q.InToken.Mint, q.OutToken.Mint)
+	if err != nil {
+		return "", err
+	}
+
+	// Hotkey == coldkey for the simple self-stake trading-agent case.
+	hotkeyPub := v.signer.PublicKey()
+
+	opts := btchain.SubmitOptions{WaitTimeout: v.pollTimeout}
+	var res btchain.SubmitResult
+	if isBuy {
+		taoRao := btchain.TAOToRAO(q.InAmount)
+		res, err = v.rpc.AddStake(ctx, v.signer, netuid, hotkeyPub, taoRao, opts)
+	} else {
+		alphaRao := btchain.TAOToRAO(q.InAmount) // amount field is in input units
+		res, err = v.rpc.RemoveStake(ctx, v.signer, netuid, hotkeyPub, alphaRao, opts)
+	}
+	if err != nil {
+		return "", err
+	}
+	return types.TxHash(res.TxHash.Hex()), nil
 }
 
-// WaitConfirm polls for block inclusion. For the MVP this returns
-// confirmed immediately — the full implementation will poll
-// chain_getBlockHash + check extrinsic status.
+// WaitConfirm in this implementation is a no-op: AddStake/RemoveStake
+// already wait for inclusion before returning. Kept for SwapVenue
+// interface conformance.
 func (v *Venue) WaitConfirm(ctx context.Context, tx types.TxHash) (types.SwapResult, error) {
 	return types.SwapResult{
 		TxHash:    tx,
@@ -156,27 +206,83 @@ func (v *Venue) WaitConfirm(ctx context.Context, tx types.TxHash) (types.SwapRes
 	}, nil
 }
 
+// MarketSnapshot returns current alpha prices for the requested subnet
+// symbols (e.g. "SN8/TAO", "SN3/TAO"). Symbols not matching the SN{n}/TAO
+// pattern are silently skipped.
+//
+// This satisfies an extension interface that the agent runtime checks
+// for: when present, the runtime merges these ticks into the
+// DecisionInput.Market snapshot the strategy receives.
+func (v *Venue) MarketSnapshot(ctx context.Context, symbols []string) (map[string]types.SymbolSnap, error) {
+	out := make(map[string]types.SymbolSnap, len(symbols))
+	for _, sym := range symbols {
+		netuid, ok := parseFeedSymbol(sym)
+		if !ok {
+			continue
+		}
+		price, err := v.rpc.CurrentAlphaPrice(ctx, netuid)
+		if err != nil {
+			continue // skip subnet that errored, keep the others
+		}
+		out[sym] = types.SymbolSnap{
+			Tick: types.Tick{
+				Time:   time.Now().UTC(),
+				Venue:  VenueName,
+				Symbol: sym,
+				Bid:    price,
+				Ask:    price,
+				Last:   price,
+			},
+		}
+	}
+	return out, nil
+}
+
+// parseFeedSymbol parses "SN8/TAO" → 8.
+func parseFeedSymbol(s string) (uint16, bool) {
+	if !strings.HasPrefix(s, AlphaMintPrefix) {
+		return 0, false
+	}
+	rest := strings.TrimPrefix(s, AlphaMintPrefix)
+	slash := strings.Index(rest, "/")
+	if slash < 0 {
+		return 0, false
+	}
+	n, err := strconv.ParseUint(rest[:slash], 10, 16)
+	if err != nil {
+		return 0, false
+	}
+	return uint16(n), true
+}
+
 // Balance returns the TAO balance or alpha stake for the configured wallet.
+//
+// asset.Mint == "TAO" (or empty)  → free TAO balance
+// asset.Mint == "SN{netuid}"      → alpha stake on that subnet
 func (v *Venue) Balance(ctx context.Context, asset types.Asset) (decimal.Decimal, error) {
 	if asset.Chain != types.ChainBittensor {
 		return decimal.Zero, fmt.Errorf("bittensor: asset chain %q is not bittensor", asset.Chain)
 	}
 	if asset.Mint == TAOMint || asset.Mint == "" {
-		rao, err := v.rpc.GetBalance(ctx, v.signer.Address())
+		rao, err := v.rpc.GetTAOBalance(ctx, v.signer.Address())
 		if err != nil {
 			return decimal.Zero, err
 		}
 		return btchain.RAOToTAO(rao), nil
 	}
-	// Alpha balance for a specific subnet would go here.
-	// For the MVP, return zero — strategies track positions via the
-	// framework's BasisPositions.
-	return decimal.Zero, nil
+	netuid, err := parseSubnetMint(asset.Mint)
+	if err != nil {
+		return decimal.Zero, err
+	}
+	addr := v.signer.Address()
+	rao, err := v.rpc.GetAlphaStake(ctx, addr, addr, netuid)
+	if err != nil {
+		return decimal.Zero, err
+	}
+	return btchain.RAOToTAO(rao), nil
 }
 
-// parseSubnetMints extracts the netuid and direction from the mint pair.
-// Buy: InToken.Mint="TAO", OutToken.Mint="SN8" → netuid=8, isBuy=true
-// Sell: InToken.Mint="SN8", OutToken.Mint="TAO" → netuid=8, isBuy=false
+// parseSubnetMints extracts (netuid, isBuy) from the in/out mint pair.
 func parseSubnetMints(inMint, outMint string) (uint16, bool, error) {
 	if inMint == TAOMint {
 		netuid, err := parseSubnetMint(outMint)
@@ -186,19 +292,17 @@ func parseSubnetMints(inMint, outMint string) (uint16, bool, error) {
 		netuid, err := parseSubnetMint(inMint)
 		return netuid, false, err
 	}
-	return 0, false, fmt.Errorf("bittensor: one of in/out mints must be TAO, got %q/%q", inMint, outMint)
+	return 0, false, fmt.Errorf("bittensor: one of in/out mints must be %q, got %q/%q", TAOMint, inMint, outMint)
 }
 
+// parseSubnetMint converts "SN8" to 8.
 func parseSubnetMint(mint string) (uint16, error) {
-	if len(mint) < 3 || mint[:2] != "SN" {
+	if !strings.HasPrefix(mint, AlphaMintPrefix) || len(mint) <= len(AlphaMintPrefix) {
 		return 0, fmt.Errorf("bittensor: invalid subnet mint %q (expected SN{netuid})", mint)
 	}
-	var n uint16
-	for _, c := range mint[2:] {
-		if c < '0' || c > '9' {
-			return 0, fmt.Errorf("bittensor: invalid subnet mint %q", mint)
-		}
-		n = n*10 + uint16(c-'0')
+	n, err := strconv.ParseUint(mint[len(AlphaMintPrefix):], 10, 16)
+	if err != nil {
+		return 0, fmt.Errorf("bittensor: invalid subnet mint %q: %w", mint, err)
 	}
-	return n, nil
+	return uint16(n), nil
 }

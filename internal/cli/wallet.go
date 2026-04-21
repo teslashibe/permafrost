@@ -20,7 +20,7 @@ func init() { addCommandFactory(newWalletCmd) }
 func newWalletCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "wallet",
-		Short: "Manage the local encrypted keystore (Solana + Hyperliquid)",
+		Short: "Manage the local encrypted keystore (Solana + Hyperliquid + Bittensor)",
 	}
 	cmd.AddCommand(
 		newWalletShowCmd(),
@@ -90,20 +90,29 @@ func newWalletGenerateCmd() *cobra.Command {
 				}
 				ks.SetSolana(s)
 				fmt.Println("solana       " + s.Address())
-			case types.ChainHyperliquid:
-				s, err := wallet.GenerateHyperliquidKey()
-				if err != nil {
-					return err
-				}
-				ks.SetHyperliquid(s)
-				fmt.Println("hyperliquid  " + s.Address())
-			default:
-				return fmt.Errorf("unknown chain %q (use solana | hyperliquid)", chain)
+		case types.ChainHyperliquid:
+			s, err := wallet.GenerateHyperliquidKey()
+			if err != nil {
+				return err
 			}
-			return ks.Save()
+			ks.SetHyperliquid(s)
+			fmt.Println("hyperliquid  " + s.Address())
+		case types.ChainBittensor:
+			s, err := wallet.GenerateBittensorKey()
+			if err != nil {
+				return err
+			}
+			ks.SetBittensor(s)
+			fmt.Println("bittensor    " + s.Address())
+			fmt.Println("\nFund this address with TAO before trading. Send TAO from")
+			fmt.Println("an exchange (Coinbase, Kraken, MEXC) or another Bittensor wallet.")
+		default:
+			return fmt.Errorf("unknown chain %q (use solana | hyperliquid | bittensor)", chain)
+		}
+		return ks.Save()
 		},
 	}
-	cmd.Flags().StringVar(&chain, "chain", "", "chain (solana | hyperliquid)")
+	cmd.Flags().StringVar(&chain, "chain", "", "chain (solana | hyperliquid | bittensor)")
 	_ = cmd.MarkFlagRequired("chain")
 	return cmd
 }
@@ -140,20 +149,27 @@ func newWalletImportCmd() *cobra.Command {
 				}
 				ks.SetSolana(s)
 				fmt.Println("solana       " + s.Address())
-			case types.ChainHyperliquid:
-				s, err := wallet.NewHyperliquidSignerFromHex(text)
-				if err != nil {
-					return err
-				}
-				ks.SetHyperliquid(s)
-				fmt.Println("hyperliquid  " + s.Address())
-			default:
-				return fmt.Errorf("unknown chain %q (use solana | hyperliquid)", chain)
+		case types.ChainHyperliquid:
+			s, err := wallet.NewHyperliquidSignerFromHex(text)
+			if err != nil {
+				return err
 			}
-			return ks.Save()
+			ks.SetHyperliquid(s)
+			fmt.Println("hyperliquid  " + s.Address())
+		case types.ChainBittensor:
+			s, err := parseBittensorImport(text)
+			if err != nil {
+				return err
+			}
+			ks.SetBittensor(s)
+			fmt.Println("bittensor    " + s.Address())
+		default:
+			return fmt.Errorf("unknown chain %q (use solana | hyperliquid | bittensor)", chain)
+		}
+		return ks.Save()
 		},
 	}
-	cmd.Flags().StringVar(&chain, "chain", "", "chain (solana | hyperliquid)")
+	cmd.Flags().StringVar(&chain, "chain", "", "chain (solana | hyperliquid | bittensor)")
 	cmd.Flags().StringVar(&from, "from", "", "path to key file")
 	_ = cmd.MarkFlagRequired("chain")
 	_ = cmd.MarkFlagRequired("from")
@@ -295,6 +311,25 @@ func unhex(c byte) (byte, bool) {
 		return c - 'A' + 10, true
 	}
 	return 0, false
+}
+
+// parseBittensorImport accepts:
+//   - a 32-byte mini-secret seed in hex (with or without 0x prefix), or
+//   - a BIP-39 mnemonic phrase (12+ words separated by spaces).
+func parseBittensorImport(text string) (*wallet.BittensorSigner, error) {
+	if hexish(text) {
+		s := strings.TrimPrefix(strings.TrimPrefix(text, "0x"), "0X")
+		raw, err := hexDecodeStrict(s)
+		if err != nil {
+			return nil, err
+		}
+		return wallet.NewBittensorSignerFromPrivate(raw)
+	}
+	// Treat as mnemonic phrase.
+	if strings.Count(text, " ") >= 11 { // 12-word mnemonic minimum
+		return wallet.NewBittensorSignerFromPhrase(text, "")
+	}
+	return nil, errors.New("bittensor: input must be 32-byte hex seed or BIP-39 mnemonic phrase")
 }
 
 // jsonStrictUnmarshal parses JSON and surfaces unknown-field errors. Used

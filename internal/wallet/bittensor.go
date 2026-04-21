@@ -1,113 +1,135 @@
+// Package wallet — Bittensor signer.
+//
+// Uses sr25519 (Schnorrkel/Ristretto) which is Bittensor's native scheme.
+// Implemented via vedhavyas/go-subkey/v2 — the canonical Go port of
+// Substrate's subkey CLI. SS58 prefix 42 (Substrate generic / Bittensor).
+//
+// The signer satisfies both:
+//   - permafrost wallet.Signer interface (for keystore registration)
+//   - gsrpc signature.KeyringPair compatibility (for extrinsic signing)
 package wallet
 
 import (
 	"context"
-	"crypto/ed25519"
+	"crypto/rand"
 	"errors"
 	"fmt"
 
-	"github.com/mr-tron/base58"
-	"golang.org/x/crypto/blake2b"
+	"github.com/vedhavyas/go-subkey/v2"
+	subscale "github.com/vedhavyas/go-subkey/v2/sr25519"
 
 	"github.com/teslashibe/permafrost/pkg/types"
 )
 
-// SS58 network prefix for Bittensor.
-const bittensorSS58Prefix byte = 42
+// SS58 network prefix for Bittensor (Substrate generic format).
+const bittensorSS58Prefix uint16 = 42
 
-// BittensorSigner signs payloads with an ed25519 keypair for the Bittensor
-// network. Bittensor supports both sr25519 and ed25519; we use ed25519
-// because Go has native support, keeping the dependency footprint minimal.
+// BittensorSigner signs payloads with an sr25519 keypair.
 //
-// The address is SS58-encoded with network prefix 42 (Substrate generic /
-// Bittensor default).
+// Bittensor's native key scheme is sr25519 (matches polkadot.js, subkey,
+// btcli). Extrinsics signed by this signer are byte-for-byte compatible
+// with the rest of the Substrate ecosystem.
 type BittensorSigner struct {
-	priv ed25519.PrivateKey
-	addr string // SS58-encoded
+	kp   subkey.KeyPair
+	addr string
 }
 
-// NewBittensorSignerFromSeed constructs a signer from a 32-byte ed25519 seed.
+// NewBittensorSignerFromSeed constructs a signer from a 32-byte mini-secret seed.
 func NewBittensorSignerFromSeed(seed []byte) (*BittensorSigner, error) {
-	if len(seed) != ed25519.SeedSize {
+	if len(seed) != 32 {
 		return nil, fmt.Errorf("bittensor: seed must be 32 bytes, got %d", len(seed))
 	}
-	priv := ed25519.NewKeyFromSeed(seed)
-	pub := priv.Public().(ed25519.PublicKey)
-	addr, err := ss58Encode(pub, bittensorSS58Prefix)
+	scheme := subscale.Scheme{}
+	kp, err := scheme.FromSeed(seed)
 	if err != nil {
-		return nil, fmt.Errorf("bittensor: ss58 encode: %w", err)
+		return nil, fmt.Errorf("bittensor: derive keypair: %w", err)
 	}
-	return &BittensorSigner{priv: priv, addr: addr}, nil
+	return &BittensorSigner{
+		kp:   kp,
+		addr: kp.SS58Address(bittensorSS58Prefix),
+	}, nil
 }
 
-// NewBittensorSignerFromPrivate constructs a signer from a 64-byte ed25519
-// private key (seed || pubkey) or a 32-byte seed.
+// NewBittensorSignerFromPrivate constructs a signer from a stored secret.
+// Accepts the 32-byte mini-secret seed (preferred) or 64-byte expanded
+// secret-key form.
 func NewBittensorSignerFromPrivate(secret []byte) (*BittensorSigner, error) {
-	switch len(secret) {
-	case ed25519.PrivateKeySize: // 64
-		priv := ed25519.PrivateKey(append([]byte(nil), secret...))
-		pub := priv.Public().(ed25519.PublicKey)
-		addr, err := ss58Encode(pub, bittensorSS58Prefix)
-		if err != nil {
-			return nil, fmt.Errorf("bittensor: ss58 encode: %w", err)
-		}
-		return &BittensorSigner{priv: priv, addr: addr}, nil
-	case ed25519.SeedSize: // 32
-		return NewBittensorSignerFromSeed(secret)
-	default:
-		return nil, fmt.Errorf("bittensor: secret must be 32 or 64 bytes, got %d", len(secret))
+	scheme := subscale.Scheme{}
+	kp, err := scheme.FromSeed(secret)
+	if err != nil {
+		return nil, fmt.Errorf("bittensor: derive keypair: %w", err)
 	}
+	return &BittensorSigner{
+		kp:   kp,
+		addr: kp.SS58Address(bittensorSS58Prefix),
+	}, nil
 }
 
-// SecretKey returns a copy of the 64-byte ed25519 private key.
+// NewBittensorSignerFromPhrase constructs a signer from a BIP-39 mnemonic
+// phrase (the polkadot.js / btcli format). Empty password = standard.
+func NewBittensorSignerFromPhrase(phrase, password string) (*BittensorSigner, error) {
+	scheme := subscale.Scheme{}
+	kp, err := scheme.FromPhrase(phrase, password)
+	if err != nil {
+		return nil, fmt.Errorf("bittensor: from phrase: %w", err)
+	}
+	return &BittensorSigner{
+		kp:   kp,
+		addr: kp.SS58Address(bittensorSS58Prefix),
+	}, nil
+}
+
+// SecretKey returns a copy of the 32-byte seed (mini-secret).
 func (s *BittensorSigner) SecretKey() []byte {
-	out := make([]byte, len(s.priv))
-	copy(out, s.priv)
+	out := make([]byte, len(s.kp.Seed()))
+	copy(out, s.kp.Seed())
 	return out
 }
+
+// PublicKey returns a copy of the 32-byte sr25519 public key. Used by
+// gsrpc when constructing storage keys for System.Account etc.
+func (s *BittensorSigner) PublicKey() []byte {
+	pub := s.kp.Public()
+	out := make([]byte, len(pub))
+	copy(out, pub)
+	return out
+}
+
+// KeyPair returns the underlying subkey keypair for direct use with gsrpc.
+func (s *BittensorSigner) KeyPair() subkey.KeyPair { return s.kp }
 
 func (s *BittensorSigner) Address() string      { return s.addr }
 func (s *BittensorSigner) Chain() types.ChainID { return types.ChainBittensor }
 
+// Sign produces a 64-byte sr25519 signature over payload. The sr25519
+// signing scheme uses Substrate's "substrate" signing context per
+// Schnorrkel spec.
 func (s *BittensorSigner) Sign(_ context.Context, payload []byte) ([]byte, error) {
-	if s.priv == nil {
+	if s.kp == nil {
 		return nil, errors.New("bittensor: signer not initialised")
 	}
-	return ed25519.Sign(s.priv, payload), nil
+	return s.kp.Sign(payload)
 }
 
 var _ Signer = (*BittensorSigner)(nil)
 
-// ss58Encode encodes a 32-byte public key with a single-byte network prefix
-// into an SS58 address. Covers prefix range 0..63.
-func ss58Encode(pub ed25519.PublicKey, prefix byte) (string, error) {
+// GenerateBittensorKey creates a fresh sr25519 keypair from crypto/rand.
+func GenerateBittensorKey() (*BittensorSigner, error) {
+	seed := make([]byte, 32)
+	if _, err := rand.Read(seed); err != nil {
+		return nil, fmt.Errorf("bittensor: generate: %w", err)
+	}
+	return NewBittensorSignerFromSeed(seed)
+}
+
+// ─── SS58 helper kept for tests ─────────────────────────────────────────────
+
+// ss58Encode is retained as a thin wrapper over the canonical subkey
+// implementation so existing tests against well-known addresses continue
+// to validate cross-tool compatibility.
+func ss58Encode(pub []byte, prefix byte) (string, error) {
 	if len(pub) != 32 {
 		return "", fmt.Errorf("ss58: expected 32-byte pubkey, got %d", len(pub))
 	}
-	payload := make([]byte, 0, 35)
-	payload = append(payload, prefix)
-	payload = append(payload, pub...)
-	hash := ss58Checksum(payload)
-	payload = append(payload, hash[0], hash[1])
-	return base58.Encode(payload), nil
-}
-
-// ss58Checksum computes the 2-byte SS58 checksum: first two bytes of
-// blake2b-512("SS58PRE" || data).
-func ss58Checksum(data []byte) [2]byte {
-	pre := []byte("SS58PRE")
-	h, _ := blake2b.New512(nil)
-	h.Write(pre)
-	h.Write(data)
-	sum := h.Sum(nil)
-	return [2]byte{sum[0], sum[1]}
-}
-
-// GenerateBittensorKey creates a fresh ed25519 keypair for Bittensor.
-func GenerateBittensorKey() (*BittensorSigner, error) {
-	_, priv, err := ed25519.GenerateKey(nil)
-	if err != nil {
-		return nil, err
-	}
-	return NewBittensorSignerFromPrivate(priv)
+	return subkey.SS58Encode(pub, uint16(prefix)), nil
 }

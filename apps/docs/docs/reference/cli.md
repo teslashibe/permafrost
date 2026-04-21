@@ -24,6 +24,7 @@ permafrost swap        quote
 permafrost risk        show
 permafrost pnl         summary | positions | history
 permafrost reconcile   [agent-id]
+permafrost bittensor   subnets | balance | price
 permafrost db          migrate up | down | status
 permafrost serve
 permafrost version
@@ -245,6 +246,30 @@ permafrost reconcile [agent-id]
 ```
 
 Triggers a one-shot reconciliation pass for one agent (or all agents) without restarting the daemon. See [reconcile and PnL](/concepts/reconcile-and-pnl).
+
+## Bittensor
+
+```bash
+permafrost bittensor subnets [--max 128]   # list active subnets + alpha prices
+permafrost bittensor balance               # TAO balance for the configured wallet
+permafrost bittensor price --netuid 8      # current alpha price for one subnet
+```
+
+All commands talk directly to the Subtensor chain via the RPC endpoint configured under `bittensor.rpc_url` in `config.yaml`. No third-party APIs.
+
+To create a Bittensor wallet:
+
+```bash
+permafrost wallet generate --chain bittensor
+```
+
+The generated SS58 address (prefix 42) needs to be funded with TAO before agents can stake. The Bittensor swap venue is **safe by default** — extrinsic submission is gated behind `bittensor.allow_submit: true`. Until enabled, `Swap()` returns `ErrSubmitDisabled` rather than silently no-op'ing.
+
+| Config key | Default | Purpose |
+|---|---|---|
+| `bittensor.rpc_url` | `wss://entrypoint-finney.opentensor.ai:443` | Subtensor WSS endpoint. Override for self-hosted or paid providers (Dwellir, etc.). |
+| `bittensor.network` | `finney` | Network preset (`finney` / `test` / `local`). Used when `rpc_url` is empty. |
+| `bittensor.allow_submit` | `false` | Set true to enable real on-chain extrinsic submission. |
 
 ## DB
 

@@ -1,9 +1,16 @@
 // Package alpha_momentum implements a momentum-rotation strategy for
-// Bittensor subnet alpha tokens. Tracks rolling price changes across
-// subnets, rotates into the top-K by momentum, exits positions where
-// momentum flips negative. Pure price-action — no external signals.
+// Bittensor subnet alpha tokens.
 //
-// Fork this and adjust window/threshold to match your risk appetite.
+// Tracks rolling price changes across subnets in the universe, rotates
+// into the top-K by momentum, exits positions where momentum flips
+// negative. Pure on-chain price-action — no external signals.
+//
+// Position sizing notes:
+//   - Entries use a fixed TAO notional per position (TAOPerPosition).
+//   - Exits sell the alpha amount we estimate we hold, computed from
+//     the entry tao notional / entry price. This is approximate; for
+//     a perfect close-out the runtime should query the venue's actual
+//     alpha balance — wired in a follow-up via SpotBalances enrichment.
 package alpha_momentum
 
 import (
@@ -34,7 +41,6 @@ type Config struct {
 	TopK int
 
 	// ExitThreshold is the momentum value below which positions are exited.
-	// Negative values mean "exit only when momentum is clearly negative".
 	ExitThreshold float64
 
 	// TAOPerPosition is the TAO amount allocated to each subnet position.
@@ -73,10 +79,16 @@ type scored struct {
 	momentum float64
 }
 
+// position records what we hold for a subnet so we can size exits correctly.
+type position struct {
+	alphaHeld  decimal.Decimal // estimated alpha amount, in alpha units
+	entryPrice decimal.Decimal // TAO per alpha at entry
+}
+
 type Strategy struct {
 	cfg     Config
 	history map[uint16][]decimal.Decimal // netuid → price history ring buffer
-	held    map[uint16]bool              // currently-held positions
+	held    map[uint16]position          // currently-held positions
 }
 
 func New(cfg map[string]any) (strategy.Strategy, error) {
@@ -88,7 +100,7 @@ func New(cfg map[string]any) (strategy.Strategy, error) {
 	return &Strategy{
 		cfg:     c,
 		history: make(map[uint16][]decimal.Decimal),
-		held:    make(map[uint16]bool),
+		held:    make(map[uint16]position),
 	}, nil
 }
 
@@ -145,38 +157,55 @@ func (s *Strategy) Decide(_ context.Context, in strategy.DecisionInput) (strateg
 	})
 
 	var swaps []types.SwapIntent
+	exits, entries := 0, 0
 
 	// Exit positions where momentum has flipped below threshold.
-	for netuid := range s.held {
+	for netuid, pos := range s.held {
 		mom := findMomentum(scores, netuid)
-		if mom < s.cfg.ExitThreshold {
-			symbol := fmt.Sprintf("SN%d", netuid)
-			swaps = append(swaps, types.SwapIntent{
-				Chain: types.ChainBittensor,
-				InToken: types.Asset{
-					Symbol: symbol,
-					Chain:  types.ChainBittensor,
-					Mint:   symbol,
-				},
-				OutToken:    taoAsset,
-				InAmount:    s.cfg.TAOPerPosition, // approximate — real implementation reads actual position size
-				SlippageBps: s.cfg.SlippageBps,
-				BasisKey:    fmt.Sprintf("alpha_momentum:%s", symbol),
-				Tag:         "alpha_momentum_exit",
-			})
-			delete(s.held, netuid)
+		if mom >= s.cfg.ExitThreshold {
+			continue
 		}
+		if pos.alphaHeld.IsZero() {
+			delete(s.held, netuid)
+			continue
+		}
+		symbol := fmt.Sprintf("SN%d", netuid)
+		swaps = append(swaps, types.SwapIntent{
+			Chain: types.ChainBittensor,
+			InToken: types.Asset{
+				Symbol: symbol,
+				Chain:  types.ChainBittensor,
+				Mint:   symbol,
+			},
+			OutToken:    taoAsset,
+			InAmount:    pos.alphaHeld, // sized in alpha units
+			SlippageBps: s.cfg.SlippageBps,
+			BasisKey:    fmt.Sprintf("alpha_momentum:%s", symbol),
+			Tag:         "alpha_momentum_exit",
+		})
+		delete(s.held, netuid)
+		exits++
 	}
 
 	// Enter top-K subnets with positive momentum that we don't already hold.
-	entered := 0
 	for _, sc := range scores {
-		if entered >= s.cfg.TopK-len(s.held) {
+		if len(s.held) >= s.cfg.TopK {
 			break
 		}
-		if s.held[sc.netuid] || sc.momentum <= 0 {
+		if _, alreadyHeld := s.held[sc.netuid]; alreadyHeld || sc.momentum <= 0 {
 			continue
 		}
+		// Look up current price to estimate alpha-out for sizing
+		// the eventual exit.
+		entryPrice := decimal.Zero
+		if hist := s.history[sc.netuid]; len(hist) > 0 {
+			entryPrice = hist[len(hist)-1]
+		}
+		var estimatedAlpha decimal.Decimal
+		if !entryPrice.IsZero() {
+			estimatedAlpha = s.cfg.TAOPerPosition.Div(entryPrice)
+		}
+
 		symbol := fmt.Sprintf("SN%d", sc.netuid)
 		swaps = append(swaps, types.SwapIntent{
 			Chain:   types.ChainBittensor,
@@ -186,17 +215,20 @@ func (s *Strategy) Decide(_ context.Context, in strategy.DecisionInput) (strateg
 				Chain:  types.ChainBittensor,
 				Mint:   symbol,
 			},
-			InAmount:    s.cfg.TAOPerPosition,
+			InAmount:    s.cfg.TAOPerPosition, // sized in TAO for entries
 			SlippageBps: s.cfg.SlippageBps,
 			BasisKey:    fmt.Sprintf("alpha_momentum:%s", symbol),
 			Tag:         "alpha_momentum_enter",
 		})
-		s.held[sc.netuid] = true
-		entered++
+		s.held[sc.netuid] = position{
+			alphaHeld:  estimatedAlpha,
+			entryPrice: entryPrice,
+		}
+		entries++
 	}
 
-	notes := fmt.Sprintf("alpha_momentum: holding %d subnets, %d entries, %d exits this tick",
-		len(s.held), entered, len(swaps)-entered)
+	notes := fmt.Sprintf("alpha_momentum: holding %d subnets, %d entries, %d exits",
+		len(s.held), entries, exits)
 
 	return strategy.Decision{
 		Swaps:      swaps,

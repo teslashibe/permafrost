@@ -133,6 +133,14 @@ type EVMChainConfig struct {
 type BittensorConfig struct {
 	RPCURL  string `mapstructure:"rpc_url"`
 	Network string `mapstructure:"network"` // finney (default) | test | local
+
+	// AllowSubmit gates real on-chain extrinsic submission. Defaults to
+	// false. When false, agents using the Bittensor swap venue receive
+	// ErrSubmitDisabled from Swap() — quotes and balance reads still
+	// work. This is the safety guard rail: operators must explicitly
+	// opt in to live trading by setting bittensor.allow_submit: true
+	// (or PERMAFROST_BITTENSOR__ALLOW_SUBMIT=true).
+	AllowSubmit bool `mapstructure:"allow_submit"`
 }
 
 // ResolvedRPCURL returns the RPC URL to use, falling back to the network

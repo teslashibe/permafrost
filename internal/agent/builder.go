@@ -355,7 +355,8 @@ func BuildEVMSwapVenue(chain types.ChainID, cfg EVMSpot, keystore wallet.Keystor
 // BittensorSpot captures the Subtensor RPC config needed by the
 // Bittensor SwapVenue.
 type BittensorSpot struct {
-	RPCURL string
+	RPCURL      string
+	AllowSubmit bool
 }
 
 // IsEnabled reports whether the operator has provided enough config for
@@ -379,7 +380,8 @@ func BuildBittensorSwapVenue(cfg BittensorSpot, keystore wallet.Keystore) (swap.
 		return nil, ErrNoBittensorSigner
 	}
 	return btswap.New(btswap.Config{
-		RPCURL: cfg.RPCURL,
+		RPCURL:      cfg.RPCURL,
+		AllowSubmit: cfg.AllowSubmit,
 	}, signer)
 }
 

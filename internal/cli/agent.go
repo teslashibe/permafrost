@@ -830,7 +830,8 @@ func evmSpotsFromConfig(cfg config.EVMConfig, getenv func(string) string) map[ty
 // builder's view.
 func bittensorSpotFromConfig(cfg config.BittensorConfig) agent.BittensorSpot {
 	return agent.BittensorSpot{
-		RPCURL: cfg.ResolvedRPCURL(),
+		RPCURL:      cfg.ResolvedRPCURL(),
+		AllowSubmit: cfg.AllowSubmit,
 	}
 }
 
