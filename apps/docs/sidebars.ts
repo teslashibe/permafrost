@@ -23,6 +23,7 @@ const sidebars: SidebarsConfig = {
         'getting-started/configuration',
         'getting-started/prerequisites',
         'getting-started/running-noop',
+        'getting-started/bittensor',
       ],
     },
     {
