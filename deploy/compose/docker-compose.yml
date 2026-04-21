@@ -50,6 +50,11 @@ services:
     environment:
       PERMAFROST_ENV: dev
       PERMAFROST_SERVER__BIND: 0.0.0.0:8080
+      # Auth token for the HTTP API. Required when the daemon binds a
+      # non-loopback address (which it does inside Docker). Empty token
+      # → middleware returns 401 for all non-public routes. The
+      # demo-bittensor script generates and passes one through here.
+      PERMAFROST_SERVER__AUTH_TOKEN: ${PERMAFROST_SERVER__AUTH_TOKEN:-}
       PERMAFROST_DATABASE__URL: postgres://permafrost:permafrost@timescale:5432/permafrost?sslmode=disable
       PERMAFROST_LOGGING__LEVEL: info
       PERMAFROST_LOGGING__FORMAT: json

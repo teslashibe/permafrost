@@ -52,6 +52,11 @@ DEMO_DIR="$ROOT_DIR/.permafrost-demo-bittensor"
 DEMO_CONFIG="$DEMO_DIR/config.yaml"
 DEMO_KEYSTORE="$DEMO_DIR/keystore.json"
 DEMO_ENV="$DEMO_DIR/env"
+DEMO_API_TOKEN_FILE="$DEMO_DIR/api_token"
+
+# Where the UI dev server reads its bearer token from. Vite picks up
+# VITE_* keys from .env.local automatically.
+DESK_ENV_LOCAL="$ROOT_DIR/apps/desk/.env.local"
 
 COMPOSE_FILE="deploy/compose/docker-compose.yml"
 
@@ -136,6 +141,36 @@ for i in $(seq 1 30); do
 done
 
 # ─── 4. init wizard (idempotent) — point at the local subtensor ─────────
+# Generate a per-demo API bearer token if one doesn't exist. Used by
+# the daemon (PERMAFROST_SERVER__AUTH_TOKEN) and the Trading Desk UI
+# (apps/desk/.env.local → VITE_API_TOKEN). Idempotent.
+mkdir -p "$DEMO_DIR"
+if [[ ! -f "$DEMO_API_TOKEN_FILE" ]]; then
+  # 32 bytes hex = 64 chars. Plenty of entropy for a single-operator
+  # localhost service.
+  if command -v openssl >/dev/null; then
+    openssl rand -hex 32 > "$DEMO_API_TOKEN_FILE"
+  else
+    head -c 32 /dev/urandom | xxd -p -c 64 > "$DEMO_API_TOKEN_FILE"
+  fi
+  chmod 600 "$DEMO_API_TOKEN_FILE"
+fi
+DEMO_API_TOKEN=$(cat "$DEMO_API_TOKEN_FILE")
+export PERMAFROST_SERVER__AUTH_TOKEN="$DEMO_API_TOKEN"
+ok "API bearer token: $DEMO_API_TOKEN_FILE"
+
+# Write/refresh the UI's .env.local so `npm run dev` in apps/desk
+# picks up the token automatically. Only the matching demo token line
+# is rewritten — any other VITE_* keys an operator added are kept.
+{
+  if [[ -f "$DESK_ENV_LOCAL" ]]; then
+    grep -v '^VITE_API_TOKEN=' "$DESK_ENV_LOCAL" || true
+  fi
+  echo "VITE_API_TOKEN=$DEMO_API_TOKEN"
+} > "$DESK_ENV_LOCAL.tmp"
+mv "$DESK_ENV_LOCAL.tmp" "$DESK_ENV_LOCAL"
+ok "UI bearer token wired: $DESK_ENV_LOCAL"
+
 if [[ ! -f "$DEMO_CONFIG" ]]; then
   echo "  → first run: generating config + keystore passphrase…"
   permafrost init \
@@ -271,6 +306,7 @@ step "Recreating daemon container so it picks up the keystore + new agents…"
 PERMAFROST_BITTENSOR__ALLOW_SUBMIT=true \
 PERMAFROST_KEYSTORE_PASSPHRASE="$PERMAFROST_KEYSTORE_PASSPHRASE" \
 PERMAFROST_KEYSTORE_DIR="$DEMO_DIR" \
+PERMAFROST_SERVER__AUTH_TOKEN="$DEMO_API_TOKEN" \
 docker compose -f "$COMPOSE_FILE" up -d --force-recreate permafrostd > /dev/null 2>&1
 for i in $(seq 1 30); do
   if curl -sf http://127.0.0.1:8080/v1/health > /dev/null 2>&1; then break; fi

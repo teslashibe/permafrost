@@ -13,20 +13,23 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/google/uuid"
 
+	"github.com/teslashibe/permafrost/internal/agent"
 	"github.com/teslashibe/permafrost/internal/config"
 	"github.com/teslashibe/permafrost/internal/store"
 )
 
 // Server bundles the Fiber app and its dependencies.
 type Server struct {
-	app *fiber.App
-	cfg *config.Config
-	log *slog.Logger
-	db  *store.DB
+	app    *fiber.App
+	cfg    *config.Config
+	log    *slog.Logger
+	db     *store.DB
+	agents *agent.Store
 }
 
 // NewServer constructs the server. db may be nil; the health endpoint will
-// then report database state as "unconfigured".
+// then report database state as "unconfigured" and the agent endpoints
+// will return 503.
 func NewServer(cfg *config.Config, log *slog.Logger, db *store.DB) *Server {
 	app := fiber.New(fiber.Config{
 		AppName:               "permafrostd",
@@ -37,6 +40,9 @@ func NewServer(cfg *config.Config, log *slog.Logger, db *store.DB) *Server {
 	})
 
 	s := &Server{app: app, cfg: cfg, log: log, db: db}
+	if db != nil {
+		s.agents = agent.NewStore(db.Pool)
+	}
 	s.registerMiddleware()
 	s.registerRoutes()
 	return s

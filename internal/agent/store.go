@@ -97,9 +97,14 @@ FROM agents WHERE id = $1`
 	return a, nil
 }
 
-// List returns all agents (newest first).
+// List returns all agents (newest first). Includes the venue + tick
+// columns so external callers (HTTP API, Trading Desk UI) can render a
+// complete row without a per-agent Get round-trip.
 func (s *Store) List(ctx context.Context) ([]Agent, error) {
-	rows, err := s.pool.Query(ctx, `SELECT id, name, strategy, mode, network, status, allocation_usdc, created_at FROM agents ORDER BY created_at DESC`)
+	rows, err := s.pool.Query(ctx, `
+SELECT id, name, strategy, mode, network, perp_venue, spot_venue,
+       allocation_usdc, tick_secs, status, created_at, updated_at
+FROM agents ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +112,12 @@ func (s *Store) List(ctx context.Context) ([]Agent, error) {
 	out := make([]Agent, 0)
 	for rows.Next() {
 		var a Agent
-		if err := rows.Scan(&a.ID, &a.Name, &a.Strategy, (*string)(&a.Mode), (*string)(&a.Network), (*string)(&a.Status), &a.AllocationUSDC, &a.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&a.ID, &a.Name, &a.Strategy, (*string)(&a.Mode), (*string)(&a.Network),
+			&a.PerpVenue, &a.SpotVenue,
+			&a.AllocationUSDC, &a.TickSecs, (*string)(&a.Status),
+			&a.CreatedAt, &a.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
