@@ -7,6 +7,14 @@ title: Bittensor alpha tokens
 
 Permafrost supports buying, holding, and selling alpha tokens on every Bittensor subnet, entirely on-chain. No third-party APIs. Three reference strategies (`alpha_dca`, `alpha_momentum`, `alpha_yield`) are ready to fork.
 
+<div align="center">
+
+![Permafrost Trading Desk — three Bittensor alpha agents trading live](../../assets/permafrost-animation.gif)
+
+*Three alpha-trading agents (Tao, Mo, Yumi) executing real on-chain swaps against a local Subtensor devnet.*
+
+</div>
+
 This guide takes you from a fresh clone to a running agent staked into your first subnet in under 10 minutes.
 
 ## What are alpha tokens?
