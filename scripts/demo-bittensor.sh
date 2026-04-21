@@ -341,14 +341,54 @@ for i in $(seq 1 30); do
 done
 ok "daemon back up — supervisor now driving Tao, Mo, Yumi against the local subtensor"
 
+# ─── 8c. spawn a noise trader so Mo + Yumi see real volatility ───────────
+# Tao's symmetric DCA pushes all subnets up roughly the same amount, so
+# the relative ranking that Mo (momentum) and Yumi (volatility-rank)
+# trade on barely changes. This sidecar randomly buys + sells small
+# amounts on a single random subnet at a time (every 4-6s), which
+# decorrelates the per-subnet price trajectories and gives the rotation
+# strategies an actual signal.
+NOISE_LOG="$DEMO_DIR/noise-trader.log"
+NOISE_PID_FILE="$DEMO_DIR/noise-trader.pid"
+if [[ -f "$NOISE_PID_FILE" ]] && kill -0 "$(cat "$NOISE_PID_FILE")" 2>/dev/null; then
+  ok "noise trader already running (pid $(cat "$NOISE_PID_FILE"))"
+else
+  step "Spawning noise trader sidecar for AMM volatility…"
+  # Larger amounts create bigger AMM moves, which decorrelate the
+  # per-subnet price trajectories enough for momentum (Mo) to actually
+  # rotate leaders rather than picking once and holding.
+  nohup permafrost --config "$DEMO_CONFIG" bittensor noise-trader \
+    --from-uri "//Alice" \
+    --subnets "$NETUIDS_CSV" \
+    --interval-secs 4 \
+    --min-tao 0.5 \
+    --max-tao 2.5 \
+    --buy-weight 55 \
+    > "$NOISE_LOG" 2>&1 &
+  echo $! > "$NOISE_PID_FILE"
+  sleep 1
+  ok "noise trader running (pid $(cat "$NOISE_PID_FILE")), log: $NOISE_LOG"
+fi
+
 # ─── 9. tail decisions across all three ──────────────────────────────────
 step "🐧🐧🐧  Three agents on the ice — tailing decisions"
 echo "  Open the Trading Desk UI: cd apps/desk && npm run dev → http://127.0.0.1:5173"
-echo "  (SIGINT to stop the demo; the daemon + subtensor keep running.)"
+echo "  Noise-trader log:        $NOISE_LOG"
+echo "  (SIGINT to stop the demo; the daemon + subtensor + noise trader keep running.)"
 echo "  Tear down everything: \`make demo-bittensor-clean\`"
 echo
 
-trap 'echo; echo "  (demo stopped — daemon + subtensor still running; \`make demo-bittensor-clean\` to teardown)"; exit 0' INT TERM
+cleanup_on_signal() {
+  echo
+  if [[ -f "$NOISE_PID_FILE" ]] && kill -0 "$(cat "$NOISE_PID_FILE")" 2>/dev/null; then
+    kill "$(cat "$NOISE_PID_FILE")" 2>/dev/null || true
+    rm -f "$NOISE_PID_FILE"
+    echo "  (noise trader stopped)"
+  fi
+  echo "  (demo stopped — daemon + subtensor still running; \`make demo-bittensor-clean\` to teardown)"
+  exit 0
+}
+trap cleanup_on_signal INT TERM
 
 LAST_PRINT=""
 while true; do

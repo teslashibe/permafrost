@@ -156,13 +156,24 @@ func (s *Strategy) Decide(_ context.Context, in strategy.DecisionInput) (strateg
 		return scores[i].momentum > scores[j].momentum
 	})
 
+	// Build the target portfolio: top-K subnets by current momentum
+	// (positive only). This is a true rotation — we always hold the
+	// best-momentum subnets RIGHT NOW, regardless of what we held
+	// before. Exit anything no longer in the target.
+	target := make(map[uint16]bool, s.cfg.TopK)
+	for i := 0; i < s.cfg.TopK && i < len(scores); i++ {
+		if scores[i].momentum <= s.cfg.ExitThreshold {
+			break
+		}
+		target[scores[i].netuid] = true
+	}
+
 	var swaps []types.SwapIntent
 	exits, entries := 0, 0
 
-	// Exit positions where momentum has flipped below threshold.
+	// Exit any held position not in the new target.
 	for netuid, pos := range s.held {
-		mom := findMomentum(scores, netuid)
-		if mom >= s.cfg.ExitThreshold {
+		if target[netuid] {
 			continue
 		}
 		if pos.alphaHeld.IsZero() {
@@ -187,12 +198,12 @@ func (s *Strategy) Decide(_ context.Context, in strategy.DecisionInput) (strateg
 		exits++
 	}
 
-	// Enter top-K subnets with positive momentum that we don't already hold.
+	// Enter any target subnets we don't already hold.
 	for _, sc := range scores {
-		if len(s.held) >= s.cfg.TopK {
-			break
+		if !target[sc.netuid] {
+			continue
 		}
-		if _, alreadyHeld := s.held[sc.netuid]; alreadyHeld || sc.momentum <= 0 {
+		if _, alreadyHeld := s.held[sc.netuid]; alreadyHeld {
 			continue
 		}
 		// Look up current price to estimate alpha-out for sizing
