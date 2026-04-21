@@ -151,7 +151,25 @@ Run the devnet test suite:
 go test -tags=devnet -v ./internal/chain/bittensor/...
 ```
 
-The `TestDevnet_BalancesTransfer` test signs and submits a real `Balances.transfer` from Alice → Bob and verifies Bob's balance increases on-chain. This proves the full signing + signed-extension + submission pipeline works against the same Subtensor runtime that powers finney mainnet.
+### What devnet validates
+
+| What you can verify on devnet | How |
+|---|---|
+| Chain client connects + reads chain state | `permafrost doctor`, `permafrost bittensor subnets` |
+| Wallet sr25519 + SS58 produces canonical addresses | `permafrost wallet generate --chain bittensor` (cross-check with btcli/polkadot.js) |
+| Real signed extrinsics submit + finalize | `TestDevnet_BalancesTransfer` (Alice→Bob 5 TAO, balance updates on-chain) |
+| Sudo wrapping works | `TestDevnet_FullStakeFlow` step 0 |
+| Strategy logic ticks correctly | Run an agent, watch `permafrost agent decisions <id> --tail` |
+
+### What devnet does NOT validate
+
+| Limitation | Why | Workaround |
+|---|---|---|
+| `add_stake` actually credits alpha | The devnet image ships with **empty AMM pools** for each subnet — there's no liquidity to swap into. Subtensor's runtime accepts the extrinsic, charges the tx fee, and silently no-ops the stake when the pool reserves are zero. | Use mainnet (subnets have populated pools) or testnet (after getting TAO from Discord) for end-to-end alpha-credit testing. |
+| Real subnet pricing dynamics | Devnet's `swap_currentAlphaPrice` returns 1 TAO per alpha for all subnets (no price discovery). | Use mainnet for realistic prices. |
+| Emission-driven yield | Devnet doesn't run the full epoch/emission machinery by default. | Use mainnet for `alpha_yield` testing. |
+
+**Bottom line:** devnet proves the chain-client infrastructure end-to-end (signing, encoding, submission, finalization all verified by the Balances.transfer test). For end-to-end alpha-credit verification, point at finney mainnet or testnet.
 
 Tear down when done:
 
